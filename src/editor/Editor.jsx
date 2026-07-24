@@ -64,11 +64,12 @@ export default function Editor({
 }) {
   const [busy, setBusy] = useState(false)
   const [selObj, setSelObj] = useState(null)
+  const [hoverObj, setHoverObj] = useState(null)
   const [showSafe, setShowSafe] = useState(false)
   const [chooser, setChooser] = useState(null) // null | 'add' | 'change'
   const frameRef = useRef(null)
   const photoInputRef = useRef(null)
-  const dragging = useRef(false)
+  const dragRef = useRef({ i: null })
 
   const isCarousel = slides && slides.length > 0
   const canCarousel = CAROUSEL_FORMATS.includes(format.id)
@@ -90,7 +91,7 @@ export default function Editor({
     set({ photo: { src, natural, focal: content.photo?.focal || { x: 0.5, y: 0.5 } } })
   }
 
-  // arrastrar el objeto seleccionado sobre la pieza
+  // ---- interacción directa sobre la pieza (hover / seleccionar / arrastrar) ----
   const posFromEvent = (e) => {
     const r = frameRef.current.getBoundingClientRect()
     return {
@@ -98,16 +99,19 @@ export default function Editor({
       y: Math.min(1, Math.max(0, (e.clientY - r.top) / r.height)),
     }
   }
-  const onFrameDown = (e) => {
-    if (selObj == null || !objects[selObj]) return
-    dragging.current = true
-    updateObject(selObj, posFromEvent(e))
+  // caja aprox del objeto en % de la pieza (para el área de selección)
+  const refDim = Math.min(format.w, format.h)
+  const objBox = (o) => {
+    let w, h
+    if (o.kind === 'image' && o.frame) { w = refDim * (o.scale || 0.4); h = w * (o.ratio || 0.6) }
+    else { w = refDim * (o.scale || 0.3); h = w }
+    const cx = format.w * (o.x ?? 0.72), cy = format.h * (o.y ?? 0.5)
+    return { left: ((cx - w / 2) / format.w) * 100, top: ((cy - h / 2) / format.h) * 100, w: (w / format.w) * 100, h: (h / format.h) * 100, rot: o.rotation || 0 }
   }
-  const onFrameMove = (e) => {
-    if (!dragging.current) return
-    updateObject(selObj, posFromEvent(e))
-  }
-  const endDrag = () => (dragging.current = false)
+  const startDrag = (e, i) => { e.stopPropagation(); setSelObj(i); dragRef.current.i = i }
+  const onFrameMove = (e) => { if (dragRef.current.i != null) updateObject(dragRef.current.i, posFromEvent(e)) }
+  const endDrag = () => { dragRef.current.i = null }
+  const onFrameDown = (e) => { if (e.target === frameRef.current || e.target.tagName === 'svg' || e.target.tagName === 'IMAGE') setSelObj(null) }
 
   const needsPhoto = template.surface === 'photo' && !content.photo?.src
 
@@ -190,6 +194,17 @@ export default function Editor({
             onPointerLeave={endDrag}
           >
             <PiecePreview template={template} content={content} format={format} />
+            {/* áreas de selección/arrastre de objetos (hover marca, click selecciona) */}
+            {objects.map((o, i) => {
+              const bx = objBox(o)
+              return (
+                <div key={i}
+                  className={'obj-hit' + (selObj === i ? ' sel' : '') + (hoverObj === i ? ' hover' : '')}
+                  style={{ left: bx.left + '%', top: bx.top + '%', width: bx.w + '%', height: bx.h + '%', transform: `rotate(${bx.rot}deg)` }}
+                  onMouseEnter={() => setHoverObj(i)} onMouseLeave={() => setHoverObj(null)}
+                  onPointerDown={(e) => startDrag(e, i)} />
+              )
+            })}
             {showSafe && (
               <div className="safe-ov" style={{
                 top: `${format.safe.top * 100}%`, bottom: `${format.safe.bottom * 100}%`,
