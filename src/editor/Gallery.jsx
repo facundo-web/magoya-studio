@@ -20,6 +20,7 @@ function RatioBox({ w, h, on }) {
 
 const FILTERS = [
   { k: 'all', label: 'Todas', test: () => true },
+  { k: 'mine', label: 'Mías', test: (t) => t.custom },
   { k: 'photo', label: 'Con foto', test: (t) => t.surface === 'photo' },
   { k: 'solid', label: 'Sin foto (color)', test: (t) => t.surface !== 'photo' },
   { k: 'dato', label: 'Dato', test: (t) => (t.roles || []).includes('metric') },
@@ -37,14 +38,15 @@ function templateBadges(t) {
   return b
 }
 
-export default function Gallery({ galleryFormat, setGalleryFormat, onPick, projects, onOpenProject, onImport, onDeleteProject }) {
+export default function Gallery({ galleryFormat, setGalleryFormat, templates = TEMPLATES, onDeleteTemplate, onPick, projects, onOpenProject, onImport, onDeleteProject }) {
   const fileRef = useRef(null)
   const [filter, setFilter] = React.useState('all')
   const groups = formatsByNetwork()
   const fmt = galleryFormat
   const network = fmt.network
   const pickNet = (net) => setGalleryFormat(groups[net][0])
-  const shownTemplates = TEMPLATES.filter((FILTERS.find((f) => f.k === filter) || FILTERS[0]).test)
+  const byId = Object.fromEntries(templates.map((t) => [t.id, t]))
+  const shownTemplates = templates.filter((FILTERS.find((f) => f.k === filter) || FILTERS[0]).test)
 
   return (
     <div className="gallery compact">
@@ -62,7 +64,7 @@ export default function Gallery({ galleryFormat, setGalleryFormat, onPick, proje
         <div className="proj-strip">
           <span className="strip-label">Tus proyectos:</span>
           {projects.slice(0, 12).map((p) => {
-            const t = TEMPLATES_BY_ID[p.templateId]
+            const t = byId[p.templateId]
             const pf = FORMATS_BY_ID[p.formatId] || fmt
             return (
               <div key={p.id} className="proj-mini" title={p.name}>
@@ -106,9 +108,14 @@ export default function Gallery({ galleryFormat, setGalleryFormat, onPick, proje
         </div>
         <div className="tgrid">
           {shownTemplates.map((t) => (
-            <button key={t.id} className="tcard" onClick={() => onPick(t, fmt)}>
+            <div key={t.id} className="tcard" role="button" tabIndex={0} onClick={() => onPick(t, fmt)}
+              onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onPick(t, fmt)}>
               <div className="thumb fixed">
                 <span className={'fmt-tag ' + (t.surface === 'photo' ? 'img' : 'txt')}>{t.surface === 'photo' ? 'IMAGEN' : 'TEXTO'}</span>
+                {t.custom && <span className="mine-tag">Mía</span>}
+                {t.custom && onDeleteTemplate && (
+                  <button className="tpl-del" title="Eliminar plantilla" onClick={(e) => { e.stopPropagation(); onDeleteTemplate(t.id) }}>✕</button>
+                )}
                 <PiecePreview template={t} content={t.defaults} format={fmt} />
               </div>
               <div className="meta">
@@ -117,7 +124,7 @@ export default function Gallery({ galleryFormat, setGalleryFormat, onPick, proje
                   {templateBadges(t).map((b) => <span key={b} className="badge-var">{b}</span>)}
                 </div>
               </div>
-            </button>
+            </div>
           ))}
         </div>
       </div>

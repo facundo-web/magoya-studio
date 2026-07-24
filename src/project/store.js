@@ -76,6 +76,57 @@ export function deleteElement(id) {
   return list
 }
 
+// ============================================================
+// MIS PLANTILLAS — el usuario guarda sus propias plantillas
+// (una pieza configurada → plantilla reutilizable). Sin código.
+// ============================================================
+const TEMPLATES_KEY = 'magoya_studio_templates_v1'
+
+export function loadCustomTemplates() {
+  try {
+    return JSON.parse(localStorage.getItem(TEMPLATES_KEY) || '[]')
+  } catch {
+    return []
+  }
+}
+
+// arma una plantilla a partir de la pieza actual (base + contenido)
+export function buildTemplateFromPiece(base, content, name) {
+  const defaults = { ...(base.defaults || {}), ...(content || {}) }
+  delete defaults.photo // la foto no se hornea: cada uso sube la suya
+  return {
+    id: 'ct_' + newProjectId().slice(2),
+    name: name || (content?.title ? String(content.title).slice(0, 40) : base.name),
+    purpose: 'Tu plantilla guardada.',
+    category: base.category,
+    surface: base.surface,
+    anchor: base.anchor,
+    zocalo: base.zocalo || false,
+    motif: base.motif,
+    handAccent: base.handAccent || false,
+    roles: base.roles,
+    defaults,
+    custom: true,
+  }
+}
+
+export function saveCustomTemplate(tpl) {
+  const list = [tpl, ...loadCustomTemplates()]
+  try {
+    localStorage.setItem(TEMPLATES_KEY, JSON.stringify(list))
+    return true
+  } catch (e) {
+    console.warn('[templates] no se pudo guardar', e)
+    return false
+  }
+}
+
+export function deleteCustomTemplate(id) {
+  const list = loadCustomTemplates().filter((t) => t.id !== id)
+  localStorage.setItem(TEMPLATES_KEY, JSON.stringify(list))
+  return list
+}
+
 // ---- export / import archivo ----
 export function exportProjectFile(project) {
   const blob = new Blob([JSON.stringify(project, null, 2)], { type: 'application/json' })

@@ -59,6 +59,7 @@ export default function Editor({
   template, format, content, slides, activeSlide,
   onChangeContent, onChangeFormat, onSelectSlide, onAddSlide, onChangeSlideTemplate, onDeleteSlide, onToast,
   elements = [], onAddElement, onDeleteElement,
+  templates = TEMPLATES, onSaveTemplate,
 }) {
   const [busy, setBusy] = useState(false)
   const [selObj, setSelObj] = useState(null)
@@ -158,6 +159,7 @@ export default function Editor({
           <label className="safe-toggle"><input type="checkbox" checked={showSafe} onChange={(e) => setShowSafe(e.target.checked)} /> Ver zona segura</label>
           <div style={{ flex: 1 }} />
           {canCarousel && !isCarousel && <button className="btn" onClick={() => setChooser('add')}>+ Convertir en carrusel</button>}
+          {onSaveTemplate && <button className="btn" title="Guardar esta pieza como tu plantilla reutilizable" onClick={() => onSaveTemplate()}>☆ Guardar como plantilla</button>}
           <DownloadMenu template={template} content={content} format={format} slides={slides} busy={busy} setBusy={setBusy} onToast={onToast} />
         </div>
 
@@ -210,7 +212,7 @@ export default function Editor({
                 <button className="btn" onClick={() => setChooser(null)}>Cerrar</button>
               </div>
               <div className="chooser-grid">
-                {TEMPLATES.map((t) => (
+                {templates.map((t) => (
                   <button key={t.id} className="tcard" onClick={() => { chooser === 'add' ? onAddSlide(t) : onChangeSlideTemplate(t); setChooser(null) }}>
                     <div className="thumb fixed"><PiecePreview template={t} content={t.defaults} format={format} /></div>
                     <div className="meta"><div className="n">{t.name}</div><div className="purpose">{t.purpose}</div></div>

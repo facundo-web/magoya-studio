@@ -2,12 +2,13 @@ import React, { useState, useEffect } from 'react'
 import Gallery from './editor/Gallery.jsx'
 import Editor from './editor/Editor.jsx'
 import BrandKit from './editor/BrandKit.jsx'
-import { TEMPLATES_BY_ID } from './templates/index.js'
+import { TEMPLATES, TEMPLATES_BY_ID } from './templates/index.js'
 import { FORMATS_BY_ID } from './formats/registry.js'
 import {
   loadProjects, upsertProject, deleteProject, newProjectId,
   exportProjectFile, importProjectFile, toShareLink, fromShareLink,
   loadElements, addElement, deleteElement,
+  loadCustomTemplates, buildTemplateFromPiece, saveCustomTemplate, deleteCustomTemplate,
 } from './project/store.js'
 
 const DEFAULT_FORMAT = 'ig-post'
@@ -16,7 +17,11 @@ export default function App() {
   const [view, setView] = useState('gallery')
   const [projects, setProjects] = useState([])
   const [elements, setElements] = useState([])
+  const [customTemplates, setCustomTemplates] = useState([])
   const [toast, setToast] = useState(null)
+
+  const allTemplates = [...TEMPLATES, ...customTemplates]
+  const allById = Object.fromEntries(allTemplates.map((t) => [t.id, t]))
 
   // pieza(s) en edición
   const [projectId, setProjectId] = useState(null)
@@ -31,6 +36,7 @@ export default function App() {
   useEffect(() => {
     setProjects(loadProjects())
     setElements(loadElements())
+    setCustomTemplates(loadCustomTemplates())
     // ¿link compartido?
     const shared = fromShareLink()
     if (shared) openFromSerialized(shared)
@@ -67,7 +73,7 @@ export default function App() {
   // ---- abrir proyecto guardado / serializado ----
   function openFromSerialized(p) {
     const ps = (p.pieces || []).map((pp) => ({
-      template: TEMPLATES_BY_ID[pp.templateId],
+      template: allById[pp.templateId],
       content: pp.content || {},
     })).filter((x) => x.template)
     if (!ps.length) {
@@ -165,6 +171,20 @@ export default function App() {
     setElements(deleteElement(id))
     showToast('Elemento eliminado de tu biblioteca')
   }
+  function saveAsTemplate(name) {
+    if (!current) return
+    const tpl = buildTemplateFromPiece(current.template, current.content, name)
+    if (saveCustomTemplate(tpl)) {
+      setCustomTemplates(loadCustomTemplates())
+      showToast('✓ Guardada en "Mis plantillas"')
+    } else {
+      showToast('⚠ No se pudo guardar (almacenamiento lleno)')
+    }
+  }
+  function removeCustomTemplate(id) {
+    setCustomTemplates(deleteCustomTemplate(id))
+    showToast('Plantilla eliminada')
+  }
 
   return (
     <div className="app">
@@ -201,6 +221,8 @@ export default function App() {
         <Gallery
           galleryFormat={FORMATS_BY_ID[galleryFormatId] || FORMATS_BY_ID[DEFAULT_FORMAT]}
           setGalleryFormat={(f) => setGalleryFormatId(f.id)}
+          templates={allTemplates}
+          onDeleteTemplate={removeCustomTemplate}
           onPick={pickTemplate}
           projects={projects}
           onOpenProject={openFromSerialized}
@@ -221,6 +243,8 @@ export default function App() {
           onChangeSlideTemplate={changeSlideTemplate}
           onDeleteSlide={deleteSlide}
           onToast={showToast}
+          templates={allTemplates}
+          onSaveTemplate={saveAsTemplate}
           elements={elements}
           onAddElement={addCustomElement}
           onDeleteElement={removeCustomElement}
