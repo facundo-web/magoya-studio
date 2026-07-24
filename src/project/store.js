@@ -156,12 +156,16 @@ export function importProjectFile(file) {
 }
 
 // ---- share link liviano (sin fotos pesadas) ----
-export function toShareLink(project) {
+// mockup: si viene, el link abre en modo PREVIEW dentro de ese mockup.
+export function toShareLink(project, mockup) {
   const light = {
-    templateId: project.templateId,
+    id: project.id,
+    name: project.name,
     formatId: project.formatId,
-    content: stripPhotos(project.content),
-    slides: project.slides ? project.slides.map((s) => ({ ...s, content: stripPhotos(s.content) })) : undefined,
+    carousel: project.carousel,
+    pieces: (project.pieces || []).map((p) => ({ templateId: p.templateId, content: stripPhotos(p.content) })),
+    mockup: mockup || null,
+    preview: !!mockup,
   }
   const json = JSON.stringify(light)
   const b64 = btoa(unescape(encodeURIComponent(json)))

@@ -292,8 +292,46 @@ button { font: inherit; cursor: pointer; }
 .chooser-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 18px; border-bottom: 1px solid var(--paper-200,#E6E1D8); }
 .chooser-grid { overflow: auto; padding: 16px 18px; display: grid; grid-template-columns: repeat(auto-fill, minmax(180px,1fr)); gap: 14px; }
 
+/* ---------- Mockups de preview ---------- */
+.mk-modal-ov { position: fixed; inset: 0; background: rgba(13,12,12,.62); z-index: 200; display: flex; align-items: center; justify-content: center; padding: 20px; }
+.mk-modal { background: var(--paper-100,#F1EDE7); border-radius: 16px; width: min(760px, 96vw); max-height: 92vh; display: flex; flex-direction: column; box-shadow: 0 30px 80px rgba(0,0,0,.4); }
+.mk-modal-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--paper-200,#E6E1D8); flex-wrap: wrap; }
+.mk-tabs { display: inline-flex; gap: 6px; }
+.mk-tabs button { border: 1px solid var(--paper-200,#E6E1D8); background: #fff; border-radius: 999px; padding: 6px 12px; font-size: 12px; font-weight: 600; }
+.mk-tabs button.on { background: var(--ink-900); color: #fff; border-color: var(--ink-900); }
+.mk-stage { flex: 1; overflow: auto; display: flex; align-items: center; justify-content: center; padding: 24px; background: #E9E4DC; border-radius: 0 0 16px 16px; }
+.mk-piece > div { display: contents; }
+.mk-piece svg { width: 100%; height: 100%; display: block; }
+/* celular */
+.mk-phone { width: 300px; background: #0D0C0C; border-radius: 38px; padding: 10px; box-shadow: 0 20px 50px rgba(0,0,0,.35); position: relative; }
+.mk-phone-screen { position: relative; border-radius: 30px; overflow: hidden; background: #000; }
+.mk-notch { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); width: 90px; height: 22px; background: #0D0C0C; border-radius: 999px; }
+.mk-story-top { position: absolute; top: 10px; left: 10px; right: 10px; display: flex; gap: 4px; z-index: 2; }
+.mk-story-top span { flex: 1; height: 3px; background: rgba(255,255,255,.55); border-radius: 2px; }
+.mk-story-top span:first-child { background: #fff; }
+.mk-story-user { position: absolute; top: 22px; left: 12px; display: flex; align-items: center; gap: 8px; color: #fff; font-size: 12px; font-weight: 600; z-index: 2; text-shadow: 0 1px 3px rgba(0,0,0,.5); }
+.mk-av { width: 26px; height: 26px; border-radius: 999px; background: linear-gradient(135deg,#00DE68,#133825); display: inline-block; border: 2px solid #fff; }
+.mk-av.lg { width: 40px; height: 40px; }
+/* feed IG */
+.mk-feed { background: #fff; }
+.mk-ig-head { display: flex; align-items: center; gap: 8px; padding: 10px; }
+.mk-ig-name { font-size: 13px; font-weight: 700; color: #111; flex: 1; }
+.mk-dots { color: #111; }
+.mk-ig-actions { display: flex; gap: 14px; padding: 10px; font-size: 18px; color: #111; }
+.mk-ig-actions .mk-save { margin-left: auto; }
+.mk-ig-cap { padding: 0 10px 12px; font-size: 12px; color: #111; }
+/* LinkedIn */
+.mk-licard { width: 380px; background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 20px 50px rgba(0,0,0,.2); }
+.mk-li-head { display: flex; align-items: center; gap: 10px; padding: 12px 14px; }
+.mk-li-name { font-size: 14px; font-weight: 700; color: #111; }
+.mk-li-sub { font-size: 11px; color: #666; }
+.mk-li-text { padding: 0 14px 10px; font-size: 13px; color: #111; }
+.mk-li-actions { display: flex; justify-content: space-around; padding: 10px; font-size: 12px; color: #555; border-top: 1px solid #eee; }
+
 .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--ink-900); color: #fff; padding: 10px 18px; border-radius: 999px; font-size: 13px; z-index: 100; box-shadow: 0 10px 30px rgba(0,0,0,.25); }
 .center-note { padding: 40px; font-family: var(--font-mono); color: #8A9389; }
+.preview-stage { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding: 28px; background: #E9E4DC; }
+.preview-note { font-size: 12px; color: #8A9389; text-align: center; max-width: 40ch; }
 
 /* ============================================================
    RESPONSIVE — tablet y mobile

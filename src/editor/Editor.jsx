@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import PiecePreview from './PiecePreview.jsx'
 import { TEMPLATES } from '../templates/index.js'
+import MockupPreview, { MOCKUPS } from './MockupPreview.jsx'
 import { FORMATS_BY_ID, formatsByNetwork, CAROUSEL_FORMATS } from '../formats/registry.js'
 import { COLOR_SCHEMES, ACCENTS, WORDMARKS, CLIENT_LOGOS, TEXT_STYLES, GRADIENTS, HIGHLIGHTS } from '../brand/brandKit.js'
 import { ALL_OBJECTS, ICONS_BY_ID, ICON_CATEGORIES } from '../brand/iconLibrary.js'
@@ -87,6 +88,8 @@ export default function Editor({
     window.addEventListener('pointermove', move); window.addEventListener('pointerup', up)
   }
   const [chooser, setChooser] = useState(null) // null | 'add' | 'change'
+  const [mockupOpen, setMockupOpen] = useState(false)
+  const [mockup, setMockup] = useState('phone')
   const frameRef = useRef(null)
   const photoInputRef = useRef(null)
   const dragRef = useRef({ i: null })
@@ -235,6 +238,7 @@ export default function Editor({
           <label className="safe-toggle"><input type="checkbox" checked={showSafe} onChange={(e) => setShowSafe(e.target.checked)} /> Ver zona segura</label>
           <div style={{ flex: 1 }} />
           {canCarousel && !isCarousel && <button className="btn" onClick={() => setChooser('add')}>+ Convertir en carrusel</button>}
+          <button className="btn" onClick={() => setMockupOpen(true)}>👁 Ver en mockup</button>
           <MoreMenu onSaveTemplate={onSaveTemplate} onShare={onShare} onExportFile={onExportFile} />
           <DownloadMenu template={template} content={content} format={format} slides={slides} busy={busy} setBusy={setBusy} onToast={onToast} />
         </div>
@@ -323,6 +327,25 @@ export default function Editor({
           </div>
         )}
       </div>
+
+      {mockupOpen && (
+        <div className="mk-modal-ov" onClick={() => setMockupOpen(false)}>
+          <div className="mk-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="mk-modal-head">
+              <div className="mk-tabs">
+                {MOCKUPS.map((m) => (
+                  <button key={m.k} className={mockup === m.k ? 'on' : ''} onClick={() => setMockup(m.k)}>{m.label}</button>
+                ))}
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {onShare && <button className="btn" onClick={() => onShare(mockup)} title="Copiá un link para que revisen cómo queda">Copiar link de preview</button>}
+                <button className="btn" onClick={() => setMockupOpen(false)}>Cerrar</button>
+              </div>
+            </div>
+            <div className="mk-stage"><MockupPreview template={template} content={content} format={format} mockup={mockup} /></div>
+          </div>
+        </div>
+      )}
 
       <div className="col-resize" onPointerDown={(e) => startResize('right', e)} title="Arrastrá para ajustar el panel" />
 

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import Gallery from './editor/Gallery.jsx'
 import Editor from './editor/Editor.jsx'
 import BrandKit from './editor/BrandKit.jsx'
+import MockupPreview from './editor/MockupPreview.jsx'
 import { TEMPLATES, TEMPLATES_BY_ID, BLANK_TEMPLATE, placeholderContent } from './templates/index.js'
 import { FORMATS_BY_ID, CAROUSEL_FORMATS } from './formats/registry.js'
 import {
@@ -19,6 +20,7 @@ export default function App() {
   const [elements, setElements] = useState([])
   const [customTemplates, setCustomTemplates] = useState([])
   const [toast, setToast] = useState(null)
+  const [preview, setPreview] = useState(null) // pieza compartida en modo preview (mockup)
   const importRef = useRef(null)
 
   const allTemplates = [...TEMPLATES, ...customTemplates]
@@ -44,7 +46,8 @@ export default function App() {
     setCustomTemplates(loadCustomTemplates())
     // ¿link compartido?
     const shared = fromShareLink()
-    if (shared) openFromSerialized(shared)
+    if (shared?.preview) setPreview(shared)
+    else if (shared) openFromSerialized(shared)
   }, [])
 
   const showToast = (msg) => {
@@ -156,10 +159,10 @@ export default function App() {
     setDirty(false)
     showToast('✓ Proyecto guardado')
   }
-  function share() {
-    const link = toShareLink(serialize())
+  function share(mockup) {
+    const link = toShareLink(serialize(), typeof mockup === 'string' ? mockup : undefined)
     navigator.clipboard?.writeText(link)
-    showToast('✓ Link copiado (sin foto — para foto usá el archivo)')
+    showToast('✓ Link copiado' + (typeof mockup === 'string' ? ' (preview en mockup)' : '') + ' — sin foto; para foto usá Exportar proyecto')
   }
   async function importFile(file) {
     try {
@@ -197,6 +200,30 @@ export default function App() {
   function removeCustomTemplate(id) {
     setCustomTemplates(deleteCustomTemplate(id))
     showToast('Plantilla eliminada')
+  }
+
+  // ---- pantalla de PREVIEW (link compartido con mockup) ----
+  if (preview) {
+    const pc = preview.pieces?.[0]
+    const t = pc && allById[pc.templateId]
+    const pfmt = FORMATS_BY_ID[preview.formatId] || FORMATS_BY_ID[DEFAULT_FORMAT]
+    const exitPreview = () => { setPreview(null); if (location.hash) location.hash = '' }
+    return (
+      <div className="app">
+        <div className="topbar">
+          <button className="brand" onClick={exitPreview}>Magoya <b>Studio</b></button>
+          <span className="save-status">Preview compartido</span>
+          <div className="spacer" />
+          <button className="btn ghost-light" onClick={() => { const p = preview; setPreview(null); if (location.hash) location.hash = ''; openFromSerialized(p) }}>Editar esta pieza</button>
+          <button className="btn primary" onClick={exitPreview}>Crear la mía</button>
+        </div>
+        <div className="preview-stage">
+          {t ? <MockupPreview template={t} content={pc.content} format={pfmt} mockup={preview.mockup || 'phone'} /> : <div className="center-note">No se pudo cargar la pieza compartida.</div>}
+          <p className="preview-note">Así queda la pieza. La foto no viaja en el link — pedila por archivo (.magoya.json) para verla completa.</p>
+        </div>
+        {toast && <div className="toast">{toast}</div>}
+      </div>
+    )
   }
 
   return (
