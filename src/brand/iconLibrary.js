@@ -45,7 +45,7 @@ export const ICONS = Object.entries(modules).map(([path, url]) => {
   }
 })
 
-// ---- marcas gráficas (currentColor → se tiñen con el acento/negro) ----
+// ---- trazos y misceláneas (currentColor → se tiñen con el acento/negro) ----
 const MARK_NAMES = { 'flourish-arrow': 'Flecha', 'flourish-circle': 'Círculo', 'flourish-underline': 'Subrayado', 'doodle-blob': 'Mancha', 'doodle-loop': 'Bucle', 'doodle-sparkle': 'Destello' }
 export const MARKS = Object.entries(markModules)
   .map(([path, url]) => {
@@ -54,7 +54,7 @@ export const MARKS = Object.entries(markModules)
   })
   .filter(Boolean)
   .filter((x) => MARK_NAMES[x.slug])
-  .map((x) => ({ id: `marks:${x.slug}`, slug: x.slug, category: 'marks', label: MARK_NAMES[x.slug], url: x.url, color: '#0D0C0C' }))
+  .map((x) => ({ id: `marks:${x.slug}`, slug: x.slug, category: x.slug.startsWith('flourish') ? 'trazos' : 'misc', label: MARK_NAMES[x.slug], url: x.url, color: '#0D0C0C', isMark: true }))
 
 // ---- logo de Magoya como elemento colocable (se ubica libre, no auto) ----
 import { WORDMARKS } from './brandKit.js'

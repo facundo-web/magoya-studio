@@ -381,7 +381,7 @@ function ObjectsBody({ objects, setObjects, updateObject, selObj, setSelObj, onT
       setPicking(false)
       return
     }
-    const isMark = icon.category === 'marks'
+    const isMark = !!icon.isMark
     setObjects([...objects, {
       kind: 'icon', iconId: icon.id,
       style: isMark ? 'plain' : 'tile',
@@ -411,7 +411,7 @@ function ObjectsBody({ objects, setObjects, updateObject, selObj, setSelObj, onT
     <>
       {objects.map((o, i) => {
         const objIcon = o.kind === 'icon' ? ICONS_BY_ID[o.iconId] : null
-        const isMark = objIcon?.category === 'marks'
+        const isMark = !!objIcon?.isMark
         const showTint = o.kind === 'icon' && (isMark || o.style === 'plain')
         return (
         <div key={i} className={'obj-card' + (selObj === i ? ' sel' : '')}>
@@ -491,7 +491,7 @@ function ObjectsBody({ objects, setObjects, updateObject, selObj, setSelObj, onT
       })}
 
       <div style={{ display: 'flex', gap: 6, marginTop: objects.length ? 8 : 0 }}>
-        <button className="btn" onClick={() => setPicking((v) => !v)}>+ Logo</button>
+        <button className="btn" onClick={() => setPicking((v) => !v)}>+ Elemento (logos, trazos…)</button>
         <button className="btn" onClick={() => fileRef.current?.click()}>+ Subir PNG</button>
         <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => e.target.files[0] && addImage(e.target.files[0])} />
       </div>

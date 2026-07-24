@@ -37,13 +37,18 @@ export function coloredIcon(url, color) {
   if (coloredCache.has(key)) return coloredCache.get(key)
   let text = iconText.get(url)
   if (!text) return cache.get(url) || null // fallback sin recolorear
-  // inyecta fill en el <svg ...> (simple-icons: path hereda fill del svg)
-  let colored = text.replace(/<svg([^>]*)>/, (m, attrs) => {
-    const cleaned = attrs.replace(/\sfill="[^"]*"/g, '')
-    return `<svg${cleaned} fill="${color}">`
-  })
-  // marcas con currentColor (flourishes/doodles) → teñir
-  colored = colored.replace(/currentColor/g, color)
+  let colored
+  if (text.includes('currentColor')) {
+    // trazos/doodles (stroke o fill = currentColor): solo reemplazar el color,
+    // NO tocar el fill del <svg> (rompería los trazos abiertos con fill="none")
+    colored = text.replace(/currentColor/g, color)
+  } else {
+    // simple-icons monocromo: el path hereda el fill del <svg>
+    colored = text.replace(/<svg([^>]*)>/, (m, attrs) => {
+      const cleaned = attrs.replace(/\sfill="[^"]*"/g, '')
+      return `<svg${cleaned} fill="${color}">`
+    })
+  }
   const dataUrl = svgTextToDataURL(colored)
   coloredCache.set(key, dataUrl)
   return dataUrl

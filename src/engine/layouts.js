@@ -176,17 +176,22 @@ export function drawPiece(b, { template, content, format }) {
     const weight = bl.hand ? 700 : bl.st.weight
     const tracking = bl.hand ? 0 : (bl.st.tracking || 0)
 
-    // fondo del texto: CTA (pill acento) o resaltado (marcador)
+    // fondo del texto: CTA (pill acento) o resaltado (marcador).
+    // Geometría basada en la línea de base real que usa b.text (y + px*0.8).
+    const lineH = bl.px * bl.lineHeight
+    const CAP = 0.72 // altura de mayúscula aprox (Manrope)
     if (isCta || bl.hl) {
       const bgFill = isCta ? p.accent : bl.hl
-      const padX = bl.px * (isCta ? 0.6 : 0.28)
-      const lineH = bl.px * bl.lineHeight
+      const padX = bl.px * (isCta ? 0.7 : 0.24)
+      const padY = bl.px * (isCta ? 0.42 : 0.14)
       bl.lines.forEach((ln, li) => {
         const w = measure(ln, { px: bl.px, weight, tracking })
+        const baseline = cursorY + bl.px * 0.8 + li * lineH
+        const glyphTop = baseline - bl.px * CAP
+        const rh = bl.px * CAP + bl.px * 0.14 + padY * 2 // cap + descendente + aire
+        const ry0 = glyphTop - padY
         const rx0 = textAnchor === 'middle' ? textX - w / 2 - padX : textX - padX
-        const ry0 = cursorY + li * lineH + (isCta ? -bl.px * 0.12 : bl.px * 0.06)
-        const rh = isCta ? bl.px * 1.35 : bl.px * 0.98
-        b.rect({ x: rx0, y: ry0, w: w + padX * 2, h: rh, rx: isCta ? rh / 2 : bl.px * 0.1, fill: bgFill })
+        b.rect({ x: rx0, y: ry0, w: w + padX * 2, h: rh, rx: isCta ? rh / 2 : bl.px * 0.12, fill: bgFill })
       })
     }
 
@@ -196,12 +201,12 @@ export function drawPiece(b, { template, content, format }) {
       : bl.role === 'author' || bl.role === 'subtitle' || bl.role === 'metricLabel' ? mutedColor
       : textColor
     b.text({
-      x: textX, y: cursorY + (isCta ? bl.px * 0.12 : 0), lines: bl.lines, px: bl.px,
+      x: textX, y: cursorY, lines: bl.lines, px: bl.px,
       weight, fill, anchor: textAnchor,
       tracking, lineHeight: bl.lineHeight,
       fontFamily: bl.hand ? FONT_HAND_STACK : undefined,
     })
-    cursorY += bl.lines.length * bl.px * bl.lineHeight + gap + (isCta ? bl.px * 0.4 : 0)
+    cursorY += bl.lines.length * lineH + gap + (isCta ? bl.px * 0.5 : 0)
   }
 
   // ---- logo ----
@@ -238,7 +243,7 @@ function drawObjects(b, { objects, W, H, ref, accent }) {
     if (!icon) continue
     const tint = o.tint === 'accent' ? accent : (o.tint || null)
     if (o.style === 'plain') {
-      b.object({ cx, cy, size, rotation, href: coloredIcon(icon.url, tint || icon.color), tile: false, shadow: icon.category === 'marks' ? false : shadow, opacity })
+      b.object({ cx, cy, size, rotation, href: coloredIcon(icon.url, tint || icon.color), tile: false, shadow: icon.isMark ? false : shadow, opacity })
     } else {
       // tile app-icon: squircle color de marca + glifo blanco
       b.object({ cx, cy, size, rotation, href: coloredIcon(icon.url, '#FFFFFF'), tile: true, tileColor: o.tileColor || icon.color, shadow, opacity })
