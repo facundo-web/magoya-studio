@@ -56,7 +56,13 @@ export const MARKS = Object.entries(markModules)
   .filter((x) => MARK_NAMES[x.slug])
   .map((x) => ({ id: `marks:${x.slug}`, slug: x.slug, category: 'marks', label: MARK_NAMES[x.slug], url: x.url, color: '#0D0C0C' }))
 
-export const ALL_OBJECTS = [...ICONS, ...MARKS]
+// ---- logo de Magoya como elemento colocable (se ubica libre, no auto) ----
+import { WORDMARKS } from './brandKit.js'
+export const MAGOYA_OBJECTS = Object.entries(WORDMARKS).map(([k, w]) => ({
+  id: `magoya:${k}`, slug: k, category: 'magoya', label: `Magoya ${w.label}`, url: w.url, color: null, isWordmark: true,
+}))
+
+export const ALL_OBJECTS = [...ICONS, ...MARKS, ...MAGOYA_OBJECTS]
 export const ICONS_BY_ID = Object.fromEntries(ALL_OBJECTS.map((i) => [i.id, i]))
-export const ICON_CATEGORIES = { ai: 'Logos de IA', social: 'Redes sociales', marks: 'Trazos y marcas' }
+export const ICON_CATEGORIES = { ai: 'Logos de IA', social: 'Redes sociales', marks: 'Trazos y marcas', magoya: 'Logo Magoya' }
 export const ICON_URLS = ALL_OBJECTS.map((i) => i.url)

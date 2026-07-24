@@ -8,10 +8,18 @@
 // ============================================================
 
 import { safeRect } from '../formats/registry.js'
-import { COLOR_SCHEMES, DEFAULT_SCHEME, ACCENTS, TEXT_STYLES, WORDMARKS, CLIENT_LOGOS, WORDMARK_RATIO, MOTIF_ESTRATOS, GRADIENTS, FONT_HAND_STACK } from '../brand/brandKit.js'
+import { COLOR_SCHEMES, DEFAULT_SCHEME, ACCENTS, TEXT_STYLES, WORDMARKS, CLIENT_LOGOS, WORDMARK_RATIO, MOTIF_ESTRATOS, GRADIENTS, FONT_HAND_STACK, HIGHLIGHTS } from '../brand/brandKit.js'
 import { ICONS_BY_ID } from '../brand/iconLibrary.js'
 import { getAsset, coloredIcon } from './assets.js'
-import { fitText } from './textLayout.js'
+import { fitText, measure } from './textLayout.js'
+
+// texto oscuro o claro según luminancia del fondo
+function contrastOn(hex) {
+  const h = (hex || '#000').replace('#', '')
+  const r = parseInt(h.slice(0, 2), 16) / 255, g = parseInt(h.slice(2, 4), 16) / 255, b = parseInt(h.slice(4, 6), 16) / 255
+  const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b
+  return lum > 0.55 ? '#0D0C0C' : '#F6F1EB'
+}
 
 // roles de texto en orden de stack
 const STACK_ORDER = ['kicker', 'title', 'subtitle', 'body', 'metric', 'metricLabel', 'quote', 'author']
@@ -36,6 +44,7 @@ export function resolvePiece(template, content) {
     textBlocks: c.textBlocks || d.textBlocks || [],
     showLogo: c.showLogo !== undefined ? c.showLogo : d.showLogo !== false,
     logoPos: c.logoPos || d.logoPos || 'left',
+    logoScale: c.logoScale || d.logoScale || 1,
     logo: c.logo || d.logo || 'cream',
     clientLogo: c.clientLogo || d.clientLogo || 'none',
     treatment: c.treatment || d.treatment || 'bw',
@@ -99,19 +108,19 @@ export function drawPiece(b, { template, content, format }) {
   // ---- stack de texto ----
   const blocks = []
   const maxTextW = safe.w * (onPhoto ? 0.92 : 0.8)
-  const pushBlock = (role, txt) => {
+  const pushBlock = (role, txt, opts = {}) => {
     if (txt === undefined || txt === null || String(txt).trim() === '') return
     const st = TEXT_STYLES[role] || TEXT_STYLES.body
     const hand = role === 'kicker' && p.handAccent
     const startPx = ref * st.sizeRel * (hand ? 1.9 : 1)
     const value = (st.upper && !hand) ? String(txt).toUpperCase() : String(txt)
-    const maxLines = role === 'title' || role === 'quote' ? 4 : role === 'kicker' ? 1 : 3
+    const maxLines = role === 'title' || role === 'quote' ? 4 : role === 'kicker' || role === 'cta' ? 1 : 3
     const fit = fitText(value, {
       weight: hand ? 700 : st.weight, tracking: hand ? 0 : (st.tracking || 0),
       maxWidth: maxTextW, maxHeight: H * 0.5, startPx,
       lineHeight: st.lineHeight || 1.15, maxLines,
     })
-    blocks.push({ role, st, value, px: fit.px, lines: fit.lines, lineHeight: st.lineHeight || 1.15, hand })
+    blocks.push({ role, st, value, px: fit.px, lines: fit.lines, lineHeight: st.lineHeight || 1.15, hand, hl: opts.hl || null })
   }
   // roles de la plantilla (piezas clásicas)
   for (const role of STACK_ORDER) {
@@ -119,7 +128,7 @@ export function drawPiece(b, { template, content, format }) {
   }
   // bloques de texto sumados por el usuario (freeform / componentes)
   for (const tb of p.textBlocks) {
-    pushBlock(tb.style || 'title', tb.text)
+    pushBlock(tb.style || 'title', tb.text, { hl: (HIGHLIGHTS[tb.highlight] || {}).value })
   }
 
   // altura total del stack (con gaps proporcionales)
@@ -162,15 +171,37 @@ export function drawPiece(b, { template, content, format }) {
   // dibujar bloques
   for (const bl of blocks) {
     const isKicker = bl.role === 'kicker'
+    const isCta = bl.role === 'cta'
     const isAccentRole = bl.role === 'metric'
-    const fill = isKicker ? p.accent : isAccentRole ? p.accent : bl.role === 'author' || bl.role === 'subtitle' || bl.role === 'metricLabel' ? mutedColor : textColor
+    const weight = bl.hand ? 700 : bl.st.weight
+    const tracking = bl.hand ? 0 : (bl.st.tracking || 0)
+
+    // fondo del texto: CTA (pill acento) o resaltado (marcador)
+    if (isCta || bl.hl) {
+      const bgFill = isCta ? p.accent : bl.hl
+      const padX = bl.px * (isCta ? 0.6 : 0.28)
+      const lineH = bl.px * bl.lineHeight
+      bl.lines.forEach((ln, li) => {
+        const w = measure(ln, { px: bl.px, weight, tracking })
+        const rx0 = textAnchor === 'middle' ? textX - w / 2 - padX : textX - padX
+        const ry0 = cursorY + li * lineH + (isCta ? -bl.px * 0.12 : bl.px * 0.06)
+        const rh = isCta ? bl.px * 1.35 : bl.px * 0.98
+        b.rect({ x: rx0, y: ry0, w: w + padX * 2, h: rh, rx: isCta ? rh / 2 : bl.px * 0.1, fill: bgFill })
+      })
+    }
+
+    const fill = isCta ? contrastOn(p.accent)
+      : bl.hl ? contrastOn(bl.hl)
+      : isKicker || isAccentRole ? p.accent
+      : bl.role === 'author' || bl.role === 'subtitle' || bl.role === 'metricLabel' ? mutedColor
+      : textColor
     b.text({
-      x: textX, y: cursorY, lines: bl.lines, px: bl.px,
-      weight: bl.hand ? 700 : bl.st.weight, fill, anchor: textAnchor,
-      tracking: bl.hand ? 0 : (bl.st.tracking || 0), lineHeight: bl.lineHeight,
+      x: textX, y: cursorY + (isCta ? bl.px * 0.12 : 0), lines: bl.lines, px: bl.px,
+      weight, fill, anchor: textAnchor,
+      tracking, lineHeight: bl.lineHeight,
       fontFamily: bl.hand ? FONT_HAND_STACK : undefined,
     })
-    cursorY += bl.lines.length * bl.px * bl.lineHeight + gap
+    cursorY += bl.lines.length * bl.px * bl.lineHeight + gap + (isCta ? bl.px * 0.4 : 0)
   }
 
   // ---- logo ----
@@ -219,7 +250,7 @@ function drawLogo(b, { p, W, H, safe, ref, hAnchor, vAnchor }) {
   const wm = WORDMARKS[p.logo] || WORDMARKS.cream
   const logoUrl = getAsset(wm.url)
   if (!logoUrl) return
-  const lw = ref * 0.2
+  const lw = ref * 0.2 * (p.logoScale || 1)
   const lh = lw / WORDMARK_RATIO
   // vertical: opuesto al stack de texto; horizontal: elegido por el usuario
   const onRight = p.logoPos === 'right'

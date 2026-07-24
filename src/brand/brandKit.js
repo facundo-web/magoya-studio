@@ -187,4 +187,15 @@ export const TEXT_STYLES = {
   quote: { weight: 700, tracking: -0.015, upper: false, sizeRel: 0.066, lineHeight: 1.15 },
   metric: { weight: 800, tracking: -0.03, upper: false, sizeRel: 0.2, lineHeight: 0.98 },
   metricLabel: { weight: 600, tracking: 0.02, upper: false, sizeRel: 0.032, lineHeight: 1.2 },
+  cta: { weight: 800, tracking: 0, upper: false, sizeRel: 0.04, lineHeight: 1.1 },
+}
+
+// colores de resaltado (marcador detrás del texto, estilo "YouTube")
+export const HIGHLIGHTS = {
+  none: { label: 'Sin resaltado', value: null },
+  yellow: { label: 'Amarillo', value: PALETTE.yellow400 },
+  lime: { label: 'Lime', value: PALETTE.lime300 },
+  emerald: { label: 'Verde', value: PALETTE.emerald500 },
+  ink: { label: 'Negro', value: PALETTE.ink900 },
+  cream: { label: 'Crema', value: PALETTE.cream100 },
 }

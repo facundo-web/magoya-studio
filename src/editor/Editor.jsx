@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import PiecePreview from './PiecePreview.jsx'
 import { TEMPLATES } from '../templates/index.js'
 import { FORMATS_BY_ID, formatsByNetwork, CAROUSEL_FORMATS } from '../formats/registry.js'
-import { COLOR_SCHEMES, ACCENTS, WORDMARKS, CLIENT_LOGOS, TEXT_STYLES, GRADIENTS } from '../brand/brandKit.js'
+import { COLOR_SCHEMES, ACCENTS, WORDMARKS, CLIENT_LOGOS, TEXT_STYLES, GRADIENTS, HIGHLIGHTS } from '../brand/brandKit.js'
 import { ALL_OBJECTS, ICONS_BY_ID, ICON_CATEGORIES } from '../brand/iconLibrary.js'
 
 // colores para teñir logos "sin fondo" y marcas
@@ -14,7 +14,7 @@ const TINTS = [
   { k: 'blue', label: 'Azul', value: '#2E7DD1', sw: '#2E7DD1' },
   { k: 'yellow', label: 'Amarillo', value: '#F2C14E', sw: '#F2C14E' },
 ]
-import { imageSize } from '../engine/assets.js'
+import { imageSize, getAsset } from '../engine/assets.js'
 import { exportPiece, exportCarousel } from '../engine/export.js'
 
 const ROLE_LABELS = {
@@ -357,6 +357,12 @@ function ObjectsBody({ objects, setObjects, updateObject, selObj, setSelObj, onT
     setSelObj(objects.length)
   }
   const addIcon = (icon) => {
+    // el logo de Magoya se coloca como imagen (mantiene su color y proporción)
+    if (icon.category === 'magoya') {
+      placeImage(getAsset(icon.url) || icon.url)
+      setPicking(false)
+      return
+    }
     const isMark = icon.category === 'marks'
     setObjects([...objects, {
       kind: 'icon', iconId: icon.id,
@@ -552,13 +558,23 @@ function BrandBody({ content, template, set }) {
 
 function LogoPosition({ content, template, set }) {
   const pos = content.logoPos || template.defaults?.logoPos || 'left'
+  const scale = content.logoScale || template.defaults?.logoScale || 1
   return (
-    <div className="field"><label>Posición del logo</label>
-      <div className="chips">
-        <button className={'chip' + (pos === 'left' ? ' on' : '')} onClick={() => set({ logoPos: 'left' })}>Izquierda</button>
-        <button className={'chip' + (pos === 'right' ? ' on' : '')} onClick={() => set({ logoPos: 'right' })}>Derecha</button>
+    <>
+      <div className="field"><label>Posición del logo</label>
+        <div className="chips">
+          <button className={'chip' + (pos === 'left' ? ' on' : '')} onClick={() => set({ logoPos: 'left' })}>Izquierda</button>
+          <button className={'chip' + (pos === 'right' ? ' on' : '')} onClick={() => set({ logoPos: 'right' })}>Derecha</button>
+        </div>
       </div>
-    </div>
+      <div className="field"><label>Tamaño del logo</label>
+        <div className="chips">
+          {[1, 2, 3, 4].map((s) => (
+            <button key={s} className={'chip' + (scale === s ? ' on' : '')} onClick={() => set({ logoScale: s })}>{s}×</button>
+          ))}
+        </div>
+      </div>
+    </>
   )
 }
 
@@ -570,6 +586,7 @@ const TEXT_STYLE_OPTS = [
   { k: 'metric', label: 'Dato (número grande)' },
   { k: 'metricLabel', label: 'Descripción del dato' },
   { k: 'quote', label: 'Cita' },
+  { k: 'cta', label: 'Botón / CTA' },
 ]
 
 function BgBody({ content, set, inputRef, onPhotoFile }) {
@@ -625,6 +642,16 @@ function TextBlocksBody({ content, set }) {
             </span>
           </div>
           <textarea value={b.text} onChange={(e) => update(i, { text: e.target.value })} rows={2} />
+          {b.style !== 'cta' && (
+            <div style={{ marginTop: 6 }}>
+              <label style={{ fontSize: 11, color: '#4A554D' }}>Resaltado (marcador)</label>
+              <div className="chips">
+                {Object.entries(HIGHLIGHTS).map(([k, hl]) => (
+                  <button key={k} className={'chip' + ((b.highlight || 'none') === k ? ' on' : '')} onClick={() => update(i, { highlight: k })}>{hl.label}</button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       ))}
       <button className="btn" onClick={add}>+ Agregar texto</button>
