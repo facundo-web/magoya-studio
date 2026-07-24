@@ -337,8 +337,8 @@ function ObjectsBody({ objects, setObjects, updateObject, selObj, setSelObj, onT
           </div>
           {o.kind === 'icon' && (
             <div className="chips" style={{ marginBottom: 8 }}>
-              <button className={'chip' + (o.style !== 'plain' ? ' on' : '')} onClick={() => updateObject(i, { style: 'tile' })}>Tile (app-icon)</button>
-              <button className={'chip' + (o.style === 'plain' ? ' on' : '')} onClick={() => updateObject(i, { style: 'plain' })}>Plano</button>
+              <button className={'chip' + (o.style !== 'plain' ? ' on' : '')} onClick={() => updateObject(i, { style: 'tile' })}>Con fondo (app-icon)</button>
+              <button className={'chip' + (o.style === 'plain' ? ' on' : '')} onClick={() => updateObject(i, { style: 'plain' })}>Sin fondo</button>
             </div>
           )}
           <label style={{ fontSize: 11, color: '#4A554D' }}>Profundidad</label>
@@ -361,6 +361,11 @@ function ObjectsBody({ objects, setObjects, updateObject, selObj, setSelObj, onT
           <input className="range" type="range" min="0.08" max="0.7" step="0.01" value={o.scale} onChange={(e) => updateObject(i, { scale: +e.target.value })} />
           <label style={{ fontSize: 11, color: '#4A554D' }}>Rotación</label>
           <input className="range" type="range" min="-45" max="45" step="1" value={o.rotation} onChange={(e) => updateObject(i, { rotation: +e.target.value })} />
+          <label style={{ fontSize: 11, color: '#4A554D' }}>Sombra (profundidad)</label>
+          <div className="chips">
+            <button className={'chip' + (o.shadow !== false ? ' on' : '')} onClick={() => updateObject(i, { shadow: true })}>Con sombra</button>
+            <button className={'chip' + (o.shadow === false ? ' on' : '')} onClick={() => updateObject(i, { shadow: false })}>Sin sombra</button>
+          </div>
         </div>
       ))}
 

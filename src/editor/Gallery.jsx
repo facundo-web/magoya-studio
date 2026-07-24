@@ -33,12 +33,20 @@ export default function Gallery({ galleryFormat, setGalleryFormat, onPick, proje
     <div className="gallery">
       <h1>Magoya Studio</h1>
       <p className="lead">
-        Piezas para redes <b>on-brand por diseño</b>. <b>1)</b> Elegí dónde vas a publicar. <b>2)</b> Elegí una plantilla.
-        Cambiás foto, texto y logo, y descargás. La marca queda <span className="mark">bloqueada</span> — imposible que se desvíe.
+        Creá piezas para redes <b>on-brand</b> en minutos, sin diseñador. La marca queda <span className="mark">bloqueada</span> — imposible que se desvíe.
       </p>
 
-      <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-        <button className="btn" onClick={() => fileRef.current?.click()}>↑ Importar proyecto (.magoya.json)</button>
+      <div className="how">
+        <span className="how-step"><b>1</b> Elegí dónde publicar</span>
+        <span className="how-sep">→</span>
+        <span className="how-step"><b>2</b> Elegí una plantilla</span>
+        <span className="how-sep">→</span>
+        <span className="how-step"><b>3</b> Editá y descargá</span>
+      </div>
+
+      <div className="open-file">
+        ¿Te compartieron un proyecto para seguir editando?
+        <button className="linklike" onClick={() => fileRef.current?.click()}>Abrir archivo .magoya.json</button>
         <input ref={fileRef} type="file" accept=".json,application/json" style={{ display: 'none' }}
           onChange={(e) => e.target.files[0] && onImport(e.target.files[0])} />
       </div>

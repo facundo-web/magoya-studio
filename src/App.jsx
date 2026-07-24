@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import Gallery from './editor/Gallery.jsx'
 import Editor from './editor/Editor.jsx'
+import BrandKit from './editor/BrandKit.jsx'
 import { TEMPLATES_BY_ID } from './templates/index.js'
 import { FORMATS_BY_ID } from './formats/registry.js'
 import {
@@ -159,22 +160,35 @@ export default function App() {
   return (
     <div className="app">
       <div className="topbar">
-        <span className="brand">Magoya <b>Studio</b></span>
-        {view === 'editor' && (
-          <button className="btn ghost-light" onClick={() => setView('gallery')}>← Galería</button>
+        <button className="brand" onClick={() => setView('gallery')} title="Ir al inicio">Magoya <b>Studio</b></button>
+        {view !== 'editor' && (
+          <nav className="topnav">
+            <button className={view === 'gallery' ? 'on' : ''} onClick={() => setView('gallery')}>Crear pieza</button>
+            <button className={view === 'brandkit' ? 'on' : ''} onClick={() => setView('brandkit')}>Kit de marca</button>
+          </nav>
+        )}
+        {view === 'editor' && current && (
+          <nav className="crumbs" aria-label="Ubicación">
+            <button className="crumb-link" onClick={() => setView('gallery')}>Inicio</button>
+            <span className="crumb-sep">›</span>
+            <span className="crumb-cur">{current.template.name}</span>
+          </nav>
         )}
         <div className="spacer" />
         {view === 'editor' && (
           <>
-            <button className="btn ghost-light" onClick={() => exportProjectFile(serialize())}>Exportar proyecto</button>
-            <button className="btn ghost-light" onClick={share}>Compartir</button>
+            <button className="btn ghost-light" onClick={() => setView('gallery')}>‹ Volver al inicio</button>
+            <button className="btn ghost-light" onClick={() => exportProjectFile(serialize())} title="Guardá el proyecto como archivo para compartirlo o seguir después">Exportar archivo</button>
+            <button className="btn ghost-light" onClick={share}>Compartir link</button>
             <button className="btn primary" onClick={save}>Guardar</button>
           </>
         )}
         {view === 'gallery' && <span className="badge">on-brand por diseño · v0.1</span>}
       </div>
 
-      {view === 'gallery' ? (
+      {view === 'brandkit' ? (
+        <BrandKit onToast={showToast} />
+      ) : view === 'gallery' ? (
         <Gallery
           galleryFormat={FORMATS_BY_ID[galleryFormatId] || FORMATS_BY_ID[DEFAULT_FORMAT]}
           setGalleryFormat={(f) => setGalleryFormatId(f.id)}
