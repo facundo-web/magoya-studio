@@ -7,6 +7,8 @@
 
 // Vite: carga todos los SVG de la carpeta como URLs
 const modules = import.meta.glob('./assets/icons/**/*.svg', { eager: true, query: '?url', import: 'default' })
+// marcas gráficas (flechas, círculos, subrayados, doodles) — assets de marca
+const markModules = import.meta.glob('./assets/*.svg', { eager: true, query: '?url', import: 'default' })
 
 const COLORS = {
   // IA
@@ -43,6 +45,18 @@ export const ICONS = Object.entries(modules).map(([path, url]) => {
   }
 })
 
-export const ICONS_BY_ID = Object.fromEntries(ICONS.map((i) => [i.id, i]))
-export const ICON_CATEGORIES = { ai: 'Logos de IA', social: 'Redes sociales' }
-export const ICON_URLS = ICONS.map((i) => i.url)
+// ---- marcas gráficas (currentColor → se tiñen con el acento/negro) ----
+const MARK_NAMES = { 'flourish-arrow': 'Flecha', 'flourish-circle': 'Círculo', 'flourish-underline': 'Subrayado', 'doodle-blob': 'Mancha', 'doodle-loop': 'Bucle', 'doodle-sparkle': 'Destello' }
+export const MARKS = Object.entries(markModules)
+  .map(([path, url]) => {
+    const m = path.match(/\/((?:flourish|doodle)-[^/]+)\.svg$/)
+    return m ? { slug: m[1], url } : null
+  })
+  .filter(Boolean)
+  .filter((x) => MARK_NAMES[x.slug])
+  .map((x) => ({ id: `marks:${x.slug}`, slug: x.slug, category: 'marks', label: MARK_NAMES[x.slug], url: x.url, color: '#0D0C0C' }))
+
+export const ALL_OBJECTS = [...ICONS, ...MARKS]
+export const ICONS_BY_ID = Object.fromEntries(ALL_OBJECTS.map((i) => [i.id, i]))
+export const ICON_CATEGORIES = { ai: 'Logos de IA', social: 'Redes sociales', marks: 'Trazos y marcas' }
+export const ICON_URLS = ALL_OBJECTS.map((i) => i.url)

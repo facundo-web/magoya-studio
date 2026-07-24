@@ -9,8 +9,10 @@ import fotoCentrada from './foto-centrada.json'
 import bloqueColor from './bloque-color.json'
 import cita from './cita.json'
 import dato from './dato.json'
+import carruselPortada from './carrusel-portada.json'
+import techTitular from './tech-titular.json'
 
-export const TEMPLATES = [zocaloPlaca, fotoTitular, fotoCentrada, bloqueColor, cita, dato]
+export const TEMPLATES = [zocaloPlaca, fotoTitular, fotoCentrada, carruselPortada, techTitular, bloqueColor, cita, dato]
 
 export const TEMPLATES_BY_ID = Object.fromEntries(TEMPLATES.map((t) => [t.id, t]))
 

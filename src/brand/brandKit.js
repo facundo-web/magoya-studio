@@ -36,6 +36,13 @@ export const PALETTE = {
   gray600: '#666666',
   gray400: '#AAAAAA',
   white: '#FFFFFF',
+  // paleta ampliada (flexibilidad, pedida por el usuario)
+  blue900: '#0E2740',
+  blue500: '#2E7DD1',
+  blue300: '#5FA8E0',
+  sand200: '#E8DFD1',
+  sand400: '#CBB48F',
+  yellow400: '#F2C14E',
 }
 
 // ---------- ROLES DE COLOR APROBADOS ----------
@@ -76,6 +83,23 @@ export const COLOR_SCHEMES = {
     onAccent: PALETTE.ink900,
     muted: PALETTE.gray600,
   },
+  // paleta ampliada
+  blue: {
+    label: 'Azul noche',
+    surface: PALETTE.blue900,
+    onSurface: PALETTE.cream50,
+    accent: PALETTE.blue300,
+    onAccent: PALETTE.blue900,
+    muted: '#8AA6BD',
+  },
+  sand: {
+    label: 'Beige',
+    surface: PALETTE.sand200,
+    onSurface: PALETTE.ink900,
+    accent: PALETTE.green900,
+    onAccent: PALETTE.cream50,
+    muted: '#8A8172',
+  },
 }
 export const DEFAULT_SCHEME = 'deep'
 
@@ -84,6 +108,9 @@ export const ACCENTS = {
   emerald: { label: 'Verde digital', value: PALETTE.emerald500 },
   lime: { label: 'Lime marcador', value: PALETTE.lime300 },
   deep: { label: 'Verde profundo', value: PALETTE.green900 },
+  blue: { label: 'Azul', value: PALETTE.blue500 },
+  yellow: { label: 'Amarillo', value: PALETTE.yellow400 },
+  ink: { label: 'Negro', value: PALETTE.ink900 },
 }
 
 // ---------- LOGOS ----------
@@ -146,15 +173,18 @@ export const GRADIENT_KEYS = Object.keys(GRADIENTS)
 // ---------- TIPOGRAFÍA ----------
 export const FONT_FAMILY = 'Manrope'
 export const FONT_STACK = "'Manrope', system-ui, -apple-system, sans-serif"
+// Segunda fuente: handwritten para acentos en carruseles (no reels/subtítulos)
+export const FONT_HAND = 'Caveat'
+export const FONT_HAND_STACK = "'Caveat', 'Comic Sans MS', cursive"
 
 // Estilos de texto semánticos (rol → tratamiento)
 // weights disponibles: 400,500,600,700,800
 export const TEXT_STYLES = {
-  kicker: { weight: 700, tracking: 0.14, upper: true, sizeRel: 0.026, mono: false },
-  title: { weight: 800, tracking: -0.02, upper: false, sizeRel: 0.078, lineHeight: 1.05 },
+  kicker: { weight: 700, tracking: 0.14, upper: true, sizeRel: 0.028, mono: false },
+  title: { weight: 800, tracking: -0.025, upper: false, sizeRel: 0.088, lineHeight: 1.02 },
   subtitle: { weight: 500, tracking: 0, upper: false, sizeRel: 0.038, lineHeight: 1.25 },
   body: { weight: 500, tracking: 0, upper: false, sizeRel: 0.03, lineHeight: 1.4 },
-  quote: { weight: 700, tracking: -0.01, upper: false, sizeRel: 0.06, lineHeight: 1.2 },
-  metric: { weight: 800, tracking: -0.02, upper: false, sizeRel: 0.16, lineHeight: 1 },
+  quote: { weight: 700, tracking: -0.015, upper: false, sizeRel: 0.066, lineHeight: 1.15 },
+  metric: { weight: 800, tracking: -0.03, upper: false, sizeRel: 0.2, lineHeight: 0.98 },
   metricLabel: { weight: 600, tracking: 0.02, upper: false, sizeRel: 0.032, lineHeight: 1.2 },
 }

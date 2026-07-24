@@ -102,7 +102,7 @@ export function createBuilder() {
       body.push(`<rect x="0" y="0" width="${n(w)}" height="${n(h)}" fill="url(#${gid})" opacity="${opacity}"/>`)
     },
     // objeto flotante: ícono en "tile" (app-icon) o imagen, con sombra + rotación
-    object({ cx, cy, size, rotation = 0, href, tile = false, tileColor = '#000', tileRadius = 0.22, shadow = true, iconInset = 0.22 }) {
+    object({ cx, cy, size, rotation = 0, href, tile = false, tileColor = '#000', tileRadius = 0.22, shadow = true, iconInset = 0.22, opacity = 1 }) {
       if (!href) return
       const half = size / 2
       const x = cx - half
@@ -117,6 +117,7 @@ export function createBuilder() {
         filterAttr = ` filter="url(#${fId})"`
       }
       const transform = rotation ? ` transform="rotate(${n(rotation)} ${n(cx)} ${n(cy)})"` : ''
+      const op = opacity < 1 ? ` opacity="${opacity}"` : ''
       let inner = ''
       if (tile) {
         const r = size * tileRadius
@@ -127,16 +128,16 @@ export function createBuilder() {
       } else {
         inner = `<image href="${href}" x="${n(x)}" y="${n(y)}" width="${n(size)}" height="${n(size)}" preserveAspectRatio="xMidYMid meet"/>`
       }
-      body.push(`<g${transform}${filterAttr}>${inner}</g>`)
+      body.push(`<g${transform}${filterAttr}${op}>${inner}</g>`)
     },
     // texto multilínea con tracking
-    text({ x, y, lines, px, weight = 400, fill, anchor = 'start', tracking = 0, lineHeight = 1.15 }) {
+    text({ x, y, lines, px, weight = 400, fill, anchor = 'start', tracking = 0, lineHeight = 1.15, fontFamily = FONT_STACK }) {
       const ls = tracking * px
       const tspans = lines
         .map((ln, i) => `<tspan x="${n(x)}" dy="${i === 0 ? 0 : n(px * lineHeight)}">${esc(ln)}</tspan>`)
         .join('')
       body.push(
-        `<text x="${n(x)}" y="${n(y + px * 0.8)}" font-family="${FONT_STACK}" font-size="${n(px)}" font-weight="${weight}" letter-spacing="${n(ls)}" fill="${fill}" text-anchor="${anchor}" style="white-space:pre">${tspans}</text>`
+        `<text x="${n(x)}" y="${n(y + px * 0.8)}" font-family="${fontFamily}" font-size="${n(px)}" font-weight="${weight}" letter-spacing="${n(ls)}" fill="${fill}" text-anchor="${anchor}" style="white-space:pre">${tspans}</text>`
       )
     },
   }

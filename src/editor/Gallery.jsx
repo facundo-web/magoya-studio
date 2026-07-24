@@ -18,12 +18,33 @@ function RatioBox({ w, h, on }) {
   return <span className="ratio-box" style={{ ...s, background: on ? 'var(--ink-900)' : '#C9C2B6' }} />
 }
 
+const FILTERS = [
+  { k: 'all', label: 'Todas', test: () => true },
+  { k: 'photo', label: 'Con foto', test: (t) => t.surface === 'photo' },
+  { k: 'solid', label: 'Sin foto (color)', test: (t) => t.surface !== 'photo' },
+  { k: 'dato', label: 'Dato', test: (t) => (t.roles || []).includes('metric') },
+  { k: 'cita', label: 'Cita', test: (t) => (t.roles || []).includes('quote') },
+]
+
+function templateBadges(t) {
+  const b = []
+  if (t.surface === 'photo') b.push('Foto')
+  if ((t.roles || []).includes('title')) b.push('Título')
+  if ((t.roles || []).includes('metric')) b.push('Dato')
+  if ((t.roles || []).includes('quote')) b.push('Cita')
+  if ((t.roles || []).includes('subtitle')) b.push('Bajada')
+  b.push('Logo')
+  return b
+}
+
 export default function Gallery({ galleryFormat, setGalleryFormat, onPick, projects, onOpenProject, onImport, onDeleteProject }) {
   const fileRef = useRef(null)
+  const [filter, setFilter] = React.useState('all')
   const groups = formatsByNetwork()
   const fmt = galleryFormat
   const network = fmt.network
   const pickNet = (net) => setGalleryFormat(groups[net][0])
+  const shownTemplates = TEMPLATES.filter((FILTERS.find((f) => f.k === filter) || FILTERS[0]).test)
 
   return (
     <div className="gallery compact">
@@ -75,16 +96,26 @@ export default function Gallery({ galleryFormat, setGalleryFormat, onPick, proje
       </div>
 
       <div className="g-templates">
-        <div className="dest-label"><b>2</b> Elegí una plantilla <span className="dl-muted">· {GROUP_USE[fmt.group]}</span></div>
+        <div className="dest-label">
+          <b>2</b> Elegí una plantilla
+          <div className="tfilters">
+            {FILTERS.map((f) => (
+              <button key={f.k} className={'tfilter' + (filter === f.k ? ' on' : '')} onClick={() => setFilter(f.k)}>{f.label}</button>
+            ))}
+          </div>
+        </div>
         <div className="tgrid">
-          {TEMPLATES.map((t) => (
+          {shownTemplates.map((t) => (
             <button key={t.id} className="tcard" onClick={() => onPick(t, fmt)}>
               <div className="thumb fixed">
+                <span className={'fmt-tag ' + (t.surface === 'photo' ? 'img' : 'txt')}>{t.surface === 'photo' ? 'IMAGEN' : 'TEXTO'}</span>
                 <PiecePreview template={t} content={t.defaults} format={fmt} />
               </div>
               <div className="meta">
                 <div className="n">{t.name}</div>
-                <div className="purpose">{t.purpose}</div>
+                <div className="badges">
+                  {templateBadges(t).map((b) => <span key={b} className="badge-var">{b}</span>)}
+                </div>
               </div>
             </button>
           ))}

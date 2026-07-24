@@ -1,0 +1,22 @@
+{
+  "id": "carrusel-portada",
+  "name": "Carrusel · portada",
+  "purpose": "Portada de carrusel: foto fuerte + etiqueta manuscrita + titular. Ideal como slide 1.",
+  "category": "post",
+  "surface": "photo",
+  "anchor": "bottom-left",
+  "zocalo": false,
+  "handAccent": true,
+  "roles": ["kicker", "title"],
+  "defaults": {
+    "scheme": "ink",
+    "accent": "lime",
+    "logo": "cream",
+    "clientLogo": "none",
+    "hasPhoto": true,
+    "treatment": "bw",
+    "gradient": { "preset": "scrimBottom", "opacity": 1 },
+    "kicker": "guía rápida",
+    "title": "5 formas de usar IA en el campo"
+  }
+}

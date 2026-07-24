@@ -1,0 +1,20 @@
+{
+  "id": "tech-titular",
+  "name": "Tech · titular",
+  "purpose": "Fondo sólido sobrio, titular grande y contundente. Estilo tecnológico para contenido de IA.",
+  "category": "post",
+  "surface": "solid",
+  "anchor": "center-left",
+  "motif": false,
+  "roles": ["kicker", "title", "subtitle"],
+  "defaults": {
+    "scheme": "ink",
+    "accent": "emerald",
+    "logo": "cream",
+    "clientLogo": "none",
+    "hasPhoto": false,
+    "kicker": "IA APLICADA",
+    "title": "La IA no reemplaza al agrónomo. Lo potencia.",
+    "subtitle": "Cómo lo pensamos en Magoya."
+  }
+}

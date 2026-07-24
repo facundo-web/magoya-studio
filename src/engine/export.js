@@ -12,6 +12,8 @@ import w500 from '@fontsource/manrope/files/manrope-latin-500-normal.woff2'
 import w600 from '@fontsource/manrope/files/manrope-latin-600-normal.woff2'
 import w700 from '@fontsource/manrope/files/manrope-latin-700-normal.woff2'
 import w800 from '@fontsource/manrope/files/manrope-latin-800-normal.woff2'
+import cav400 from '@fontsource/caveat/files/caveat-latin-400-normal.woff2'
+import cav700 from '@fontsource/caveat/files/caveat-latin-700-normal.woff2'
 
 const WEIGHTS = [
   [400, w400],
@@ -19,6 +21,10 @@ const WEIGHTS = [
   [600, w600],
   [700, w700],
   [800, w800],
+]
+const HAND_WEIGHTS = [
+  [400, cav400],
+  [700, cav700],
 ]
 
 let _fontFaceCss = null
@@ -37,12 +43,16 @@ async function fileToBase64(url) {
 // construye (y cachea) el CSS @font-face con Manrope embebida
 export async function buildFontFaceCss() {
   if (_fontFaceCss) return _fontFaceCss
-  const parts = await Promise.all(
-    WEIGHTS.map(async ([weight, url]) => {
+  const parts = await Promise.all([
+    ...WEIGHTS.map(async ([weight, url]) => {
       const b64 = await fileToBase64(url)
       return `@font-face{font-family:'Manrope';font-style:normal;font-weight:${weight};src:url(data:font/woff2;base64,${b64}) format('woff2');}`
-    })
-  )
+    }),
+    ...HAND_WEIGHTS.map(async ([weight, url]) => {
+      const b64 = await fileToBase64(url)
+      return `@font-face{font-family:'Caveat';font-style:normal;font-weight:${weight};src:url(data:font/woff2;base64,${b64}) format('woff2');}`
+    }),
+  ])
   _fontFaceCss = parts.join('')
   return _fontFaceCss
 }

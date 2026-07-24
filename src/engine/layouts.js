@@ -8,7 +8,7 @@
 // ============================================================
 
 import { safeRect } from '../formats/registry.js'
-import { COLOR_SCHEMES, DEFAULT_SCHEME, ACCENTS, TEXT_STYLES, WORDMARKS, CLIENT_LOGOS, WORDMARK_RATIO, MOTIF_ESTRATOS, GRADIENTS } from '../brand/brandKit.js'
+import { COLOR_SCHEMES, DEFAULT_SCHEME, ACCENTS, TEXT_STYLES, WORDMARKS, CLIENT_LOGOS, WORDMARK_RATIO, MOTIF_ESTRATOS, GRADIENTS, FONT_HAND_STACK } from '../brand/brandKit.js'
 import { ICONS_BY_ID } from '../brand/iconLibrary.js'
 import { getAsset, coloredIcon } from './assets.js'
 import { fitText } from './textLayout.js'
@@ -35,6 +35,7 @@ export function resolvePiece(template, content) {
     photo: c.photo || null,
     gradient: c.gradient !== undefined ? c.gradient : d.gradient || null,
     objects: c.objects || d.objects || [],
+    handAccent: template.handAccent || false,
     text: {
       kicker: pick(c.kicker, d.kicker),
       title: pick(c.title, d.title),
@@ -96,15 +97,16 @@ export function drawPiece(b, { template, content, format }) {
     const txt = p.text[role]
     if (txt === undefined || txt === null || String(txt).trim() === '') continue
     const st = TEXT_STYLES[role] || TEXT_STYLES.body
-    const startPx = ref * st.sizeRel
-    const value = st.upper ? String(txt).toUpperCase() : String(txt)
+    const hand = role === 'kicker' && p.handAccent
+    const startPx = ref * st.sizeRel * (hand ? 1.9 : 1)
+    const value = (st.upper && !hand) ? String(txt).toUpperCase() : String(txt)
     const maxLines = role === 'title' || role === 'quote' ? 4 : role === 'kicker' ? 1 : 3
     const fit = fitText(value, {
-      weight: st.weight, tracking: st.tracking || 0,
+      weight: hand ? 700 : st.weight, tracking: hand ? 0 : (st.tracking || 0),
       maxWidth: maxTextW, maxHeight: H * 0.5, startPx,
       lineHeight: st.lineHeight || 1.15, maxLines,
     })
-    blocks.push({ role, st, value, px: fit.px, lines: fit.lines, lineHeight: st.lineHeight || 1.15 })
+    blocks.push({ role, st, value, px: fit.px, lines: fit.lines, lineHeight: st.lineHeight || 1.15, hand })
   }
 
   // altura total del stack (con gaps proporcionales)
@@ -142,7 +144,7 @@ export function drawPiece(b, { template, content, format }) {
   }
 
   // ---- objetos DETRÁS del texto (profundidad) ----
-  drawObjects(b, { objects: (p.objects || []).filter((o) => !o.front), W, H, ref })
+  drawObjects(b, { objects: (p.objects || []).filter((o) => !o.front), W, H, ref, accent: p.accent })
 
   // dibujar bloques
   for (const bl of blocks) {
@@ -151,8 +153,9 @@ export function drawPiece(b, { template, content, format }) {
     const fill = isKicker ? p.accent : isAccentRole ? p.accent : bl.role === 'author' || bl.role === 'subtitle' || bl.role === 'metricLabel' ? mutedColor : textColor
     b.text({
       x: textX, y: cursorY, lines: bl.lines, px: bl.px,
-      weight: bl.st.weight, fill, anchor: textAnchor,
-      tracking: bl.st.tracking || 0, lineHeight: bl.lineHeight,
+      weight: bl.hand ? 700 : bl.st.weight, fill, anchor: textAnchor,
+      tracking: bl.hand ? 0 : (bl.st.tracking || 0), lineHeight: bl.lineHeight,
+      fontFamily: bl.hand ? FONT_HAND_STACK : undefined,
     })
     cursorY += bl.lines.length * bl.px * bl.lineHeight + gap
   }
@@ -161,27 +164,29 @@ export function drawPiece(b, { template, content, format }) {
   drawLogo(b, { p, W, H, safe, ref, textAnchor, hAnchor, vAnchor })
 
   // ---- objetos DELANTE del texto (profundidad) ----
-  drawObjects(b, { objects: (p.objects || []).filter((o) => o.front), W, H, ref })
+  drawObjects(b, { objects: (p.objects || []).filter((o) => o.front), W, H, ref, accent: p.accent })
 }
 
-function drawObjects(b, { objects, W, H, ref }) {
+function drawObjects(b, { objects, W, H, ref, accent }) {
   for (const o of objects || []) {
     const size = ref * (o.scale || 0.28)
     const cx = W * (o.x ?? 0.72)
     const cy = H * (o.y ?? 0.5)
     const rotation = o.rotation || 0
     const shadow = o.shadow !== false
+    const opacity = o.opacity ?? 1
     if (o.kind === 'image' && o.src) {
-      b.object({ cx, cy, size, rotation, href: o.src, tile: false, shadow })
+      b.object({ cx, cy, size, rotation, href: o.src, tile: false, shadow, opacity })
       continue
     }
     const icon = ICONS_BY_ID[o.iconId]
     if (!icon) continue
+    const tint = o.tint === 'accent' ? accent : (o.tint || null)
     if (o.style === 'plain') {
-      b.object({ cx, cy, size, rotation, href: coloredIcon(icon.url, icon.color), tile: false, shadow })
+      b.object({ cx, cy, size, rotation, href: coloredIcon(icon.url, tint || icon.color), tile: false, shadow: icon.category === 'marks' ? false : shadow, opacity })
     } else {
       // tile app-icon: squircle color de marca + glifo blanco
-      b.object({ cx, cy, size, rotation, href: coloredIcon(icon.url, '#FFFFFF'), tile: true, tileColor: o.tileColor || icon.color, shadow })
+      b.object({ cx, cy, size, rotation, href: coloredIcon(icon.url, '#FFFFFF'), tile: true, tileColor: o.tileColor || icon.color, shadow, opacity })
     }
   }
 }

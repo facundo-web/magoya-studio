@@ -1,8 +1,19 @@
 import React, { useState, useRef, useEffect } from 'react'
 import PiecePreview from './PiecePreview.jsx'
+import { TEMPLATES } from '../templates/index.js'
 import { FORMATS_BY_ID, formatsByNetwork, CAROUSEL_FORMATS } from '../formats/registry.js'
 import { COLOR_SCHEMES, ACCENTS, WORDMARKS, CLIENT_LOGOS, TEXT_STYLES, GRADIENTS } from '../brand/brandKit.js'
-import { ICONS, ICON_CATEGORIES } from '../brand/iconLibrary.js'
+import { ALL_OBJECTS, ICONS_BY_ID, ICON_CATEGORIES } from '../brand/iconLibrary.js'
+
+// colores para teñir logos "sin fondo" y marcas
+const TINTS = [
+  { k: 'accent', label: 'Acento', value: 'accent', sw: '#00DE68' },
+  { k: 'ink', label: 'Negro', value: '#0D0C0C', sw: '#0D0C0C' },
+  { k: 'white', label: 'Blanco', value: '#FFFFFF', sw: '#FFFFFF' },
+  { k: 'emerald', label: 'Verde', value: '#00DE68', sw: '#00DE68' },
+  { k: 'blue', label: 'Azul', value: '#2E7DD1', sw: '#2E7DD1' },
+  { k: 'yellow', label: 'Amarillo', value: '#F2C14E', sw: '#F2C14E' },
+]
 import { imageSize } from '../engine/assets.js'
 import { exportPiece, exportCarousel } from '../engine/export.js'
 
@@ -46,12 +57,13 @@ function Section({ title, help, summary, defaultOpen = false, children }) {
 
 export default function Editor({
   template, format, content, slides, activeSlide,
-  onChangeContent, onChangeFormat, onSelectSlide, onAddSlide, onDeleteSlide, onToast,
+  onChangeContent, onChangeFormat, onSelectSlide, onAddSlide, onChangeSlideTemplate, onDeleteSlide, onToast,
   elements = [], onAddElement, onDeleteElement,
 }) {
   const [busy, setBusy] = useState(false)
   const [selObj, setSelObj] = useState(null)
   const [showSafe, setShowSafe] = useState(false)
+  const [chooser, setChooser] = useState(null) // null | 'add' | 'change'
   const frameRef = useRef(null)
   const photoInputRef = useRef(null)
   const dragging = useRef(false)
@@ -145,7 +157,7 @@ export default function Editor({
           <span style={{ fontSize: 13, color: '#5C6B61' }}>{format.network} · {format.label} · {format.w}×{format.h}</span>
           <label className="safe-toggle"><input type="checkbox" checked={showSafe} onChange={(e) => setShowSafe(e.target.checked)} /> Ver zona segura</label>
           <div style={{ flex: 1 }} />
-          {canCarousel && !isCarousel && <button className="btn" onClick={onAddSlide}>+ Convertir en carrusel</button>}
+          {canCarousel && !isCarousel && <button className="btn" onClick={() => setChooser('add')}>+ Convertir en carrusel</button>}
           <DownloadMenu template={template} content={content} format={format} slides={slides} busy={busy} setBusy={setBusy} onToast={onToast} />
         </div>
 
@@ -184,8 +196,28 @@ export default function Editor({
                 <PiecePreview template={s.template} content={s.content} format={format} />
               </button>
             ))}
-            <button className="add" onClick={onAddSlide} title="Agregar slide">+</button>
-            {slides.length > 1 && <button className="btn" style={{ marginLeft: 8 }} onClick={() => onDeleteSlide(activeSlide)}>Borrar slide</button>}
+            <button className="add" onClick={() => setChooser('add')} title="Agregar slide con otro diseño">+</button>
+            <button className="btn" style={{ marginLeft: 8 }} onClick={() => setChooser('change')}>Cambiar diseño</button>
+            {slides.length > 1 && <button className="btn" onClick={() => onDeleteSlide(activeSlide)}>Borrar slide</button>}
+          </div>
+        )}
+
+        {chooser && (
+          <div className="chooser-ov" onClick={() => setChooser(null)}>
+            <div className="chooser" onClick={(e) => e.stopPropagation()}>
+              <div className="chooser-head">
+                <strong>{chooser === 'add' ? 'Elegí el diseño de la nueva slide' : 'Cambiá el diseño de esta slide'}</strong>
+                <button className="btn" onClick={() => setChooser(null)}>Cerrar</button>
+              </div>
+              <div className="chooser-grid">
+                {TEMPLATES.map((t) => (
+                  <button key={t.id} className="tcard" onClick={() => { chooser === 'add' ? onAddSlide(t) : onChangeSlideTemplate(t); setChooser(null) }}>
+                    <div className="thumb fixed"><PiecePreview template={t} content={t.defaults} format={format} /></div>
+                    <div className="meta"><div className="n">{t.name}</div><div className="purpose">{t.purpose}</div></div>
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -305,7 +337,13 @@ function ObjectsBody({ objects, setObjects, updateObject, selObj, setSelObj, onT
     setSelObj(objects.length)
   }
   const addIcon = (icon) => {
-    setObjects([...objects, { kind: 'icon', iconId: icon.id, style: 'tile', x: 0.72, y: 0.42, scale: 0.3, rotation: -8, shadow: true }])
+    const isMark = icon.category === 'marks'
+    setObjects([...objects, {
+      kind: 'icon', iconId: icon.id,
+      style: isMark ? 'plain' : 'tile',
+      tint: isMark ? 'accent' : undefined,
+      x: 0.72, y: 0.42, scale: isMark ? 0.34 : 0.3, rotation: isMark ? 0 : -8, shadow: true, opacity: 1,
+    }])
     setSelObj(objects.length)
     setPicking(false)
   }
@@ -323,23 +361,38 @@ function ObjectsBody({ objects, setObjects, updateObject, selObj, setSelObj, onT
   const remove = (i) => { setObjects(objects.filter((_, idx) => idx !== i)); setSelObj(null) }
   const bringFront = (i) => { const a = [...objects]; const [it] = a.splice(i, 1); a.push(it); setObjects(a); setSelObj(a.length - 1) }
   const sendBack = (i) => { const a = [...objects]; const [it] = a.splice(i, 1); a.unshift(it); setObjects(a); setSelObj(0) }
-  const iconsInCat = cat === 'custom' ? [] : ICONS.filter((i) => i.category === cat)
+  const iconsInCat = cat === 'custom' ? [] : ALL_OBJECTS.filter((i) => i.category === cat)
 
   return (
     <>
-      {objects.map((o, i) => (
+      {objects.map((o, i) => {
+        const objIcon = o.kind === 'icon' ? ICONS_BY_ID[o.iconId] : null
+        const isMark = objIcon?.category === 'marks'
+        const showTint = o.kind === 'icon' && (isMark || o.style === 'plain')
+        return (
         <div key={i} className={'obj-card' + (selObj === i ? ' sel' : '')}>
           <div className="obj-head">
             <button className="obj-name" onClick={() => setSelObj(selObj === i ? null : i)}>
-              {selObj === i ? '◉ ' : '○ '}{o.kind === 'image' ? 'PNG subido' : (ICONS.find((x) => x.id === o.iconId)?.label || 'Logo')}
+              {selObj === i ? '◉ ' : '○ '}{o.kind === 'image' ? 'PNG subido' : (objIcon?.label || 'Logo')}
             </button>
             <button className="btn" style={{ padding: '2px 8px' }} onClick={() => remove(i)}>✕</button>
           </div>
-          {o.kind === 'icon' && (
+          {o.kind === 'icon' && !isMark && (
             <div className="chips" style={{ marginBottom: 8 }}>
               <button className={'chip' + (o.style !== 'plain' ? ' on' : '')} onClick={() => updateObject(i, { style: 'tile' })}>Con fondo (app-icon)</button>
               <button className={'chip' + (o.style === 'plain' ? ' on' : '')} onClick={() => updateObject(i, { style: 'plain' })}>Sin fondo</button>
             </div>
+          )}
+          {showTint && (
+            <>
+              <label style={{ fontSize: 11, color: '#4A554D' }}>Color</label>
+              <div className="swatches" style={{ marginBottom: 8 }}>
+                {TINTS.map((t) => (
+                  <button key={t.k} className={'sw' + ((o.tint || 'accent') === t.value ? ' on' : '')} title={t.label}
+                    style={{ background: t.sw }} onClick={() => updateObject(i, { tint: t.value })} />
+                ))}
+              </div>
+            </>
           )}
           <label style={{ fontSize: 11, color: '#4A554D' }}>Profundidad</label>
           <div className="chips" style={{ marginBottom: 6 }}>
@@ -361,13 +414,16 @@ function ObjectsBody({ objects, setObjects, updateObject, selObj, setSelObj, onT
           <input className="range" type="range" min="0.08" max="0.7" step="0.01" value={o.scale} onChange={(e) => updateObject(i, { scale: +e.target.value })} />
           <label style={{ fontSize: 11, color: '#4A554D' }}>Rotación</label>
           <input className="range" type="range" min="-45" max="45" step="1" value={o.rotation} onChange={(e) => updateObject(i, { rotation: +e.target.value })} />
+          <label style={{ fontSize: 11, color: '#4A554D' }}>Opacidad (para fondos tenues)</label>
+          <input className="range" type="range" min="0.1" max="1" step="0.05" value={o.opacity ?? 1} onChange={(e) => updateObject(i, { opacity: +e.target.value })} />
           <label style={{ fontSize: 11, color: '#4A554D' }}>Sombra (profundidad)</label>
           <div className="chips">
             <button className={'chip' + (o.shadow !== false ? ' on' : '')} onClick={() => updateObject(i, { shadow: true })}>Con sombra</button>
             <button className={'chip' + (o.shadow === false ? ' on' : '')} onClick={() => updateObject(i, { shadow: false })}>Sin sombra</button>
           </div>
         </div>
-      ))}
+        )
+      })}
 
       <div style={{ display: 'flex', gap: 6, marginTop: objects.length ? 8 : 0 }}>
         <button className="btn" onClick={() => setPicking((v) => !v)}>+ Logo</button>

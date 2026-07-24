@@ -170,7 +170,16 @@ button { font: inherit; cursor: pointer; }
 .fmttab .fd { font-size: 11px; color: #8A9389; font-family: var(--font-mono); }
 .g-templates { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .tgrid { flex: 1; min-height: 0; overflow: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 14px; align-content: start; padding: 4px 2px 2px; }
-.thumb.fixed { height: 150px; display: flex; align-items: center; justify-content: center; background: #20302A; aspect-ratio: auto; }
+.thumb.fixed { position: relative; height: 150px; display: flex; align-items: center; justify-content: center; background: #20302A; aspect-ratio: auto; }
+/* filtro + badges de plantilla */
+.tfilters { display: inline-flex; gap: 5px; margin-left: 12px; flex-wrap: wrap; }
+.tfilter { border: 1px solid var(--paper-200,#E6E1D8); background: #fff; border-radius: 999px; padding: 3px 10px; font-size: 12px; font-weight: 600; color: #5C6B61; }
+.tfilter.on { background: var(--ink-900); color: #fff; border-color: var(--ink-900); }
+.fmt-tag { position: absolute; top: 6px; left: 6px; z-index: 2; font-size: 9px; font-weight: 800; letter-spacing: .08em; padding: 2px 6px; border-radius: 4px; }
+.fmt-tag.img { background: var(--emerald-500); color: var(--ink-900); }
+.fmt-tag.txt { background: rgba(255,255,255,.9); color: var(--ink-900); }
+.badges { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
+.badge-var { font-size: 10px; font-weight: 600; color: #5C6B61; background: var(--paper-100,#F1EDE7); border: 1px solid var(--paper-200,#E6E1D8); border-radius: 999px; padding: 1px 7px; }
 .thumb.fixed > div { display: contents; }
 .thumb.fixed svg { max-height: 150px; max-width: 100%; width: auto; height: auto; display: block; }
 /* proyectos: strip compacto */
@@ -225,5 +234,42 @@ button { font: inherit; cursor: pointer; }
 .menu-pop button.rec { background: #F0FBF4; border: 1px solid #CDEBD8; }
 .menu-pop button.rec:hover { background: #E4F7EC; }
 
+/* selector de diseño de slide (carrusel) */
+.chooser-ov { position: fixed; inset: 0; background: rgba(13,12,12,.55); display: flex; align-items: center; justify-content: center; z-index: 200; padding: 24px; }
+.chooser { background: var(--paper-100,#F1EDE7); border-radius: 16px; width: min(920px, 96vw); max-height: 86vh; display: flex; flex-direction: column; box-shadow: 0 30px 80px rgba(0,0,0,.4); }
+.chooser-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 18px; border-bottom: 1px solid var(--paper-200,#E6E1D8); }
+.chooser-grid { overflow: auto; padding: 16px 18px; display: grid; grid-template-columns: repeat(auto-fill, minmax(180px,1fr)); gap: 14px; }
+
 .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--ink-900); color: #fff; padding: 10px 18px; border-radius: 999px; font-size: 13px; z-index: 100; box-shadow: 0 10px 30px rgba(0,0,0,.25); }
 .center-note { padding: 40px; font-family: var(--font-mono); color: #8A9389; }
+
+/* ============================================================
+   RESPONSIVE — tablet y mobile
+   ============================================================ */
+@media (max-width: 900px) {
+  .topbar { flex-wrap: wrap; row-gap: 8px; padding: 10px 14px; }
+  .topbar .btn { padding: 7px 12px; font-size: 12px; }
+  .crumbs { order: 3; width: 100%; }
+}
+@media (max-width: 820px) {
+  /* permitir scroll de página en pantallas chicas */
+  html, body, #root { height: auto; }
+  .app { height: auto; min-height: 100vh; }
+  .gallery.compact { height: auto; overflow: visible; padding: 14px 16px 24px; }
+  .tgrid { overflow: visible; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+  /* editor: apilar preview arriba, controles abajo */
+  .editor { grid-template-columns: 1fr; }
+  .stage { order: -1; }
+  .stage-canvas { padding: 14px; min-height: 42vh; }
+  .piece-frame svg { max-height: 46vh; }
+  .sidebar { border-right: 0; border-top: 1px solid var(--paper-200,#E6E1D8); overflow: visible; }
+  .stage-tools { position: sticky; top: 0; background: #E9E4DC; z-index: 5; }
+  .dest, .palette-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 520px) {
+  .gallery.compact h1 { font-size: 20px; }
+  .grid, .tgrid { grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); }
+  .fmttab .fd { display: none; }
+  .how { gap: 6px; }
+  .how-sep { display: none; }
+}

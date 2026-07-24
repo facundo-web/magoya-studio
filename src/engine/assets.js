@@ -42,6 +42,8 @@ export function coloredIcon(url, color) {
     const cleaned = attrs.replace(/\sfill="[^"]*"/g, '')
     return `<svg${cleaned} fill="${color}">`
   })
+  // marcas con currentColor (flourishes/doodles) → teñir
+  colored = colored.replace(/currentColor/g, color)
   const dataUrl = svgTextToDataURL(colored)
   coloredCache.set(key, dataUrl)
   return dataUrl

@@ -100,15 +100,24 @@ export default function App() {
     if (active === 0 && next.title) setProjectName(next.title)
     setDirty(true)
   }
-  function addSlide() {
+  function addSlide(template) {
     setPieces((ps) => {
       const src = ps[active]
-      return [...ps, { template: src.template, content: { ...src.content, photo: null } }]
+      const tpl = template || src.template
+      // con plantilla elegida → arranca de sus defaults; sin plantilla → copia el contenido
+      const content = template ? { ...template.defaults } : { ...src.content, photo: null }
+      return [...ps, { template: tpl, content }]
     })
     setCarousel(true)
     setActive(pieces.length)
     setDirty(true)
     showToast('Slide agregada')
+  }
+  function changeSlideTemplate(template) {
+    // cambia el diseño de la slide activa, conservando el contenido (textos/foto/marca)
+    setPieces((ps) => ps.map((p, i) => (i === active ? { template, content: p.content } : p)))
+    setDirty(true)
+    showToast('Diseño de la slide cambiado')
   }
   function deleteSlide(i) {
     setPieces((ps) => {
@@ -209,6 +218,7 @@ export default function App() {
           onChangeFormat={(f) => { setFormatId(f.id); setDirty(true) }}
           onSelectSlide={setActive}
           onAddSlide={addSlide}
+          onChangeSlideTemplate={changeSlideTemplate}
           onDeleteSlide={deleteSlide}
           onToast={showToast}
           elements={elements}
