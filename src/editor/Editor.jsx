@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import PiecePreview from './PiecePreview.jsx'
 import { FORMATS_BY_ID, formatsByNetwork, CAROUSEL_FORMATS } from '../formats/registry.js'
 import { COLOR_SCHEMES, ACCENTS, WORDMARKS, CLIENT_LOGOS, TEXT_STYLES, GRADIENTS } from '../brand/brandKit.js'
@@ -7,7 +7,7 @@ import { imageSize } from '../engine/assets.js'
 import { exportPiece, exportCarousel } from '../engine/export.js'
 
 const ROLE_LABELS = {
-  kicker: 'Kicker (etiqueta)',
+  kicker: 'Etiqueta',
   title: 'Título',
   subtitle: 'Subtítulo',
   body: 'Cuerpo',
@@ -17,15 +17,84 @@ const ROLE_LABELS = {
   author: 'Autor / fuente',
 }
 
+// grilla de posiciones (para ubicar objetos rápido)
+const POS_GRID = [
+  [0.22, 0.2], [0.5, 0.2], [0.78, 0.2],
+  [0.22, 0.5], [0.5, 0.5], [0.78, 0.5],
+  [0.22, 0.8], [0.5, 0.8], [0.78, 0.8],
+]
+
+/* ---------------- Sección colapsable ---------------- */
+function Section({ title, help, summary, defaultOpen = false, children }) {
+  const [open, setOpen] = useState(defaultOpen)
+  return (
+    <div className={'sec' + (open ? ' open' : '')}>
+      <button className="sec-head" onClick={() => setOpen((o) => !o)}>
+        <span className="sec-title">{title}</span>
+        {!open && summary ? <span className="sec-sum">{summary}</span> : null}
+        <span className="sec-chev">{open ? '▾' : '▸'}</span>
+      </button>
+      {open && (
+        <div className="sec-body">
+          {help && <p className="panel-help">{help}</p>}
+          {children}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function Editor({
-  template, format, content, mode, slides, activeSlide,
+  template, format, content, slides, activeSlide,
   onChangeContent, onChangeFormat, onSelectSlide, onAddSlide, onDeleteSlide, onToast,
 }) {
   const [busy, setBusy] = useState(false)
+  const [selObj, setSelObj] = useState(null)
+  const [showSafe, setShowSafe] = useState(false)
+  const frameRef = useRef(null)
+  const photoInputRef = useRef(null)
+  const dragging = useRef(false)
+
   const isCarousel = slides && slides.length > 0
   const canCarousel = CAROUSEL_FORMATS.includes(format.id)
 
   const set = (patch) => onChangeContent({ ...content, ...patch })
+  const objects = content.objects || []
+  const setObjects = (next) => set({ objects: next })
+  const updateObject = (i, patch) => setObjects(objects.map((o, idx) => (idx === i ? { ...o, ...patch } : o)))
+
+  // foto: subir → dataURL (compartido entre panel y overlay)
+  const onPhotoFile = async (file) => {
+    if (!file || !file.type.startsWith('image/')) return onToast('Ese archivo no es una imagen')
+    const src = await new Promise((res) => {
+      const r = new FileReader()
+      r.onload = () => res(r.result)
+      r.readAsDataURL(file)
+    })
+    const natural = await imageSize(src)
+    set({ photo: { src, natural, focal: content.photo?.focal || { x: 0.5, y: 0.5 } } })
+  }
+
+  // arrastrar el objeto seleccionado sobre la pieza
+  const posFromEvent = (e) => {
+    const r = frameRef.current.getBoundingClientRect()
+    return {
+      x: Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)),
+      y: Math.min(1, Math.max(0, (e.clientY - r.top) / r.height)),
+    }
+  }
+  const onFrameDown = (e) => {
+    if (selObj == null || !objects[selObj]) return
+    dragging.current = true
+    updateObject(selObj, posFromEvent(e))
+  }
+  const onFrameMove = (e) => {
+    if (!dragging.current) return
+    updateObject(selObj, posFromEvent(e))
+  }
+  const endDrag = () => (dragging.current = false)
+
+  const needsPhoto = template.surface === 'photo' && !content.photo?.src
 
   return (
     <div className="editor">
@@ -35,55 +104,86 @@ export default function Editor({
           {template.purpose && <div className="sh-purpose">{template.purpose}</div>}
           <div className="sh-dest">Para <b>{format.network} · {format.label}</b> · {format.w}×{format.h}</div>
         </div>
-        <FormatPanel format={format} onChangeFormat={onChangeFormat} />
-        <ContentPanel template={template} content={content} set={set} />
+
+        <Section title="Formato / red" defaultOpen summary={`${format.network} · ${format.label}`}
+          help="Cambiá el tamaño según dónde publiques. La pieza se re-acomoda sola.">
+          <FormatBody format={format} onChangeFormat={onChangeFormat} />
+        </Section>
+
+        <Section title="Contenido" defaultOpen help="Editá los textos de la pieza.">
+          <ContentBody template={template} content={content} set={set} />
+        </Section>
+
         {template.surface === 'photo' && (
-          <PhotoPanel content={content} set={set} mode={mode} onToast={onToast} />
+          <Section title="Foto" defaultOpen summary={content.photo?.src ? '✓ cargada' : 'falta'}
+            help="Subí una foto. Sale en B&N (regla de marca) por defecto.">
+            <PhotoBody content={content} set={set} inputRef={photoInputRef} onPhotoFile={onPhotoFile} />
+          </Section>
         )}
-        <GradientPanel content={content} set={set} />
-        <ObjectsPanel content={content} set={set} mode={mode} onToast={onToast} />
-        <BrandPanel content={content} template={template} set={set} mode={mode} />
+
+        <Section title="Degradé" summary={content.gradient?.preset ? (GRADIENTS[content.gradient.preset]?.label || 'sí') : 'no'}
+          help="Un degradé encima del fondo para dar clima y legibilidad.">
+          <GradientBody content={content} set={set} />
+        </Section>
+
+        <Section title="Objetos · logos & profundidad" summary={objects.length ? `${objects.length}` : 'ninguno'}
+          help="Sumá logos (IA / redes) o tu PNG. Seleccioná uno y arrastralo en la pieza.">
+          <ObjectsBody objects={objects} setObjects={setObjects} updateObject={updateObject}
+            selObj={selObj} setSelObj={setSelObj} onToast={onToast} />
+        </Section>
+
+        <Section title="Marca" summary="colores y logos"
+          help="Colores, acento y logos — todo dentro de la marca.">
+          <BrandBody content={content} template={template} set={set} />
+        </Section>
       </div>
 
       <div className="stage">
         <div className="stage-tools">
-          <span style={{ fontSize: 13, color: '#5C6B61' }}>
-            {format.network} · {format.label} · {format.w}×{format.h}
-          </span>
+          <span style={{ fontSize: 13, color: '#5C6B61' }}>{format.network} · {format.label} · {format.w}×{format.h}</span>
+          <label className="safe-toggle"><input type="checkbox" checked={showSafe} onChange={(e) => setShowSafe(e.target.checked)} /> Ver zona segura</label>
           <div style={{ flex: 1 }} />
-          {canCarousel && !isCarousel && (
-            <button className="btn" onClick={onAddSlide}>+ Convertir en carrusel</button>
-          )}
-          <DownloadMenu
-            template={template} content={content} format={format}
-            slides={slides} busy={busy} setBusy={setBusy} onToast={onToast}
-          />
+          {canCarousel && !isCarousel && <button className="btn" onClick={onAddSlide}>+ Convertir en carrusel</button>}
+          <DownloadMenu template={template} content={content} format={format} slides={slides} busy={busy} setBusy={setBusy} onToast={onToast} />
         </div>
 
         <div className="stage-canvas">
-          <div className="piece-frame">
+          <div
+            className={'piece-frame' + (selObj != null ? ' dragging-ready' : '')}
+            ref={frameRef}
+            onPointerDown={onFrameDown}
+            onPointerMove={onFrameMove}
+            onPointerUp={endDrag}
+            onPointerLeave={endDrag}
+          >
             <PiecePreview template={template} content={content} format={format} />
+            {showSafe && (
+              <div className="safe-ov" style={{
+                top: `${format.safe.top * 100}%`, bottom: `${format.safe.bottom * 100}%`,
+                left: `${format.safe.left * 100}%`, right: `${format.safe.right * 100}%`,
+              }} />
+            )}
+            {needsPhoto && (
+              <button className="photo-cta" onClick={() => photoInputRef.current?.click()}>
+                <span className="pc-ic">＋</span>
+                <span>Subí una foto para empezar</span>
+              </button>
+            )}
+            {selObj != null && objects[selObj] && (
+              <div className="drag-hint">Arrastrá para ubicar el objeto</div>
+            )}
           </div>
         </div>
 
         {isCarousel && (
           <div className="strip">
             {slides.map((s, i) => (
-              <button
-                key={i}
-                className={'slide-thumb' + (i === activeSlide ? ' on' : '')}
-                onClick={() => onSelectSlide(i)}
-                title={`Slide ${i + 1}`}
-              >
+              <button key={i} className={'slide-thumb' + (i === activeSlide ? ' on' : '')} onClick={() => onSelectSlide(i)} title={`Slide ${i + 1}`}>
                 <PiecePreview template={s.template} content={s.content} format={format} />
               </button>
             ))}
             <button className="add" onClick={onAddSlide} title="Agregar slide">+</button>
-            {slides.length > 1 && (
-              <button className="btn" style={{ marginLeft: 8 }} onClick={() => onDeleteSlide(activeSlide)}>
-                Borrar slide
-              </button>
-            )}
+            {slides.length > 1 && <button className="btn" style={{ marginLeft: 8 }} onClick={() => onDeleteSlide(activeSlide)}>Borrar slide</button>}
           </div>
         )}
       </div>
@@ -92,39 +192,30 @@ export default function Editor({
 }
 
 /* ---------------- Format ---------------- */
-function FormatPanel({ format, onChangeFormat }) {
+function FormatBody({ format, onChangeFormat }) {
   const groups = formatsByNetwork()
   return (
-    <div className="panel">
-      <h3>Formato / red</h3>
-      <p className="panel-help">Cambiá el tamaño según dónde publiques. La pieza se re-acomoda sola.</p>
-      <div className="field">
-        <select value={format.id} onChange={(e) => onChangeFormat(FORMATS_BY_ID[e.target.value])}>
-          {Object.entries(groups).map(([net, list]) => (
-            <optgroup key={net} label={net}>
-              {list.map((f) => (
-                <option key={f.id} value={f.id}>
-                  {f.label} — {f.w}×{f.h}
-                </option>
-              ))}
-            </optgroup>
-          ))}
-        </select>
-      </div>
+    <div className="field">
+      <select value={format.id} onChange={(e) => onChangeFormat(FORMATS_BY_ID[e.target.value])}>
+        {Object.entries(groups).map(([net, list]) => (
+          <optgroup key={net} label={net}>
+            {list.map((f) => (
+              <option key={f.id} value={f.id}>{f.label} — {f.w}×{f.h}</option>
+            ))}
+          </optgroup>
+        ))}
+      </select>
     </div>
   )
 }
 
-/* ---------------- Content (texto) ---------------- */
-function ContentPanel({ template, content, set }) {
+/* ---------------- Content ---------------- */
+function ContentBody({ template, content, set }) {
   const roles = template.roles || []
   return (
-    <div className="panel">
-      <h3>Contenido</h3>
-      <p className="panel-help">Editá los textos de la pieza.</p>
+    <>
       {roles.map((role) => {
-        const st = TEXT_STYLES[role]
-        const long = role === 'title' || role === 'quote' || role === 'subtitle' || role === 'body' || role === 'metricLabel'
+        const long = ['title', 'quote', 'subtitle', 'body', 'metricLabel'].includes(role)
         const val = content[role] ?? template.defaults?.[role] ?? ''
         return (
           <div className="field" key={role}>
@@ -137,46 +228,23 @@ function ContentPanel({ template, content, set }) {
           </div>
         )
       })}
-    </div>
+    </>
   )
 }
 
 /* ---------------- Photo ---------------- */
-function PhotoPanel({ content, set, mode, onToast }) {
-  const fileRef = useRef(null)
+function PhotoBody({ content, set, inputRef, onPhotoFile }) {
   const photo = content.photo
   const treatment = content.treatment || 'bw'
-
-  const onFile = async (file) => {
-    if (!file.type.startsWith('image/')) {
-      onToast('Ese archivo no es una imagen')
-      return
-    }
-    const src = await new Promise((res) => {
-      const r = new FileReader()
-      r.onload = () => res(r.result)
-      r.readAsDataURL(file)
-    })
-    const natural = await imageSize(src)
-    set({ photo: { src, natural, focal: photo?.focal || { x: 0.5, y: 0.5 } } })
-  }
-
   return (
-    <div className="panel">
-      <h3>Foto</h3>
-      <p className="panel-help">Subí una foto. Sale en B&N (regla de marca) por defecto.</p>
-      <div
-        className={'dropzone' + (photo?.src ? ' has' : '')}
-        onClick={() => fileRef.current?.click()}
+    <>
+      <div className={'dropzone' + (photo?.src ? ' has' : '')}
+        onClick={() => inputRef.current?.click()}
         onDragOver={(e) => e.preventDefault()}
-        onDrop={(e) => {
-          e.preventDefault()
-          e.dataTransfer.files[0] && onFile(e.dataTransfer.files[0])
-        }}
-      >
+        onDrop={(e) => { e.preventDefault(); e.dataTransfer.files[0] && onPhotoFile(e.dataTransfer.files[0]) }}>
         {photo?.src ? '✓ Foto cargada — click para cambiar' : 'Arrastrá una foto o hacé click'}
       </div>
-      <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => e.target.files[0] && onFile(e.target.files[0])} />
+      <input ref={inputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => e.target.files[0] && onPhotoFile(e.target.files[0])} />
 
       <div className="field" style={{ marginTop: 12 }}>
         <label>Tratamiento</label>
@@ -186,114 +254,93 @@ function PhotoPanel({ content, set, mode, onToast }) {
         </div>
       </div>
 
-      {mode === 'designer' && photo?.src && (
+      {photo?.src && (
         <>
-          <div className="field">
-            <label>Encuadre horizontal</label>
-            <input className="range" type="range" min="0" max="1" step="0.01"
-              value={photo.focal?.x ?? 0.5}
-              onChange={(e) => set({ photo: { ...photo, focal: { ...photo.focal, x: +e.target.value } } })} />
-          </div>
-          <div className="field">
-            <label>Encuadre vertical</label>
-            <input className="range" type="range" min="0" max="1" step="0.01"
-              value={photo.focal?.y ?? 0.5}
-              onChange={(e) => set({ photo: { ...photo, focal: { ...photo.focal, y: +e.target.value } } })} />
-          </div>
+          <div className="field"><label>Encuadre horizontal</label>
+            <input className="range" type="range" min="0" max="1" step="0.01" value={photo.focal?.x ?? 0.5}
+              onChange={(e) => set({ photo: { ...photo, focal: { ...photo.focal, x: +e.target.value } } })} /></div>
+          <div className="field"><label>Encuadre vertical</label>
+            <input className="range" type="range" min="0" max="1" step="0.01" value={photo.focal?.y ?? 0.5}
+              onChange={(e) => set({ photo: { ...photo, focal: { ...photo.focal, y: +e.target.value } } })} /></div>
         </>
       )}
-    </div>
+    </>
   )
 }
 
-/* ---------------- Gradient overlay ---------------- */
-function GradientPanel({ content, set }) {
+/* ---------------- Gradient ---------------- */
+function GradientBody({ content, set }) {
   const g = content.gradient || null
   const on = !!g?.preset
   const setPreset = (preset) => set({ gradient: preset ? { preset, opacity: g?.opacity ?? 1 } : null })
   return (
-    <div className="panel">
-      <h3>Degradé (sobre el fondo)</h3>
-      <p className="panel-help">Un degradé encima del fondo para dar clima y legibilidad.</p>
+    <>
       <div className="chips">
         <button className={'chip' + (!on ? ' on' : '')} onClick={() => setPreset(null)}>Sin degradé</button>
         {Object.entries(GRADIENTS).map(([k, gr]) => (
-          <button key={k} className={'chip' + (g?.preset === k ? ' on' : '')} onClick={() => setPreset(k)}>
-            {gr.label}
-          </button>
+          <button key={k} className={'chip' + (g?.preset === k ? ' on' : '')} onClick={() => setPreset(k)}>{gr.label}</button>
         ))}
       </div>
       {on && (
-        <div className="field" style={{ marginTop: 10 }}>
-          <label>Intensidad</label>
-          <input className="range" type="range" min="0.2" max="1" step="0.05"
-            value={g.opacity ?? 1}
-            onChange={(e) => set({ gradient: { ...g, opacity: +e.target.value } })} />
-        </div>
+        <div className="field" style={{ marginTop: 10 }}><label>Intensidad</label>
+          <input className="range" type="range" min="0.2" max="1" step="0.05" value={g.opacity ?? 1}
+            onChange={(e) => set({ gradient: { ...g, opacity: +e.target.value } })} /></div>
       )}
-    </div>
+    </>
   )
 }
 
-/* ---------------- Objetos (logos / profundidad) ---------------- */
-function ObjectsPanel({ content, set, mode, onToast }) {
+/* ---------------- Objects ---------------- */
+function ObjectsBody({ objects, setObjects, updateObject, selObj, setSelObj, onToast }) {
   const [picking, setPicking] = useState(false)
   const [cat, setCat] = useState('ai')
   const fileRef = useRef(null)
-  const objects = content.objects || []
 
   const addIcon = (icon) => {
-    const next = [...objects, { kind: 'icon', iconId: icon.id, style: 'tile', x: 0.72, y: 0.42, scale: 0.3, rotation: -8, shadow: true }]
-    set({ objects: next })
+    setObjects([...objects, { kind: 'icon', iconId: icon.id, style: 'tile', x: 0.72, y: 0.42, scale: 0.3, rotation: -8, shadow: true }])
+    setSelObj(objects.length)
     setPicking(false)
   }
   const addImage = async (file) => {
     if (!file.type.startsWith('image/')) return onToast('No es una imagen')
-    const src = await new Promise((res) => {
-      const r = new FileReader()
-      r.onload = () => res(r.result)
-      r.readAsDataURL(file)
-    })
-    set({ objects: [...objects, { kind: 'image', src, x: 0.72, y: 0.42, scale: 0.32, rotation: 0, shadow: true }] })
+    const src = await new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(file) })
+    setObjects([...objects, { kind: 'image', src, x: 0.72, y: 0.42, scale: 0.32, rotation: 0, shadow: true }])
+    setSelObj(objects.length)
   }
-  const update = (i, patch) => set({ objects: objects.map((o, idx) => (idx === i ? { ...o, ...patch } : o)) })
-  const remove = (i) => set({ objects: objects.filter((_, idx) => idx !== i) })
-
+  const remove = (i) => { setObjects(objects.filter((_, idx) => idx !== i)); setSelObj(null) }
   const iconsInCat = ICONS.filter((i) => i.category === cat)
 
   return (
-    <div className="panel">
-      <h3>Objetos · logos & profundidad</h3>
-      <p className="panel-help">Sumá logos (IA / redes) o tu PNG. Dan profundidad y movimiento.</p>
-
+    <>
       {objects.map((o, i) => (
-        <div key={i} style={{ border: '1px solid var(--paper-200,#E6E1D8)', borderRadius: 10, padding: 10, marginBottom: 8, background: '#fff' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-            <strong style={{ fontSize: 13 }}>{o.kind === 'image' ? 'PNG subido' : (ICONS.find((x) => x.id === o.iconId)?.label || 'Logo')}</strong>
+        <div key={i} className={'obj-card' + (selObj === i ? ' sel' : '')}>
+          <div className="obj-head">
+            <button className="obj-name" onClick={() => setSelObj(selObj === i ? null : i)}>
+              {selObj === i ? '◉ ' : '○ '}{o.kind === 'image' ? 'PNG subido' : (ICONS.find((x) => x.id === o.iconId)?.label || 'Logo')}
+            </button>
             <button className="btn" style={{ padding: '2px 8px' }} onClick={() => remove(i)}>✕</button>
           </div>
           {o.kind === 'icon' && (
-            <div className="chips" style={{ marginBottom: 6 }}>
-              <button className={'chip' + (o.style !== 'plain' ? ' on' : '')} onClick={() => update(i, { style: 'tile' })}>Tile (app-icon)</button>
-              <button className={'chip' + (o.style === 'plain' ? ' on' : '')} onClick={() => update(i, { style: 'plain' })}>Plano</button>
+            <div className="chips" style={{ marginBottom: 8 }}>
+              <button className={'chip' + (o.style !== 'plain' ? ' on' : '')} onClick={() => updateObject(i, { style: 'tile' })}>Tile (app-icon)</button>
+              <button className={'chip' + (o.style === 'plain' ? ' on' : '')} onClick={() => updateObject(i, { style: 'plain' })}>Plano</button>
             </div>
           )}
+          <label style={{ fontSize: 11, color: '#4A554D' }}>Posición</label>
+          <div className="posgrid">
+            {POS_GRID.map(([px, py], k) => (
+              <button key={k} className={'posdot' + (Math.abs((o.x ?? 0.5) - px) < 0.02 && Math.abs((o.y ?? 0.5) - py) < 0.02 ? ' on' : '')}
+                onClick={() => updateObject(i, { x: px, y: py })} title="Ubicar acá" />
+            ))}
+          </div>
           <label style={{ fontSize: 11, color: '#4A554D' }}>Tamaño</label>
-          <input className="range" type="range" min="0.08" max="0.7" step="0.01" value={o.scale} onChange={(e) => update(i, { scale: +e.target.value })} />
+          <input className="range" type="range" min="0.08" max="0.7" step="0.01" value={o.scale} onChange={(e) => updateObject(i, { scale: +e.target.value })} />
           <label style={{ fontSize: 11, color: '#4A554D' }}>Rotación</label>
-          <input className="range" type="range" min="-45" max="45" step="1" value={o.rotation} onChange={(e) => update(i, { rotation: +e.target.value })} />
-          {mode === 'designer' && (
-            <>
-              <label style={{ fontSize: 11, color: '#4A554D' }}>Posición X</label>
-              <input className="range" type="range" min="0" max="1" step="0.01" value={o.x} onChange={(e) => update(i, { x: +e.target.value })} />
-              <label style={{ fontSize: 11, color: '#4A554D' }}>Posición Y</label>
-              <input className="range" type="range" min="0" max="1" step="0.01" value={o.y} onChange={(e) => update(i, { y: +e.target.value })} />
-            </>
-          )}
+          <input className="range" type="range" min="-45" max="45" step="1" value={o.rotation} onChange={(e) => updateObject(i, { rotation: +e.target.value })} />
         </div>
       ))}
 
-      <div style={{ display: 'flex', gap: 6 }}>
+      <div style={{ display: 'flex', gap: 6, marginTop: objects.length ? 8 : 0 }}>
         <button className="btn" onClick={() => setPicking((v) => !v)}>+ Logo</button>
         <button className="btn" onClick={() => fileRef.current?.click()}>+ Subir PNG</button>
         <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => e.target.files[0] && addImage(e.target.files[0])} />
@@ -306,72 +353,53 @@ function ObjectsPanel({ content, set, mode, onToast }) {
               <button key={k} className={'chip' + (cat === k ? ' on' : '')} onClick={() => setCat(k)}>{label}</button>
             ))}
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 6 }}>
+          <div className="icon-grid">
             {iconsInCat.map((icon) => (
-              <button key={icon.id} title={icon.label} onClick={() => addIcon(icon)}
-                style={{ aspectRatio: '1/1', borderRadius: 10, border: 0, background: icon.color, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 6 }}>
-                <img src={icon.url} alt={icon.label} style={{ width: '70%', height: '70%', filter: 'brightness(0) invert(1)' }} />
+              <button key={icon.id} title={icon.label} onClick={() => addIcon(icon)} className="icon-pick" style={{ background: icon.color }}>
+                <img src={icon.url} alt={icon.label} />
               </button>
             ))}
           </div>
-          <div className="hint">También podés subir el PNG oficial (versión a color) de cualquier logo.</div>
+          <div className="hint">También podés subir el PNG oficial (a color) de cualquier logo.</div>
         </div>
       )}
-    </div>
+    </>
   )
 }
 
 /* ---------------- Brand ---------------- */
-function BrandPanel({ content, template, set, mode }) {
+function BrandBody({ content, template, set }) {
   const scheme = content.scheme || template.defaults?.scheme || 'deep'
   const accent = content.accent || template.defaults?.accent || 'emerald'
   const logo = content.logo || template.defaults?.logo || 'cream'
   const clientLogo = content.clientLogo || template.defaults?.clientLogo || 'none'
   return (
-    <div className="panel">
-      <h3>Marca</h3>
-      <p className="panel-help">Colores, acento y logos — todo dentro de la marca.</p>
-
-      {(mode === 'designer' || template.surface !== 'photo') && (
-        <div className="field">
-          <label>Esquema de color</label>
-          <div className="swatches">
-            {Object.entries(COLOR_SCHEMES).map(([k, s]) => (
-              <button key={k} className={'sw' + (scheme === k ? ' on' : '')} title={s.label}
-                style={{ background: s.surface }} onClick={() => set({ scheme: k })} />
-            ))}
-          </div>
+    <>
+      <div className="field"><label>Esquema de color</label>
+        <div className="swatches">
+          {Object.entries(COLOR_SCHEMES).map(([k, s]) => (
+            <button key={k} className={'sw' + (scheme === k ? ' on' : '')} title={s.label} style={{ background: s.surface }} onClick={() => set({ scheme: k })} />
+          ))}
         </div>
-      )}
-
-      <div className="field">
-        <label>Acento</label>
+      </div>
+      <div className="field"><label>Acento</label>
         <div className="swatches">
           {Object.entries(ACCENTS).map(([k, a]) => (
-            <button key={k} className={'sw' + (accent === k ? ' on' : '')} title={a.label}
-              style={{ background: a.value }} onClick={() => set({ accent: k })} />
+            <button key={k} className={'sw' + (accent === k ? ' on' : '')} title={a.label} style={{ background: a.value }} onClick={() => set({ accent: k })} />
           ))}
         </div>
       </div>
-
-      <div className="field">
-        <label>Logo Magoya</label>
+      <div className="field"><label>Logo Magoya</label>
         <select value={logo} onChange={(e) => set({ logo: e.target.value })}>
-          {Object.entries(WORDMARKS).map(([k, w]) => (
-            <option key={k} value={k}>{w.label}</option>
-          ))}
+          {Object.entries(WORDMARKS).map(([k, w]) => (<option key={k} value={k}>{w.label}</option>))}
         </select>
       </div>
-
-      <div className="field">
-        <label>Logo de cliente</label>
+      <div className="field"><label>Logo de cliente</label>
         <select value={clientLogo} onChange={(e) => set({ clientLogo: e.target.value })}>
-          {Object.entries(CLIENT_LOGOS).map(([k, l]) => (
-            <option key={k} value={k}>{l.label}</option>
-          ))}
+          {Object.entries(CLIENT_LOGOS).map(([k, l]) => (<option key={k} value={k}>{l.label}</option>))}
         </select>
       </div>
-    </div>
+    </>
   )
 }
 
@@ -379,51 +407,30 @@ function BrandPanel({ content, template, set, mode }) {
 function DownloadMenu({ template, content, format, slides, busy, setBusy, onToast }) {
   const [open, setOpen] = useState(false)
   const isCarousel = slides && slides.length > 0
-
   const run = async (fn, label) => {
-    setOpen(false)
-    setBusy(true)
-    onToast('Generando ' + label + '…')
-    try {
-      await fn()
-      onToast('✓ ' + label + ' descargado')
-    } catch (e) {
-      console.error(e)
-      onToast('⚠ Error al exportar')
-    } finally {
-      setBusy(false)
-    }
+    setOpen(false); setBusy(true); onToast('Generando ' + label + '…')
+    try { await fn(); onToast('✓ ' + label + ' descargado') }
+    catch (e) { console.error(e); onToast('⚠ Error al exportar') }
+    finally { setBusy(false) }
   }
-
   return (
     <div className="menu">
-      <button className="btn primary" disabled={busy} onClick={() => setOpen((o) => !o)}>
-        ↓ Descargar
-      </button>
+      <button className="btn primary" disabled={busy} onClick={() => setOpen((o) => !o)}>↓ Descargar</button>
       {open && (
         <div className="menu-pop" onMouseLeave={() => setOpen(false)}>
-          <div className="grp">Esta pieza</div>
-          <button onClick={() => run(() => exportPiece({ template, content, format, kind: 'png', scale: 3 }), 'PNG @3x')}>
-            <span>PNG — alta calidad</span><span>@3x</span>
+          <div className="grp">Recomendado</div>
+          <button className="rec" onClick={() => run(() => exportPiece({ template, content, format, kind: 'png', scale: 3 }), 'PNG @3x')}>
+            <span>PNG — listo para redes</span><span>@3x</span>
           </button>
-          <button onClick={() => run(() => exportPiece({ template, content, format, kind: 'png', scale: 2 }), 'PNG @2x')}>
-            <span>PNG</span><span>@2x</span>
-          </button>
-          <button onClick={() => run(() => exportPiece({ template, content, format, kind: 'jpg', scale: 2 }), 'JPG')}>
-            <span>JPG</span><span>@2x</span>
-          </button>
-          <button onClick={() => run(() => exportPiece({ template, content, format, kind: 'svg' }), 'SVG')}>
-            <span>SVG — vectorial</span><span>∞</span>
-          </button>
+          <div className="grp">Otras opciones</div>
+          <button onClick={() => run(() => exportPiece({ template, content, format, kind: 'png', scale: 2 }), 'PNG @2x')}><span>PNG más liviano</span><span>@2x</span></button>
+          <button onClick={() => run(() => exportPiece({ template, content, format, kind: 'jpg', scale: 2 }), 'JPG')}><span>JPG</span><span>@2x</span></button>
+          <button onClick={() => run(() => exportPiece({ template, content, format, kind: 'svg' }), 'SVG')}><span>SVG — vectorial</span><span>∞</span></button>
           {isCarousel && (
             <>
               <div className="grp">Carrusel ({slides.length} slides)</div>
-              <button onClick={() => run(() => exportCarousel({ slides, format, kind: 'zip', scale: 3 }), 'ZIP de PNGs')}>
-                <span>ZIP de PNGs</span><span>@3x</span>
-              </button>
-              <button onClick={() => run(() => exportCarousel({ slides, format, kind: 'pdf', scale: 2 }), 'PDF')}>
-                <span>PDF</span><span>multipágina</span>
-              </button>
+              <button onClick={() => run(() => exportCarousel({ slides, format, kind: 'zip', scale: 3 }), 'ZIP de PNGs')}><span>ZIP de PNGs</span><span>@3x</span></button>
+              <button onClick={() => run(() => exportCarousel({ slides, format, kind: 'pdf', scale: 2 }), 'PDF')}><span>PDF</span><span>multipágina</span></button>
             </>
           )}
         </div>

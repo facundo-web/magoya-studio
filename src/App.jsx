@@ -12,7 +12,6 @@ const DEFAULT_FORMAT = 'ig-post'
 
 export default function App() {
   const [view, setView] = useState('gallery')
-  const [mode, setMode] = useState('quick') // quick | designer
   const [projects, setProjects] = useState([])
   const [toast, setToast] = useState(null)
 
@@ -24,6 +23,7 @@ export default function App() {
   const [pieces, setPieces] = useState([]) // [{template, content}]
   const [active, setActive] = useState(0)
   const [carousel, setCarousel] = useState(false)
+  const [dirty, setDirty] = useState(false)
 
   useEffect(() => {
     setProjects(loadProjects())
@@ -41,6 +41,13 @@ export default function App() {
   const format = FORMATS_BY_ID[formatId] || FORMATS_BY_ID[DEFAULT_FORMAT]
   const current = pieces[active] || null
 
+  // autosave: guarda el proyecto en edición tras cada cambio (debounced)
+  useEffect(() => {
+    if (view !== 'editor' || !projectId || !pieces.length || !dirty) return
+    const t = setTimeout(() => setProjects(upsertProject(serialize())), 800)
+    return () => clearTimeout(t)
+  }, [dirty, pieces, formatId, carousel, view, projectId])
+
   // ---- iniciar desde template ----
   function pickTemplate(template, chosenFormat) {
     setProjectId(newProjectId())
@@ -49,6 +56,7 @@ export default function App() {
     setPieces([{ template, content: { ...template.defaults } }])
     setActive(0)
     setCarousel(false)
+    setDirty(false)
     setView('editor')
   }
 
@@ -68,6 +76,7 @@ export default function App() {
     setPieces(ps)
     setActive(0)
     setCarousel(!!p.carousel)
+    setDirty(false)
     setView('editor')
   }
 
@@ -85,6 +94,7 @@ export default function App() {
   function changeContent(next) {
     setPieces((ps) => ps.map((p, i) => (i === active ? { ...p, content: next } : p)))
     if (active === 0 && next.title) setProjectName(next.title)
+    setDirty(true)
   }
   function addSlide() {
     setPieces((ps) => {
@@ -93,6 +103,7 @@ export default function App() {
     })
     setCarousel(true)
     setActive(pieces.length)
+    setDirty(true)
     showToast('Slide agregada')
   }
   function deleteSlide(i) {
@@ -102,6 +113,7 @@ export default function App() {
     })
     setActive((a) => Math.max(0, a - (i <= a ? 1 : 0)))
     if (pieces.length - 1 <= 1) setCarousel(false)
+    setDirty(true)
   }
 
   // ---- acciones ----
@@ -109,6 +121,7 @@ export default function App() {
     const proj = serialize()
     const next = upsertProject(proj)
     setProjects(next)
+    setDirty(false)
     showToast('✓ Proyecto guardado')
   }
   function share() {
@@ -135,13 +148,7 @@ export default function App() {
       <div className="topbar">
         <span className="brand">Magoya <b>Studio</b></span>
         {view === 'editor' && (
-          <>
-            <button className="btn ghost-light" onClick={() => setView('gallery')}>← Galería</button>
-            <div className="seg" title="Modo de edición">
-              <button className={mode === 'quick' ? 'on' : ''} onClick={() => setMode('quick')}>Rápido</button>
-              <button className={mode === 'designer' ? 'on' : ''} onClick={() => setMode('designer')}>Diseñador</button>
-            </div>
-          </>
+          <button className="btn ghost-light" onClick={() => setView('gallery')}>← Galería</button>
         )}
         <div className="spacer" />
         {view === 'editor' && (
@@ -169,11 +176,10 @@ export default function App() {
           template={current.template}
           content={current.content}
           format={format}
-          mode={mode}
           slides={carousel ? pieces : null}
           activeSlide={active}
           onChangeContent={changeContent}
-          onChangeFormat={(f) => setFormatId(f.id)}
+          onChangeFormat={(f) => { setFormatId(f.id); setDirty(true) }}
           onSelectSlide={setActive}
           onAddSlide={addSlide}
           onDeleteSlide={deleteSlide}
