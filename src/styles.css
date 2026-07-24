@@ -180,6 +180,11 @@ button { font: inherit; cursor: pointer; }
 .fmt-tag.txt { background: rgba(255,255,255,.9); color: var(--ink-900); }
 .badges { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
 .badge-var { font-size: 10px; font-weight: 600; color: #5C6B61; background: var(--paper-100,#F1EDE7); border: 1px solid var(--paper-200,#E6E1D8); border-radius: 999px; padding: 1px 7px; }
+.action-card { border-style: dashed; border-color: var(--gray-400); }
+.thumb.fixed.action { flex-direction: column; gap: 6px; background: #FBFAF7; color: #5C6B61; text-align: center; padding: 12px; }
+.action-ic { font-size: 30px; color: var(--emerald-600); line-height: 1; }
+.action-t { font-weight: 800; font-size: 14px; color: var(--ink-900); }
+.action-s { font-size: 11px; color: #8A9389; }
 .mine-tag { position: absolute; top: 6px; right: 26px; z-index: 2; font-size: 9px; font-weight: 800; letter-spacing: .06em; padding: 2px 6px; border-radius: 4px; background: var(--lime-300); color: var(--ink-900); }
 .tpl-del { position: absolute; top: 5px; right: 5px; z-index: 3; width: 18px; height: 18px; border-radius: 999px; border: 0; background: rgba(13,12,12,.7); color: #fff; font-size: 10px; line-height: 1; }
 .tpl-del:hover { background: var(--color-danger,#D8514E); }

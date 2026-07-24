@@ -18,6 +18,36 @@ export const TEMPLATES = [blank, zocaloPlaca, fotoTitular, fotoCentrada, carruse
 export const TEMPLATES_BY_ID = Object.fromEntries(TEMPLATES.map((t) => [t.id, t]))
 export const BLANK_TEMPLATE = blank
 
+// El copy NO vive en la plantilla: la plantilla es estructura. Estos son
+// los textos de muestra (placeholders) que se ven en la galería y con los
+// que arranca la edición — el usuario los reemplaza.
+export const PLACEHOLDERS = {
+  kicker: 'ETIQUETA',
+  title: 'Escribí tu título',
+  subtitle: 'Una bajada corta',
+  body: 'Tu texto',
+  metric: '00%',
+  metricLabel: 'Qué mide el dato',
+  quote: 'Tu cita acá',
+  author: 'Autor · Fuente',
+}
+
+// contenido inicial de una plantilla: mantiene el DISEÑO (colores, logo,
+// motivo, objetos) pero reemplaza el copy por placeholders y limpia la foto.
+export function placeholderContent(t) {
+  const d = t.defaults || {}
+  const c = { ...d }
+  delete c.photo
+  ;(t.roles || []).forEach((r) => { c[r] = PLACEHOLDERS[r] ?? '' })
+  if (t.freeform) {
+    c.textBlocks = (d.textBlocks || []).map((b) => ({ style: b.style, text: PLACEHOLDERS[b.style] || 'Tu texto acá' }))
+  } else {
+    c.textBlocks = (d.textBlocks || []).map((b) => ({ ...b }))
+  }
+  c.objects = (d.objects || []).map((o) => ({ ...o }))
+  return c
+}
+
 // categorías para agrupar/filtrar en la galería
 export const CATEGORIES = {
   libre: 'En blanco',

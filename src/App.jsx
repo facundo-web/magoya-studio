@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import Gallery from './editor/Gallery.jsx'
 import Editor from './editor/Editor.jsx'
 import BrandKit from './editor/BrandKit.jsx'
-import { TEMPLATES, TEMPLATES_BY_ID, BLANK_TEMPLATE } from './templates/index.js'
+import { TEMPLATES, TEMPLATES_BY_ID, BLANK_TEMPLATE, placeholderContent } from './templates/index.js'
 import { FORMATS_BY_ID, CAROUSEL_FORMATS } from './formats/registry.js'
 import {
   loadProjects, upsertProject, deleteProject, newProjectId,
@@ -19,19 +19,14 @@ export default function App() {
   const [elements, setElements] = useState([])
   const [customTemplates, setCustomTemplates] = useState([])
   const [toast, setToast] = useState(null)
+  const importRef = useRef(null)
 
   const allTemplates = [...TEMPLATES, ...customTemplates]
   const allById = Object.fromEntries(allTemplates.map((t) => [t.id, t]))
 
-  // contenido inicial desde una plantilla, clonando arrays (sin refs compartidas)
-  const freshContent = (tpl) => {
-    const d = tpl.defaults || {}
-    return {
-      ...d,
-      textBlocks: (d.textBlocks || []).map((b) => ({ ...b })),
-      objects: (d.objects || []).map((o) => ({ ...o })),
-    }
-  }
+  // contenido inicial: estructura de la plantilla con placeholders (el copy
+  // no vive en la plantilla; el usuario lo escribe).
+  const freshContent = (tpl) => placeholderContent(tpl)
 
   // pieza(s) en edición
   const [projectId, setProjectId] = useState(null)
@@ -230,7 +225,13 @@ export default function App() {
             <button className="btn primary" onClick={save}>Guardar</button>
           </>
         )}
-        {view === 'gallery' && <span className="badge">on-brand por diseño · v0.1</span>}
+        {view !== 'editor' && (
+          <>
+            <button className="btn ghost-light" onClick={() => importRef.current?.click()}>Abrir proyecto</button>
+            <input ref={importRef} type="file" accept=".json,application/json" style={{ display: 'none' }}
+              onChange={(e) => e.target.files[0] && importFile(e.target.files[0])} />
+          </>
+        )}
       </div>
 
       {view === 'brandkit' ? (

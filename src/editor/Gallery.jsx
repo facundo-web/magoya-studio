@@ -1,5 +1,5 @@
 import React, { useRef } from 'react'
-import { TEMPLATES, TEMPLATES_BY_ID, CATEGORIES } from '../templates/index.js'
+import { TEMPLATES, TEMPLATES_BY_ID, CATEGORIES, placeholderContent } from '../templates/index.js'
 import { FORMATS_BY_ID, formatsByNetwork } from '../formats/registry.js'
 import PiecePreview from './PiecePreview.jsx'
 
@@ -51,14 +51,8 @@ export default function Gallery({ galleryFormat, setGalleryFormat, templates = T
   return (
     <div className="gallery compact">
       <div className="g-head">
-        <div className="g-head-row">
-          <h1>Magoya Studio</h1>
-          {onStartCarousel && <button className="btn primary" onClick={() => onStartCarousel(fmt)}>⊞ Armar un carrusel</button>}
-          <button className="linklike" onClick={() => fileRef.current?.click()}>¿Te compartieron un proyecto? Abrir .magoya.json</button>
-          <input ref={fileRef} type="file" accept=".json,application/json" style={{ display: 'none' }}
-            onChange={(e) => e.target.files[0] && onImport(e.target.files[0])} />
-        </div>
-        <p className="lead">Piezas para redes <b>on-brand</b> en minutos, sin diseñador. La marca queda <span className="mark">bloqueada</span>.</p>
+        <h1>Crear una pieza</h1>
+        <p className="lead">Elegí la red y una plantilla. Vos ponés la <b>foto y el texto</b>; los colores, la tipografía y el logo ya salen de la marca.</p>
       </div>
 
       {projects && projects.length > 0 && (
@@ -108,6 +102,16 @@ export default function Gallery({ galleryFormat, setGalleryFormat, templates = T
           </div>
         </div>
         <div className="tgrid">
+          {filter === 'all' && onStartCarousel && (
+            <div className="tcard action-card" role="button" tabIndex={0} onClick={() => onStartCarousel(fmt)}
+              onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onStartCarousel(fmt)}>
+              <div className="thumb fixed action">
+                <span className="action-ic">⊞</span>
+                <span className="action-t">Armar un carrusel</span>
+                <span className="action-s">Varias slides, componés cada una</span>
+              </div>
+            </div>
+          )}
           {shownTemplates.map((t) => (
             <div key={t.id} className="tcard" role="button" tabIndex={0} onClick={() => onPick(t, fmt)}
               onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onPick(t, fmt)}>
@@ -117,7 +121,7 @@ export default function Gallery({ galleryFormat, setGalleryFormat, templates = T
                 {t.custom && onDeleteTemplate && (
                   <button className="tpl-del" title="Eliminar plantilla" onClick={(e) => { e.stopPropagation(); onDeleteTemplate(t.id) }}>✕</button>
                 )}
-                <PiecePreview template={t} content={t.defaults} format={fmt} />
+                <PiecePreview template={t} content={placeholderContent(t)} format={fmt} />
               </div>
               <div className="meta">
                 <div className="n">{t.name}</div>
