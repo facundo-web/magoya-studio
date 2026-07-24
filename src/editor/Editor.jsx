@@ -128,7 +128,7 @@ export default function Editor({
         </Section>
 
         <Section title="Objetos · logos & profundidad" summary={objects.length ? `${objects.length}` : 'ninguno'}
-          help="Sumá logos (IA / redes) o tu PNG. Seleccioná uno y arrastralo en la pieza.">
+          help="Sumá logos (IA / redes) o tu PNG. Arrastralos en la pieza y con Profundidad traelos al frente o atrás del texto.">
           <ObjectsBody objects={objects} setObjects={setObjects} updateObject={updateObject}
             selObj={selObj} setSelObj={setSelObj} onToast={onToast}
             elements={elements} onAddElement={onAddElement} onDeleteElement={onDeleteElement} />
@@ -321,6 +321,8 @@ function ObjectsBody({ objects, setObjects, updateObject, selObj, setSelObj, onT
     placeImage(src, elementId)
   }
   const remove = (i) => { setObjects(objects.filter((_, idx) => idx !== i)); setSelObj(null) }
+  const bringFront = (i) => { const a = [...objects]; const [it] = a.splice(i, 1); a.push(it); setObjects(a); setSelObj(a.length - 1) }
+  const sendBack = (i) => { const a = [...objects]; const [it] = a.splice(i, 1); a.unshift(it); setObjects(a); setSelObj(0) }
   const iconsInCat = cat === 'custom' ? [] : ICONS.filter((i) => i.category === cat)
 
   return (
@@ -339,6 +341,15 @@ function ObjectsBody({ objects, setObjects, updateObject, selObj, setSelObj, onT
               <button className={'chip' + (o.style === 'plain' ? ' on' : '')} onClick={() => updateObject(i, { style: 'plain' })}>Plano</button>
             </div>
           )}
+          <label style={{ fontSize: 11, color: '#4A554D' }}>Profundidad</label>
+          <div className="chips" style={{ marginBottom: 6 }}>
+            <button className={'chip' + (!o.front ? ' on' : '')} onClick={() => updateObject(i, { front: false })}>Detrás del texto</button>
+            <button className={'chip' + (o.front ? ' on' : '')} onClick={() => updateObject(i, { front: true })}>Delante del texto</button>
+          </div>
+          <div className="chips" style={{ marginBottom: 10 }}>
+            <button className="chip" onClick={() => bringFront(i)}>↑ Traer al frente</button>
+            <button className="chip" onClick={() => sendBack(i)}>↓ Enviar al fondo</button>
+          </div>
           <label style={{ fontSize: 11, color: '#4A554D' }}>Posición</label>
           <div className="posgrid">
             {POS_GRID.map(([px, py], k) => (

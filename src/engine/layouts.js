@@ -141,8 +141,8 @@ export function drawPiece(b, { template, content, format }) {
     b.rect({ x: hAnchor === 'center' ? W / 2 - ref * 0.06 : safe.x, y: cursorY - gap, w: ref * 0.12, h: Math.max(3, ref * 0.006), fill: p.accent })
   }
 
-  // ---- objetos flotantes (profundidad / movimiento) ----
-  drawObjects(b, { objects: p.objects, W, H, ref })
+  // ---- objetos DETRÁS del texto (profundidad) ----
+  drawObjects(b, { objects: (p.objects || []).filter((o) => !o.front), W, H, ref })
 
   // dibujar bloques
   for (const bl of blocks) {
@@ -159,6 +159,9 @@ export function drawPiece(b, { template, content, format }) {
 
   // ---- logo ----
   drawLogo(b, { p, W, H, safe, ref, textAnchor, hAnchor, vAnchor })
+
+  // ---- objetos DELANTE del texto (profundidad) ----
+  drawObjects(b, { objects: (p.objects || []).filter((o) => o.front), W, H, ref })
 }
 
 function drawObjects(b, { objects, W, H, ref }) {
