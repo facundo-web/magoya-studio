@@ -10,7 +10,7 @@ La marca queda **bloqueada por diseño**: colores, tipografía (Manrope) y logos
 - **Todas las redes**: un registro de formatos con reflow automático por proporción y zonas seguras.
 - **Foto**: subir, B&N (regla de marca) o color, encuadre por punto focal.
 - **Degradés** sobre el fondo (scrim, verde Magoya, glow, etc.) con intensidad.
-- **Objetos / logos**: biblioteca de logos de IA y redes (estilo *app-icon* con profundidad y sombra) + subir PNG propio.
+- **Objetos / logos**: biblioteca de logos de IA y redes (estilo *app-icon* con profundidad y sombra), posicionables por presets o **arrastrando en la pieza**. Cualquiera puede **subir sus propios logos/elementos** (PNG/SVG) a **"Mis elementos"** — quedan guardados y reutilizables siempre, sin tocar código.
 - **Marca**: esquemas de color aprobados, acento, variante de wordmark, logo de cliente.
 - **Dos modos**: *Rápido* (para cualquiera) y *Diseñador* (más control, todo dentro de la marca).
 - **Export**: PNG @2x/@3x (alta calidad, Manrope embebida), JPG, **SVG vectorial**, y **carrusel** (ZIP de PNGs o PDF).

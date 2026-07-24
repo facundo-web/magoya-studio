@@ -47,6 +47,7 @@ function Section({ title, help, summary, defaultOpen = false, children }) {
 export default function Editor({
   template, format, content, slides, activeSlide,
   onChangeContent, onChangeFormat, onSelectSlide, onAddSlide, onDeleteSlide, onToast,
+  elements = [], onAddElement, onDeleteElement,
 }) {
   const [busy, setBusy] = useState(false)
   const [selObj, setSelObj] = useState(null)
@@ -129,7 +130,8 @@ export default function Editor({
         <Section title="Objetos · logos & profundidad" summary={objects.length ? `${objects.length}` : 'ninguno'}
           help="Sumá logos (IA / redes) o tu PNG. Seleccioná uno y arrastralo en la pieza.">
           <ObjectsBody objects={objects} setObjects={setObjects} updateObject={updateObject}
-            selObj={selObj} setSelObj={setSelObj} onToast={onToast} />
+            selObj={selObj} setSelObj={setSelObj} onToast={onToast}
+            elements={elements} onAddElement={onAddElement} onDeleteElement={onDeleteElement} />
         </Section>
 
         <Section title="Marca" summary="colores y logos"
@@ -291,24 +293,35 @@ function GradientBody({ content, set }) {
 }
 
 /* ---------------- Objects ---------------- */
-function ObjectsBody({ objects, setObjects, updateObject, selObj, setSelObj, onToast }) {
+function ObjectsBody({ objects, setObjects, updateObject, selObj, setSelObj, onToast, elements = [], onAddElement, onDeleteElement }) {
   const [picking, setPicking] = useState(false)
   const [cat, setCat] = useState('ai')
   const fileRef = useRef(null)
 
+  const CATS = { ...ICON_CATEGORIES, custom: 'Mis elementos' }
+
+  const placeImage = (src, elementId) => {
+    setObjects([...objects, { kind: 'image', src, elementId, x: 0.72, y: 0.42, scale: 0.32, rotation: 0, shadow: true }])
+    setSelObj(objects.length)
+  }
   const addIcon = (icon) => {
     setObjects([...objects, { kind: 'icon', iconId: icon.id, style: 'tile', x: 0.72, y: 0.42, scale: 0.3, rotation: -8, shadow: true }])
     setSelObj(objects.length)
     setPicking(false)
   }
+  // subir = guardar en la biblioteca (reutilizable) + colocar
   const addImage = async (file) => {
-    if (!file.type.startsWith('image/')) return onToast('No es una imagen')
+    if (!file || !file.type.startsWith('image/')) return onToast('No es una imagen')
     const src = await new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(file) })
-    setObjects([...objects, { kind: 'image', src, x: 0.72, y: 0.42, scale: 0.32, rotation: 0, shadow: true }])
-    setSelObj(objects.length)
+    let elementId
+    if (onAddElement) {
+      const el = onAddElement({ name: file.name.replace(/\.[^.]+$/, ''), src })
+      elementId = el?.id
+    }
+    placeImage(src, elementId)
   }
   const remove = (i) => { setObjects(objects.filter((_, idx) => idx !== i)); setSelObj(null) }
-  const iconsInCat = ICONS.filter((i) => i.category === cat)
+  const iconsInCat = cat === 'custom' ? [] : ICONS.filter((i) => i.category === cat)
 
   return (
     <>
@@ -349,18 +362,38 @@ function ObjectsBody({ objects, setObjects, updateObject, selObj, setSelObj, onT
       {picking && (
         <div style={{ marginTop: 10 }}>
           <div className="chips" style={{ marginBottom: 8 }}>
-            {Object.entries(ICON_CATEGORIES).map(([k, label]) => (
+            {Object.entries(CATS).map(([k, label]) => (
               <button key={k} className={'chip' + (cat === k ? ' on' : '')} onClick={() => setCat(k)}>{label}</button>
             ))}
           </div>
-          <div className="icon-grid">
-            {iconsInCat.map((icon) => (
-              <button key={icon.id} title={icon.label} onClick={() => addIcon(icon)} className="icon-pick" style={{ background: icon.color }}>
-                <img src={icon.url} alt={icon.label} />
-              </button>
-            ))}
-          </div>
-          <div className="hint">También podés subir el PNG oficial (a color) de cualquier logo.</div>
+          {cat === 'custom' ? (
+            <>
+              <div className="icon-grid">
+                <button className="icon-pick upload" title="Subir un elemento" onClick={() => fileRef.current?.click()}>
+                  <span>＋</span>
+                </button>
+                {elements.map((el) => (
+                  <div key={el.id} className="icon-pick custom" title={el.name}>
+                    <img src={el.src} alt={el.name} onClick={() => placeImage(el.src, el.id)} />
+                    <button className="el-del" title="Quitar de la biblioteca"
+                      onClick={(e) => { e.stopPropagation(); onDeleteElement && onDeleteElement(el.id) }}>✕</button>
+                  </div>
+                ))}
+              </div>
+              {elements.length === 0 && <div className="hint">Subí logos o elementos (PNG/SVG). Quedan guardados acá para reusar siempre.</div>}
+            </>
+          ) : (
+            <>
+              <div className="icon-grid">
+                {iconsInCat.map((icon) => (
+                  <button key={icon.id} title={icon.label} onClick={() => addIcon(icon)} className="icon-pick" style={{ background: icon.color }}>
+                    <img src={icon.url} alt={icon.label} />
+                  </button>
+                ))}
+              </div>
+              <div className="hint">¿Falta un logo? Subí el tuyo en <b>Mis elementos</b> — queda guardado para reusar.</div>
+            </>
+          )}
         </div>
       )}
     </>

@@ -44,6 +44,38 @@ export function newProjectId() {
   return 'p_' + Array.from(a, (x) => x.toString(16).padStart(2, '0')).join('')
 }
 
+// ============================================================
+// BIBLIOTECA DE ELEMENTOS PROPIOS (logos / imágenes subidas)
+// Cualquiera puede sumar elementos; quedan guardados y reutilizables.
+// ============================================================
+const ELEMENTS_KEY = 'magoya_studio_elements_v1'
+
+export function loadElements() {
+  try {
+    return JSON.parse(localStorage.getItem(ELEMENTS_KEY) || '[]')
+  } catch {
+    return []
+  }
+}
+
+export function addElement({ name, src }) {
+  const el = { id: newProjectId().replace('p_', 'el_'), name: name || 'Elemento', src }
+  const list = [el, ...loadElements()]
+  try {
+    localStorage.setItem(ELEMENTS_KEY, JSON.stringify(list))
+  } catch (e) {
+    console.warn('[elements] no se pudo guardar (¿lleno?)', e)
+    return { el, saved: false }
+  }
+  return { el, saved: true }
+}
+
+export function deleteElement(id) {
+  const list = loadElements().filter((e) => e.id !== id)
+  localStorage.setItem(ELEMENTS_KEY, JSON.stringify(list))
+  return list
+}
+
 // ---- export / import archivo ----
 export function exportProjectFile(project) {
   const blob = new Blob([JSON.stringify(project, null, 2)], { type: 'application/json' })

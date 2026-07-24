@@ -6,6 +6,7 @@ import { FORMATS_BY_ID } from './formats/registry.js'
 import {
   loadProjects, upsertProject, deleteProject, newProjectId,
   exportProjectFile, importProjectFile, toShareLink, fromShareLink,
+  loadElements, addElement, deleteElement,
 } from './project/store.js'
 
 const DEFAULT_FORMAT = 'ig-post'
@@ -13,6 +14,7 @@ const DEFAULT_FORMAT = 'ig-post'
 export default function App() {
   const [view, setView] = useState('gallery')
   const [projects, setProjects] = useState([])
+  const [elements, setElements] = useState([])
   const [toast, setToast] = useState(null)
 
   // pieza(s) en edición
@@ -27,6 +29,7 @@ export default function App() {
 
   useEffect(() => {
     setProjects(loadProjects())
+    setElements(loadElements())
     // ¿link compartido?
     const shared = fromShareLink()
     if (shared) openFromSerialized(shared)
@@ -142,6 +145,16 @@ export default function App() {
     setProjects(deleteProject(id))
     showToast('Proyecto eliminado')
   }
+  function addCustomElement({ name, src }) {
+    const { el, saved } = addElement({ name, src })
+    setElements(loadElements())
+    if (!saved) showToast('⚠ Guardado local lleno — el elemento no quedó en la biblioteca')
+    return el
+  }
+  function removeCustomElement(id) {
+    setElements(deleteElement(id))
+    showToast('Elemento eliminado de tu biblioteca')
+  }
 
   return (
     <div className="app">
@@ -184,6 +197,9 @@ export default function App() {
           onAddSlide={addSlide}
           onDeleteSlide={deleteSlide}
           onToast={showToast}
+          elements={elements}
+          onAddElement={addCustomElement}
+          onDeleteElement={removeCustomElement}
         />
       ) : (
         <div className="center-note">Cargando…</div>
