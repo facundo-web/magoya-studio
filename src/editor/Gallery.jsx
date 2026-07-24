@@ -56,20 +56,27 @@ export default function Gallery({ galleryFormat, setGalleryFormat, templates = T
       </div>
 
       {projects && projects.length > 0 && (
-        <div className="proj-strip">
-          <span className="strip-label">Tus proyectos:</span>
-          {projects.slice(0, 12).map((p) => {
-            const t = byId[p.templateId]
-            const pf = FORMATS_BY_ID[p.formatId] || fmt
-            return (
-              <div key={p.id} className="proj-mini" title={p.name}>
-                <button className="pm-open" onClick={() => onOpenProject(p)}>
-                  {t && <PiecePreview template={t} content={p.content} format={pf} />}
-                </button>
-                <button className="pm-del" onClick={() => onDeleteProject(p.id)} title="Eliminar">✕</button>
-              </div>
-            )
-          })}
+        <div className="proj-block">
+          <div className="proj-head">Tus proyectos <span className="proj-hint">se guardan solos — seguí donde dejaste</span></div>
+          <div className="proj-row">
+            {projects.slice(0, 12).map((p) => {
+              const pc = p.pieces?.[0]
+              const t = pc && byId[pc.templateId]
+              const pf = FORMATS_BY_ID[p.formatId] || fmt
+              return (
+                <div key={p.id} className="proj-card">
+                  <button className="proj-thumb" onClick={() => onOpenProject(p)} title="Seguir editando">
+                    {t && <PiecePreview template={t} content={pc.content} format={pf} />}
+                  </button>
+                  <div className="proj-meta">
+                    <span className="proj-name" title={p.name}>{p.name || 'Sin título'}</span>
+                    <button className="proj-del" onClick={() => onDeleteProject(p.id)} title="Eliminar proyecto">✕</button>
+                  </div>
+                  <div className="proj-fmt">{pf.network} · {pf.label}</div>
+                </div>
+              )
+            })}
+          </div>
         </div>
       )}
 

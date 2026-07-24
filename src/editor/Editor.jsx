@@ -60,7 +60,7 @@ export default function Editor({
   template, format, content, slides, activeSlide,
   onChangeContent, onChangeFormat, onSelectSlide, onAddSlide, onChangeSlideTemplate, onDeleteSlide, onToast,
   elements = [], onAddElement, onDeleteElement,
-  templates = TEMPLATES, onSaveTemplate,
+  templates = TEMPLATES, onSaveTemplate, onShare, onExportFile,
 }) {
   const [busy, setBusy] = useState(false)
   const [selObj, setSelObj] = useState(null)
@@ -176,7 +176,7 @@ export default function Editor({
           <label className="safe-toggle"><input type="checkbox" checked={showSafe} onChange={(e) => setShowSafe(e.target.checked)} /> Ver zona segura</label>
           <div style={{ flex: 1 }} />
           {canCarousel && !isCarousel && <button className="btn" onClick={() => setChooser('add')}>+ Convertir en carrusel</button>}
-          {onSaveTemplate && <button className="btn" title="Guardar esta pieza como tu plantilla reutilizable" onClick={() => onSaveTemplate()}>☆ Guardar como plantilla</button>}
+          <MoreMenu onSaveTemplate={onSaveTemplate} onShare={onShare} onExportFile={onExportFile} />
           <DownloadMenu template={template} content={content} format={format} slides={slides} busy={busy} setBusy={setBusy} onToast={onToast} />
         </div>
 
@@ -725,6 +725,26 @@ function LogoBody({ content, template, set }) {
         </>
       )}
     </>
+  )
+}
+
+/* ---------------- More menu (acciones de proyecto) ---------------- */
+function MoreMenu({ onSaveTemplate, onShare, onExportFile }) {
+  const [open, setOpen] = useState(false)
+  const act = (fn) => { setOpen(false); fn && fn() }
+  return (
+    <div className="menu">
+      <button className="btn" onClick={() => setOpen((o) => !o)}>Más ▾</button>
+      {open && (
+        <div className="menu-pop" onMouseLeave={() => setOpen(false)}>
+          <div className="grp">Compartir</div>
+          <button onClick={() => act(onShare)}><span>Copiar link de la pieza</span><span>↗</span></button>
+          <button onClick={() => act(onExportFile)}><span>Exportar proyecto (.json)</span><span>↓</span></button>
+          <div className="grp">Reusar</div>
+          <button onClick={() => act(onSaveTemplate)}><span>Guardar como plantilla</span><span>☆</span></button>
+        </div>
+      )}
+    </div>
   )
 }
 

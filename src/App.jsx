@@ -219,10 +219,8 @@ export default function App() {
         <div className="spacer" />
         {view === 'editor' && (
           <>
+            <span className="save-status" title="Tu trabajo se guarda solo">{dirty ? '• Sin guardar' : '✓ Guardado'}</span>
             <button className="btn ghost-light" onClick={() => setView('gallery')}>‹ Volver al inicio</button>
-            <button className="btn ghost-light" onClick={() => exportProjectFile(serialize())} title="Guardá el proyecto como archivo para compartirlo o seguir después">Exportar archivo</button>
-            <button className="btn ghost-light" onClick={share}>Compartir link</button>
-            <button className="btn primary" onClick={save}>Guardar</button>
           </>
         )}
         {view !== 'editor' && (
@@ -265,6 +263,8 @@ export default function App() {
           onToast={showToast}
           templates={allTemplates}
           onSaveTemplate={saveAsTemplate}
+          onShare={share}
+          onExportFile={() => exportProjectFile(serialize())}
           elements={elements}
           onAddElement={addCustomElement}
           onDeleteElement={removeCustomElement}
