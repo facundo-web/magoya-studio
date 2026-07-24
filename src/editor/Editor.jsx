@@ -4,6 +4,7 @@ import { TEMPLATES } from '../templates/index.js'
 import { FORMATS_BY_ID, formatsByNetwork, CAROUSEL_FORMATS } from '../formats/registry.js'
 import { COLOR_SCHEMES, ACCENTS, WORDMARKS, CLIENT_LOGOS, TEXT_STYLES, GRADIENTS, HIGHLIGHTS } from '../brand/brandKit.js'
 import { ALL_OBJECTS, ICONS_BY_ID, ICON_CATEGORIES } from '../brand/iconLibrary.js'
+import { PHOTOS } from '../brand/photoLibrary.js'
 
 // colores para teñir logos "sin fondo" y marcas
 const TINTS = [
@@ -289,6 +290,14 @@ function ContentBody({ template, content, set }) {
 function PhotoBody({ content, set, inputRef, onPhotoFile }) {
   const photo = content.photo
   const treatment = content.treatment || 'bw'
+  // foto de la biblioteca → dataURL (para que exporte bien) + dims naturales
+  const useLibraryPhoto = async (url) => {
+    const res = await fetch(url)
+    const blob = await res.blob()
+    const src = await new Promise((r) => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(blob) })
+    const natural = await imageSize(src)
+    set({ photo: { src, natural, focal: content.photo?.focal || { x: 0.5, y: 0.5 } } })
+  }
   return (
     <>
       <div className={'dropzone' + (photo?.src ? ' has' : '')}
@@ -298,6 +307,15 @@ function PhotoBody({ content, set, inputRef, onPhotoFile }) {
         {photo?.src ? '✓ Foto cargada — click para cambiar' : 'Arrastrá una foto o hacé click'}
       </div>
       <input ref={inputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => e.target.files[0] && onPhotoFile(e.target.files[0])} />
+
+      <label style={{ fontSize: 11, color: '#4A554D', marginTop: 10, display: 'block' }}>Biblioteca Magoya</label>
+      <div className="photo-lib">
+        {PHOTOS.map((p) => (
+          <button key={p.slug} className="photo-lib-item" title={p.label} onClick={() => useLibraryPhoto(p.url)}>
+            <img src={p.url} alt={p.label} loading="lazy" />
+          </button>
+        ))}
+      </div>
 
       <div className="field" style={{ marginTop: 12 }}>
         <label>Tratamiento</label>

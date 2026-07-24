@@ -225,6 +225,11 @@ button { font: inherit; cursor: pointer; }
 .icon-pick.custom { background: #fff; border: 1px solid var(--paper-200,#E6E1D8); }
 .icon-pick.custom img { width: 78%; height: 78%; object-fit: contain; cursor: pointer; }
 .icon-pick.upload { background: #FBFAF7; border: 1.5px dashed var(--gray-400); color: #8A9389; font-size: 22px; }
+/* biblioteca de fotos */
+.photo-lib { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 6px; }
+.photo-lib-item { aspect-ratio: 1/1; border: 1px solid var(--paper-200,#E6E1D8); border-radius: 8px; overflow: hidden; padding: 0; background: #20302A; }
+.photo-lib-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.photo-lib-item:hover { border-color: var(--emerald-500); }
 .el-del { position: absolute; top: -6px; right: -6px; width: 18px; height: 18px; border-radius: 999px; border: 0; background: var(--ink-900); color: #fff; font-size: 10px; line-height: 1; display: flex; align-items: center; justify-content: center; }
 
 /* stage: zona segura, cta de foto, drag */
