@@ -79,6 +79,9 @@ export default function Editor({
   const objects = content.objects || []
   const setObjects = (next) => set({ objects: next })
   const updateObject = (i, patch) => setObjects(objects.map((o, idx) => (idx === i ? { ...o, ...patch } : o)))
+  const objRemove = (i) => { setObjects(objects.filter((_, idx) => idx !== i)); setSelObj(null) }
+  const objBringFront = (i) => { const a = [...objects]; const [it] = a.splice(i, 1); a.push(it); setObjects(a); setSelObj(a.length - 1) }
+  const objSendBack = (i) => { const a = [...objects]; const [it] = a.splice(i, 1); a.unshift(it); setObjects(a); setSelObj(0) }
 
   // foto: subir → dataURL (compartido entre panel y overlay)
   const onPhotoFile = async (file) => {
@@ -143,7 +146,7 @@ export default function Editor({
   const needsPhoto = template.surface === 'photo' && !content.photo?.src
 
   return (
-    <div className="editor">
+    <div className={'editor' + (selObj != null ? ' has-sel' : '')}>
       <div className="sidebar">
         <div className="side-head">
           <div className="sh-name">{template.name}</div>
@@ -190,8 +193,8 @@ export default function Editor({
 
         <Section title="Objetos · logos & profundidad" summary={objects.length ? `${objects.length}` : 'ninguno'}
           help="Sumá logos (IA / redes) o tu PNG. Arrastralos en la pieza y con Profundidad traelos al frente o atrás del texto.">
-          <ObjectsBody objects={objects} setObjects={setObjects} updateObject={updateObject}
-            selObj={selObj} setSelObj={setSelObj} onToast={onToast}
+          <ObjectsBody objects={objects} setObjects={setObjects}
+            selObj={selObj} setSelObj={setSelObj} objRemove={objRemove} onToast={onToast}
             elements={elements} onAddElement={onAddElement} onDeleteElement={onDeleteElement} />
         </Section>
 
@@ -295,6 +298,21 @@ export default function Editor({
           </div>
         )}
       </div>
+
+      <aside className="inspector">
+        {selObj != null && objects[selObj] ? (
+          <>
+            <div className="insp-kicker">Propiedades del elemento</div>
+            <ObjectProps o={objects[selObj]} i={selObj} updateObject={updateObject} objRemove={objRemove} objBringFront={objBringFront} objSendBack={objSendBack} />
+          </>
+        ) : (
+          <div className="insp-empty">
+            <div className="insp-empty-ic">☞</div>
+            Seleccioná un elemento en la pieza para editar sus propiedades acá.
+            <span className="insp-empty-sub">Doble-click en un texto para editarlo directo.</span>
+          </div>
+        )}
+      </aside>
     </div>
   )
 }
@@ -415,12 +433,11 @@ function GradientBody({ content, set }) {
   )
 }
 
-/* ---------------- Objects ---------------- */
-function ObjectsBody({ objects, setObjects, updateObject, selObj, setSelObj, onToast, elements = [], onAddElement, onDeleteElement }) {
+/* ---------------- Objects: insertar + lista (izquierda) ---------------- */
+function ObjectsBody({ objects, setObjects, selObj, setSelObj, objRemove, onToast, elements = [], onAddElement, onDeleteElement }) {
   const [picking, setPicking] = useState(false)
   const [cat, setCat] = useState('ai')
   const fileRef = useRef(null)
-
   const CATS = { ...ICON_CATEGORIES, custom: 'Mis elementos' }
 
   const placeImage = async (src, elementId) => {
@@ -429,120 +446,37 @@ function ObjectsBody({ objects, setObjects, updateObject, selObj, setSelObj, onT
     setSelObj(objects.length)
   }
   const addIcon = (icon) => {
-    // el logo de Magoya se coloca como imagen (mantiene su color y proporción)
-    if (icon.category === 'magoya') {
-      placeImage(getAsset(icon.url) || icon.url)
-      setPicking(false)
-      return
-    }
+    if (icon.category === 'magoya') { placeImage(getAsset(icon.url) || icon.url); setPicking(false); return }
     const isMark = !!icon.isMark
-    setObjects([...objects, {
-      kind: 'icon', iconId: icon.id,
-      style: isMark ? 'plain' : 'tile',
-      tint: isMark ? 'accent' : undefined,
-      x: 0.72, y: 0.42, scale: isMark ? 0.34 : 0.3, rotation: isMark ? 0 : -8, shadow: true, opacity: 1,
-    }])
+    setObjects([...objects, { kind: 'icon', iconId: icon.id, style: isMark ? 'plain' : 'tile', tint: isMark ? 'accent' : undefined, x: 0.72, y: 0.42, scale: isMark ? 0.34 : 0.3, rotation: isMark ? 0 : -8, shadow: true, opacity: 1 }])
     setSelObj(objects.length)
     setPicking(false)
   }
-  // subir = guardar en la biblioteca (reutilizable) + colocar
   const addImage = async (file) => {
     if (!file || !file.type.startsWith('image/')) return onToast('No es una imagen')
     const src = await new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(file) })
     let elementId
-    if (onAddElement) {
-      const el = onAddElement({ name: file.name.replace(/\.[^.]+$/, ''), src })
-      elementId = el?.id
-    }
+    if (onAddElement) { const el = onAddElement({ name: file.name.replace(/\.[^.]+$/, ''), src }); elementId = el?.id }
     placeImage(src, elementId)
   }
-  const remove = (i) => { setObjects(objects.filter((_, idx) => idx !== i)); setSelObj(null) }
-  const bringFront = (i) => { const a = [...objects]; const [it] = a.splice(i, 1); a.push(it); setObjects(a); setSelObj(a.length - 1) }
-  const sendBack = (i) => { const a = [...objects]; const [it] = a.splice(i, 1); a.unshift(it); setObjects(a); setSelObj(0) }
   const iconsInCat = cat === 'custom' ? [] : ALL_OBJECTS.filter((i) => i.category === cat)
 
   return (
     <>
-      {objects.map((o, i) => {
-        const objIcon = o.kind === 'icon' ? ICONS_BY_ID[o.iconId] : null
-        const isMark = !!objIcon?.isMark
-        const showTint = o.kind === 'icon' && (isMark || o.style === 'plain')
-        return (
-        <div key={i} className={'obj-card' + (selObj === i ? ' sel' : '')}>
-          <div className="obj-head">
-            <button className="obj-name" onClick={() => setSelObj(selObj === i ? null : i)}>
-              {selObj === i ? '◉ ' : '○ '}{o.kind === 'image' ? 'PNG subido' : (objIcon?.label || 'Logo')}
-            </button>
-            <button className="btn" style={{ padding: '2px 8px' }} onClick={() => remove(i)}>✕</button>
-          </div>
-          {o.kind === 'icon' && !isMark && (
-            <div className="chips" style={{ marginBottom: 8 }}>
-              <button className={'chip' + (o.style !== 'plain' ? ' on' : '')} onClick={() => updateObject(i, { style: 'tile' })}>Con fondo (app-icon)</button>
-              <button className={'chip' + (o.style === 'plain' ? ' on' : '')} onClick={() => updateObject(i, { style: 'plain' })}>Sin fondo</button>
-            </div>
-          )}
-          {o.kind === 'image' && (
-            <>
-              <div className="chips" style={{ marginBottom: 8 }}>
-                <button className={'chip' + (!o.frame ? ' on' : '')} onClick={() => updateObject(i, { frame: false })}>Imagen libre</button>
-                <button className={'chip' + (o.frame ? ' on' : '')} onClick={() => updateObject(i, { frame: true, ratio: o.ratio || 0.62 })} title="Recortá la imagen en un marco, ej: dentro de una pantalla">Recorte / pantalla</button>
+      {objects.length > 0 && (
+        <div className="obj-list">
+          {objects.map((o, i) => {
+            const oi = o.kind === 'icon' ? ICONS_BY_ID[o.iconId] : null
+            return (
+              <div key={i} className={'obj-row' + (selObj === i ? ' sel' : '')}>
+                <button className="obj-row-name" onClick={() => setSelObj(i)}>{selObj === i ? '◉ ' : '○ '}{o.kind === 'image' ? 'PNG / foto' : (oi?.label || 'Logo')}</button>
+                <button className="obj-row-del" onClick={() => objRemove(i)} title="Quitar">✕</button>
               </div>
-              {o.frame && (
-                <>
-                  <label style={{ fontSize: 11, color: '#4A554D' }}>Proporción (ancho/alto)</label>
-                  <input className="range" type="range" min="0.3" max="1.8" step="0.02" value={o.ratio || 0.62} onChange={(e) => updateObject(i, { ratio: +e.target.value })} />
-                  <label style={{ fontSize: 11, color: '#4A554D' }}>Radio de esquinas</label>
-                  <input className="range" type="range" min="0" max="0.3" step="0.01" value={o.radius || 0} onChange={(e) => updateObject(i, { radius: +e.target.value })} />
-                  <label style={{ fontSize: 11, color: '#4A554D' }}>Zoom de la imagen</label>
-                  <input className="range" type="range" min="1" max="3" step="0.05" value={o.zoom || 1} onChange={(e) => updateObject(i, { zoom: +e.target.value })} />
-                  <label style={{ fontSize: 11, color: '#4A554D' }}>Encuadre X / Y</label>
-                  <input className="range" type="range" min="0" max="1" step="0.01" value={o.focal?.x ?? 0.5} onChange={(e) => updateObject(i, { focal: { ...(o.focal || { x: 0.5, y: 0.5 }), x: +e.target.value } })} />
-                  <input className="range" type="range" min="0" max="1" step="0.01" value={o.focal?.y ?? 0.5} onChange={(e) => updateObject(i, { focal: { ...(o.focal || { x: 0.5, y: 0.5 }), y: +e.target.value } })} />
-                </>
-              )}
-            </>
-          )}
-          {showTint && (
-            <>
-              <label style={{ fontSize: 11, color: '#4A554D' }}>Color</label>
-              <div className="swatches" style={{ marginBottom: 8 }}>
-                {TINTS.map((t) => (
-                  <button key={t.k} className={'sw' + ((o.tint || 'accent') === t.value ? ' on' : '')} title={t.label}
-                    style={{ background: t.sw }} onClick={() => updateObject(i, { tint: t.value })} />
-                ))}
-              </div>
-            </>
-          )}
-          <label style={{ fontSize: 11, color: '#4A554D' }}>Profundidad</label>
-          <div className="chips" style={{ marginBottom: 6 }}>
-            <button className={'chip' + (!o.front ? ' on' : '')} onClick={() => updateObject(i, { front: false })}>Detrás del texto</button>
-            <button className={'chip' + (o.front ? ' on' : '')} onClick={() => updateObject(i, { front: true })}>Delante del texto</button>
-          </div>
-          <div className="chips" style={{ marginBottom: 10 }}>
-            <button className="chip" onClick={() => bringFront(i)}>↑ Traer al frente</button>
-            <button className="chip" onClick={() => sendBack(i)}>↓ Enviar al fondo</button>
-          </div>
-          <label style={{ fontSize: 11, color: '#4A554D' }}>Posición</label>
-          <div className="posgrid">
-            {POS_GRID.map(([px, py], k) => (
-              <button key={k} className={'posdot' + (Math.abs((o.x ?? 0.5) - px) < 0.02 && Math.abs((o.y ?? 0.5) - py) < 0.02 ? ' on' : '')}
-                onClick={() => updateObject(i, { x: px, y: py })} title="Ubicar acá" />
-            ))}
-          </div>
-          <label style={{ fontSize: 11, color: '#4A554D' }}>Tamaño</label>
-          <input className="range" type="range" min="0.08" max="0.7" step="0.01" value={o.scale} onChange={(e) => updateObject(i, { scale: +e.target.value })} />
-          <label style={{ fontSize: 11, color: '#4A554D' }}>Rotación</label>
-          <input className="range" type="range" min="-45" max="45" step="1" value={o.rotation} onChange={(e) => updateObject(i, { rotation: +e.target.value })} />
-          <label style={{ fontSize: 11, color: '#4A554D' }}>Opacidad (para fondos tenues)</label>
-          <input className="range" type="range" min="0.1" max="1" step="0.05" value={o.opacity ?? 1} onChange={(e) => updateObject(i, { opacity: +e.target.value })} />
-          <label style={{ fontSize: 11, color: '#4A554D' }}>Sombra (profundidad)</label>
-          <div className="chips">
-            <button className={'chip' + (o.shadow !== false ? ' on' : '')} onClick={() => updateObject(i, { shadow: true })}>Con sombra</button>
-            <button className={'chip' + (o.shadow === false ? ' on' : '')} onClick={() => updateObject(i, { shadow: false })}>Sin sombra</button>
-          </div>
+            )
+          })}
+          <div className="hint">Tocá un elemento (acá o en la pieza) → editás sus propiedades a la derecha.</div>
         </div>
-        )
-      })}
+      )}
 
       <div style={{ display: 'flex', gap: 6, marginTop: objects.length ? 8 : 0 }}>
         <button className="btn" onClick={() => setPicking((v) => !v)}>+ Elemento (logos, trazos…)</button>
@@ -560,14 +494,11 @@ function ObjectsBody({ objects, setObjects, updateObject, selObj, setSelObj, onT
           {cat === 'custom' ? (
             <>
               <div className="icon-grid">
-                <button className="icon-pick upload" title="Subir un elemento" onClick={() => fileRef.current?.click()}>
-                  <span>＋</span>
-                </button>
+                <button className="icon-pick upload" title="Subir un elemento" onClick={() => fileRef.current?.click()}><span>＋</span></button>
                 {elements.map((el) => (
                   <div key={el.id} className="icon-pick custom" title={el.name}>
                     <img src={el.src} alt={el.name} onClick={() => placeImage(el.src, el.id)} />
-                    <button className="el-del" title="Quitar de la biblioteca"
-                      onClick={(e) => { e.stopPropagation(); onDeleteElement && onDeleteElement(el.id) }}>✕</button>
+                    <button className="el-del" title="Quitar de la biblioteca" onClick={(e) => { e.stopPropagation(); onDeleteElement && onDeleteElement(el.id) }}>✕</button>
                   </div>
                 ))}
               </div>
@@ -587,6 +518,84 @@ function ObjectsBody({ objects, setObjects, updateObject, selObj, setSelObj, onT
           )}
         </div>
       )}
+    </>
+  )
+}
+
+/* ---------------- Object properties (panel derecho / inspector) ---------------- */
+function ObjectProps({ o, i, updateObject, objRemove, objBringFront, objSendBack }) {
+  const objIcon = o.kind === 'icon' ? ICONS_BY_ID[o.iconId] : null
+  const isMark = !!objIcon?.isMark
+  const showTint = o.kind === 'icon' && (isMark || o.style === 'plain')
+  return (
+    <>
+      <div className="insp-head">
+        <span className="insp-name">{o.kind === 'image' ? 'PNG / foto' : (objIcon?.label || 'Logo')}</span>
+        <button className="btn" style={{ padding: '2px 8px' }} onClick={() => objRemove(i)}>Quitar</button>
+      </div>
+      {o.kind === 'icon' && !isMark && (
+        <div className="chips" style={{ marginBottom: 8 }}>
+          <button className={'chip' + (o.style !== 'plain' ? ' on' : '')} onClick={() => updateObject(i, { style: 'tile' })}>Con fondo (app-icon)</button>
+          <button className={'chip' + (o.style === 'plain' ? ' on' : '')} onClick={() => updateObject(i, { style: 'plain' })}>Sin fondo</button>
+        </div>
+      )}
+      {o.kind === 'image' && (
+        <>
+          <div className="chips" style={{ marginBottom: 8 }}>
+            <button className={'chip' + (!o.frame ? ' on' : '')} onClick={() => updateObject(i, { frame: false })}>Imagen libre</button>
+            <button className={'chip' + (o.frame ? ' on' : '')} onClick={() => updateObject(i, { frame: true, ratio: o.ratio || 0.62 })} title="Recortá la imagen en un marco, ej: dentro de una pantalla">Recorte / pantalla</button>
+          </div>
+          {o.frame && (
+            <>
+              <label>Proporción (ancho/alto)</label>
+              <input className="range" type="range" min="0.3" max="1.8" step="0.02" value={o.ratio || 0.62} onChange={(e) => updateObject(i, { ratio: +e.target.value })} />
+              <label>Radio de esquinas</label>
+              <input className="range" type="range" min="0" max="0.3" step="0.01" value={o.radius || 0} onChange={(e) => updateObject(i, { radius: +e.target.value })} />
+              <label>Zoom de la imagen</label>
+              <input className="range" type="range" min="1" max="3" step="0.05" value={o.zoom || 1} onChange={(e) => updateObject(i, { zoom: +e.target.value })} />
+              <label>Encuadre X / Y</label>
+              <input className="range" type="range" min="0" max="1" step="0.01" value={o.focal?.x ?? 0.5} onChange={(e) => updateObject(i, { focal: { ...(o.focal || { x: 0.5, y: 0.5 }), x: +e.target.value } })} />
+              <input className="range" type="range" min="0" max="1" step="0.01" value={o.focal?.y ?? 0.5} onChange={(e) => updateObject(i, { focal: { ...(o.focal || { x: 0.5, y: 0.5 }), y: +e.target.value } })} />
+            </>
+          )}
+        </>
+      )}
+      {showTint && (
+        <>
+          <label>Color</label>
+          <div className="swatches" style={{ marginBottom: 8 }}>
+            {TINTS.map((t) => (
+              <button key={t.k} className={'sw' + ((o.tint || 'accent') === t.value ? ' on' : '')} title={t.label} style={{ background: t.sw }} onClick={() => updateObject(i, { tint: t.value })} />
+            ))}
+          </div>
+        </>
+      )}
+      <label>Profundidad</label>
+      <div className="chips" style={{ marginBottom: 6 }}>
+        <button className={'chip' + (!o.front ? ' on' : '')} onClick={() => updateObject(i, { front: false })}>Detrás del texto</button>
+        <button className={'chip' + (o.front ? ' on' : '')} onClick={() => updateObject(i, { front: true })}>Delante del texto</button>
+      </div>
+      <div className="chips" style={{ marginBottom: 10 }}>
+        <button className="chip" onClick={() => objBringFront(i)}>↑ Traer al frente</button>
+        <button className="chip" onClick={() => objSendBack(i)}>↓ Enviar al fondo</button>
+      </div>
+      <label>Posición</label>
+      <div className="posgrid">
+        {POS_GRID.map(([px, py], k) => (
+          <button key={k} className={'posdot' + (Math.abs((o.x ?? 0.5) - px) < 0.02 && Math.abs((o.y ?? 0.5) - py) < 0.02 ? ' on' : '')} onClick={() => updateObject(i, { x: px, y: py })} title="Ubicar acá" />
+        ))}
+      </div>
+      <label>Tamaño</label>
+      <input className="range" type="range" min="0.08" max="0.7" step="0.01" value={o.scale} onChange={(e) => updateObject(i, { scale: +e.target.value })} />
+      <label>Rotación</label>
+      <input className="range" type="range" min="-45" max="45" step="1" value={o.rotation} onChange={(e) => updateObject(i, { rotation: +e.target.value })} />
+      <label>Opacidad (para fondos tenues)</label>
+      <input className="range" type="range" min="0.1" max="1" step="0.05" value={o.opacity ?? 1} onChange={(e) => updateObject(i, { opacity: +e.target.value })} />
+      <label>Sombra (profundidad)</label>
+      <div className="chips">
+        <button className={'chip' + (o.shadow !== false ? ' on' : '')} onClick={() => updateObject(i, { shadow: true })}>Con sombra</button>
+        <button className={'chip' + (o.shadow === false ? ' on' : '')} onClick={() => updateObject(i, { shadow: false })}>Sin sombra</button>
+      </div>
     </>
   )
 }
