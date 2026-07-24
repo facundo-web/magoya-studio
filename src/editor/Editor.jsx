@@ -64,9 +64,28 @@ export default function Editor({
 }) {
   const [busy, setBusy] = useState(false)
   const [selObj, setSelObj] = useState(null)
+  const [selText, setSelText] = useState(null) // eid del texto seleccionado
   const [hoverObj, setHoverObj] = useState(null)
   const [editing, setEditing] = useState(null) // edición de texto in-place
   const [showSafe, setShowSafe] = useState(false)
+  const [panelW, setPanelW] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('magoya_panels_v1')) || { left: 300, right: 320 } } catch { return { left: 300, right: 320 } }
+  })
+  const startResize = (side, e) => {
+    e.preventDefault()
+    const startX = e.clientX
+    const startW = panelW[side]
+    const move = (ev) => {
+      const dx = ev.clientX - startX
+      const w = Math.max(220, Math.min(480, side === 'left' ? startW + dx : startW - dx))
+      setPanelW((p) => ({ ...p, [side]: w }))
+    }
+    const up = () => {
+      window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up)
+      setPanelW((p) => { try { localStorage.setItem('magoya_panels_v1', JSON.stringify(p)) } catch {} return p })
+    }
+    window.addEventListener('pointermove', move); window.addEventListener('pointerup', up)
+  }
   const [chooser, setChooser] = useState(null) // null | 'add' | 'change'
   const frameRef = useRef(null)
   const photoInputRef = useRef(null)
@@ -112,10 +131,14 @@ export default function Editor({
     const cx = format.w * (o.x ?? 0.72), cy = format.h * (o.y ?? 0.5)
     return { left: ((cx - w / 2) / format.w) * 100, top: ((cy - h / 2) / format.h) * 100, w: (w / format.w) * 100, h: (h / format.h) * 100, rot: o.rotation || 0 }
   }
-  const startDrag = (e, i) => { e.stopPropagation(); setSelObj(i); dragRef.current.i = i }
+  const startDrag = (e, i) => { e.stopPropagation(); setSelObj(i); setSelText(null); dragRef.current.i = i }
   const onFrameMove = (e) => { if (dragRef.current.i != null) updateObject(dragRef.current.i, posFromEvent(e)) }
   const endDrag = () => { dragRef.current.i = null }
-  const onFrameDown = (e) => { if (e.target === frameRef.current || e.target.tagName === 'svg' || e.target.tagName === 'IMAGE') setSelObj(null) }
+  const onFrameDown = (e) => {
+    const t = e.target.closest && e.target.closest('text[data-eid]')
+    if (t) { setSelText(t.getAttribute('data-eid')); setSelObj(null); return }
+    if (e.target === frameRef.current || e.target.tagName === 'svg' || e.target.tagName === 'IMAGE') { setSelObj(null); setSelText(null) }
+  }
 
   // ---- editar texto tocándolo sobre la pieza ----
   const getText = (eid) => {
@@ -147,7 +170,7 @@ export default function Editor({
 
   return (
     <div className={'editor' + (selObj != null ? ' has-sel' : '')}>
-      <div className="sidebar">
+      <div className="sidebar" style={{ width: panelW.left }}>
         <div className="side-head">
           <div className="sh-name">{template.name}</div>
           {template.purpose && <div className="sh-purpose">{template.purpose}</div>}
@@ -203,6 +226,8 @@ export default function Editor({
           {template.freeform ? <LogoBody content={content} template={template} set={set} /> : <BrandBody content={content} template={template} set={set} />}
         </Section>
       </div>
+
+      <div className="col-resize" onPointerDown={(e) => startResize('left', e)} title="Arrastrá para ajustar el panel" />
 
       <div className="stage">
         <div className="stage-tools">
@@ -299,17 +324,24 @@ export default function Editor({
         )}
       </div>
 
-      <aside className="inspector">
+      <div className="col-resize" onPointerDown={(e) => startResize('right', e)} title="Arrastrá para ajustar el panel" />
+
+      <aside className="inspector" style={{ width: panelW.right }}>
         {selObj != null && objects[selObj] ? (
           <>
             <div className="insp-kicker">Propiedades del elemento</div>
             <ObjectProps o={objects[selObj]} i={selObj} updateObject={updateObject} objRemove={objRemove} objBringFront={objBringFront} objSendBack={objSendBack} />
           </>
+        ) : selText ? (
+          <>
+            <div className="insp-kicker">Propiedades del texto</div>
+            <TextProps eid={selText} content={content} set={set} getText={getText} setText={setText} />
+          </>
         ) : (
           <div className="insp-empty">
             <div className="insp-empty-ic">☞</div>
-            Seleccioná un elemento en la pieza para editar sus propiedades acá.
-            <span className="insp-empty-sub">Doble-click en un texto para editarlo directo.</span>
+            Tocá un elemento o un texto en la pieza para editar sus propiedades acá.
+            <span className="insp-empty-sub">Doble-click en un texto para escribir directo.</span>
           </div>
         )}
       </aside>
@@ -786,6 +818,42 @@ function LogoBody({ content, template, set }) {
             </select>
           </div>
         </>
+      )}
+    </>
+  )
+}
+
+/* ---------------- Text properties (panel derecho / inspector) ---------------- */
+function TextProps({ eid, content, set, getText, setText }) {
+  const isTb = eid.startsWith('tb:')
+  const idx = isTb ? +eid.slice(3) : -1
+  const block = isTb ? (content.textBlocks || [])[idx] : null
+  const val = getText(eid)
+  const updateBlock = (patch) => set({ textBlocks: (content.textBlocks || []).map((b, i) => (i === idx ? { ...b, ...patch } : b)) })
+  return (
+    <>
+      <div className="insp-head"><span className="insp-name">Texto</span></div>
+      <label>Contenido</label>
+      <textarea value={val} onChange={(e) => setText(eid, e.target.value)} rows={2} />
+      {isTb && block ? (
+        <>
+          <label>Estilo</label>
+          <select value={block.style || 'title'} onChange={(e) => updateBlock({ style: e.target.value })}>
+            {TEXT_STYLE_OPTS.map((o) => <option key={o.k} value={o.k}>{o.label}</option>)}
+          </select>
+          {block.style !== 'cta' && (
+            <>
+              <label>Resaltado (marcador)</label>
+              <div className="chips">
+                {Object.entries(HIGHLIGHTS).map(([k, hl]) => (
+                  <button key={k} className={'chip' + ((block.highlight || 'none') === k ? ' on' : '')} onClick={() => updateBlock({ highlight: k })}>{hl.label}</button>
+                ))}
+              </div>
+            </>
+          )}
+        </>
+      ) : (
+        <div className="hint">El estilo y el tamaño de este texto los define la plantilla (marca bloqueada).</div>
       )}
     </>
   )

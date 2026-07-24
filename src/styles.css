@@ -79,9 +79,13 @@ button { font: inherit; cursor: pointer; }
 .tcard .meta .c { font-size: 12px; color: #8A9389; }
 
 /* ---------- Editor layout ---------- */
-.editor { flex: 1; display: grid; grid-template-columns: 300px 1fr 320px; min-height: 0; }
-@media (max-width: 1040px) { .editor { grid-template-columns: 280px 1fr; } .inspector { display: none; } .editor.has-sel .inspector { display: block; position: fixed; right: 0; top: 52px; bottom: 0; width: 300px; z-index: 40; box-shadow: -8px 0 30px rgba(0,0,0,.15); } }
-@media (max-width: 860px) { .editor { grid-template-columns: 1fr; } }
+.editor { flex: 1; display: flex; min-height: 0; }
+.editor .sidebar, .editor .inspector { flex: none; }
+.editor .stage { flex: 1; min-width: 0; }
+.col-resize { flex: none; width: 7px; cursor: col-resize; background: transparent; position: relative; z-index: 6; }
+.col-resize::before { content: ''; position: absolute; left: 3px; top: 0; bottom: 0; width: 1px; background: var(--paper-200,#E6E1D8); }
+.col-resize:hover::before, .col-resize:active::before { background: var(--emerald-500); width: 2px; left: 2.5px; }
+@media (max-width: 860px) { .editor { flex-direction: column; } .editor .sidebar, .editor .inspector { width: auto !important; } .col-resize { display: none; } .editor .stage { order: -1; } }
 /* inspector (panel derecho de propiedades) */
 .inspector { border-left: 1px solid var(--paper-200,#E6E1D8); background: #FBFAF7; overflow: auto; padding: 16px; }
 .inspector label { display: block; font-size: 11px; font-weight: 600; color: #4A554D; margin: 8px 0 4px; }
