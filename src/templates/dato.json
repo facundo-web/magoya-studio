@@ -1,0 +1,19 @@
+{
+  "id": "dato",
+  "name": "Dato / métrica",
+  "category": "metric",
+  "surface": "solid",
+  "anchor": "center-left",
+  "motif": true,
+  "roles": ["kicker", "metric", "metricLabel"],
+  "defaults": {
+    "scheme": "ink",
+    "accent": "emerald",
+    "logo": "cream",
+    "clientLogo": "none",
+    "hasPhoto": false,
+    "kicker": "IMPACTO",
+    "metric": "−70%",
+    "metricLabel": "tickets de soporte en campo"
+  }
+}

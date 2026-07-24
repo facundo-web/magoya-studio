@@ -1,0 +1,19 @@
+{
+  "id": "foto-centrada",
+  "name": "Foto con mensaje centrado",
+  "category": "zocalo",
+  "surface": "photo",
+  "anchor": "center-center",
+  "zocalo": false,
+  "roles": ["title", "subtitle"],
+  "defaults": {
+    "scheme": "deep",
+    "accent": "emerald",
+    "logo": "cream",
+    "clientLogo": "none",
+    "hasPhoto": true,
+    "treatment": "bw",
+    "title": "El campo no espera",
+    "subtitle": "Soporte que responde donde está el productor."
+  }
+}

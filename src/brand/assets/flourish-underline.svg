@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 26" fill="none">
+  <!-- subrayado a mano: dos trazos sueltos, no perfectos -->
+  <path d="M5 16 C 48 7, 96 20, 142 11 C 184 3, 214 12, 235 9"
+        stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+  <path d="M14 21 C 70 15, 120 24, 176 17 C 200 14, 218 19, 230 17"
+        stroke="currentColor" stroke-width="3" stroke-linecap="round" opacity=".55"/>
+</svg>

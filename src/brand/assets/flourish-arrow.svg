@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 130 100" fill="none">
+  <!-- flecha garabateada curva -->
+  <path d="M14 14 C 56 26, 84 40, 88 78"
+        stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+  <path d="M66 64 C 76 72, 84 76, 88 80 C 92 74, 98 66, 110 58"
+        stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

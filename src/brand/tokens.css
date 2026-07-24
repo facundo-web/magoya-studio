@@ -1,0 +1,194 @@
+/* ============================================================
+   MAGOYA · DESIGN SYSTEM — TOKENS  v0.2
+   Capa 1: Primitivos (valor crudo, no usar directo en UI)
+   Capa 2: Semánticos (var --color-*  →  esto es lo que se usa)
+   ------------------------------------------------------------
+   Fuente autoritativa: guía de producción Magoya (buzo/bordado).
+   ✔ = color oficial de marca.   + = derivado para completar
+   escala (hover, bordes, fondos, data-viz).
+   Tipografía: Manrope (variable) — Google Fonts.
+   ============================================================ */
+
+:root {
+  /* ---------- 1. PRIMITIVOS ---------- */
+
+  /* Verde Magoya — institucional / superficies oscuras */
+  --green-950: #0C2117;   /* + el más profundo (fondo) */
+  --green-900: #133825;   /* ✔ Verde Magoya oficial */
+  --green-800: #1A4A31;   /* + superficie elevada */
+  --green-700: #235F40;   /* + bordes / hover sobre oscuro */
+
+  /* Emerald — verde digital / acento (del wordmark) */
+  --emerald-400: #33E886; /* + claro */
+  --emerald-500: #00DE68; /* ✔ acento digital */
+  --emerald-600: #00B856; /* + hover */
+  --emerald-700: #009145; /* + pressed */
+
+  /* Verdes de soporte (solo data-viz / decorativo, del moodboard) */
+  --leaf-300: #88E755;    /* ✔ */
+  --leaf-400: #3FDF75;    /* ✔ */
+  --leaf-500: #33DB4E;    /* ✔ */
+
+  /* Crema Magoya — neutro cálido firma */
+  --cream-50:  #F6F1EB;   /* + casi blanco cálido */
+  --cream-100: #ECE3DB;   /* ✔ Crema Magoya oficial */
+  --cream-200: #DCD0C4;   /* + */
+  --cream-300: #C4B5A6;   /* + */
+
+  /* CAPA EXPRESIVA / EDITORIAL — papel, spring & lime marcador */
+  --paper-50:  #F7F4EF;   /* + canvas claro */
+  --paper-100: #F1EDE7;   /* + canvas editorial (greige) — lienzo de presentaciones */
+  --paper-200: #E6E1D8;   /* + bordes suaves sobre papel */
+  --spring-300:#9CEBAB;   /* + bloque spring claro */
+  --spring-500:#4FD46A;   /* + bloque spring (energía / stats) */
+  --lime-300:  #CBF06E;   /* + MARCADOR / highlight detrás de texto */
+  --lime-400:  #B6E84F;   /* + marcador fuerte / estado activo */
+
+  /* Neutros / grises (cálidos, de la guía) */
+  --ink-900: #0D0C0C;     /* ✔ negro logo */
+  --gray-800: #222222;    /* ✔ */
+  --gray-600: #666666;    /* ✔ */
+  --gray-400: #AAAAAA;    /* ✔ */
+  --gray-300: #D0D0D0;    /* ✔ */
+  --white: #FFFFFF;       /* ✔ */
+
+  /* Funcionales (estados) */
+  --success-500: var(--emerald-500);
+  --info-500:    #2E7DD1;   /* + */
+  --warning-500: #E0A33A;   /* + */
+  --danger-500:  #D8514E;   /* + */
+
+
+  /* ---------- 2. SEMÁNTICOS (tema = verde profundo, default Magoya) ---------- */
+
+  /* Fondos y superficies */
+  --color-bg:             var(--green-950);
+  --color-surface:        var(--green-900);
+  --color-surface-raised: var(--green-800);
+  --color-overlay:        rgba(12,33,23,.75);
+
+  /* Texto */
+  --color-text:         var(--cream-50);    /* principal (logo crema sobre verde) */
+  --color-text-muted:   var(--cream-300);   /* secundario */
+  --color-text-subtle:  #8FA396;            /* terciario / captions (verde-grisáceo) */
+  --color-text-inverse: var(--green-900);   /* sobre fondos claros/acento */
+
+  /* Acento / marca */
+  --color-accent:       var(--emerald-500);
+  --color-accent-hover: var(--emerald-600);
+  --color-accent-text:  var(--green-950);   /* texto SOBRE el verde digital */
+  --color-mark:         var(--lime-300);    /* resaltado a mano detrás de palabras */
+
+  /* Bordes y líneas */
+  --color-border:        rgba(236,227,219,.16);
+  --color-border-strong: var(--green-700);
+  --color-focus:         var(--emerald-500);
+
+  /* Estados */
+  --color-success: var(--success-500);
+  --color-info:    var(--info-500);
+  --color-warning: var(--warning-500);
+  --color-danger:  var(--danger-500);
+
+
+  /* ---------- 3. ESCALAS NO-COLOR ---------- */
+
+  /* Tipografía — Manrope variable */
+  --font-display: "Manrope", system-ui, sans-serif;
+  --font-body:    "Manrope", system-ui, sans-serif;
+  --font-mono:    ui-monospace, "SF Mono", Menlo, monospace;
+
+  /* Escala tipográfica (ratio 1.25 / major third) */
+  --text-xs:   0.75rem;   /* 12 */
+  --text-sm:   0.875rem;  /* 14 */
+  --text-base: 1rem;      /* 16 */
+  --text-lg:   1.25rem;   /* 20 */
+  --text-xl:   1.563rem;  /* 25 */
+  --text-2xl:  1.953rem;  /* 31 */
+  --text-3xl:  2.441rem;  /* 39 */
+  --text-4xl:  3.052rem;  /* 49 */
+  --text-5xl:  3.815rem;  /* 61 */
+
+  --leading-tight: 1.1;
+  --leading-snug:  1.3;
+  --leading-normal:1.55;
+
+  /* Manrope: pesos disponibles 200–800 */
+  --weight-regular: 400;
+  --weight-medium:  500;
+  --weight-semibold:600;
+  --weight-bold:    700;
+  --weight-extra:   800;
+  --tracking-tight: -0.02em;
+  --tracking-wide:  0.12em;
+
+  /* Espaciado (base 4px) */
+  --space-1: 0.25rem; --space-2: 0.5rem;  --space-3: 0.75rem;
+  --space-4: 1rem;    --space-5: 1.5rem;  --space-6: 2rem;
+  --space-8: 3rem;    --space-10: 4rem;   --space-12: 6rem;
+
+  /* Radios */
+  --radius-sm: 6px; --radius-md: 12px; --radius-lg: 20px; --radius-full: 999px;
+
+  /* Sombras */
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.3);
+  --shadow-md: 0 10px 30px rgba(0,0,0,.35);
+  --shadow-glow: 0 0 0 1px var(--emerald-500), 0 0 28px rgba(0,222,104,.28);
+}
+
+/* ---------- TEMA CLARO / CREMA (slides sobre fondo claro) ---------- */
+[data-theme="light"] {
+  --color-bg:             var(--cream-100);
+  --color-surface:        var(--cream-50);
+  --color-surface-raised: var(--white);
+  --color-text:           var(--green-900);
+  --color-text-muted:     var(--gray-600);
+  --color-text-subtle:    var(--gray-400);
+  --color-text-inverse:   var(--cream-50);
+  --color-accent:         var(--emerald-600);
+  --color-accent-hover:   var(--emerald-700);
+  --color-accent-text:    var(--white);
+  --color-border:         var(--cream-200);
+  --color-border-strong:  var(--cream-300);
+}
+
+/* ---------- TEMA PAPER / EDITORIAL (lienzo de presentaciones y marketing) ----------
+   Es la capa expresiva: papel greige cálido, texto verde profundo,
+   botones sólidos oscuros (estilo editorial) y lime como marcador. */
+[data-theme="paper"] {
+  --color-bg:             var(--paper-100);
+  --color-surface:        var(--paper-50);
+  --color-surface-raised: var(--white);
+  --color-text:           var(--green-900);
+  --color-text-muted:     #5C6B61;          /* verde-grisáceo */
+  --color-text-subtle:    #8A9389;
+  --color-text-inverse:   var(--paper-50);
+  --color-accent:         var(--green-900); /* botón sólido oscuro */
+  --color-accent-hover:   var(--green-800);
+  --color-accent-text:    var(--cream-50);
+  --color-mark:           var(--lime-300);  /* highlight detrás de palabras */
+  --color-border:         var(--paper-200);
+  --color-border-strong:  #CFC8BC;
+}
+
+/* ---------- TEMA STUDIO (blanco + negro + verde) ----------
+   La capa de slides/marketing del deck: equilibrio negro↔verde.
+   Negro = estructura/gravitas · verde = vida/energía (≈20-30%). */
+[data-theme="studio"] {
+  --color-bg:             var(--white);
+  --color-surface:        #F6F6F3;
+  --color-surface-raised: var(--white);
+  --color-text:           var(--ink-900);   /* negro cálido = lo tecnológico */
+  --color-text-muted:     var(--gray-600);
+  --color-text-subtle:    var(--gray-400);
+  --color-text-inverse:   var(--white);
+  --color-accent:         var(--emerald-500);/* verde energía */
+  --color-accent-hover:   var(--emerald-600);
+  --color-accent-text:    var(--ink-900);
+  --color-mark:           var(--lime-400);
+  --color-border:         #E7E7E2;
+  --color-border-strong:  #D2D2CC;
+  /* roles de la capa expresiva */
+  --color-motif:          var(--lime-400);  /* acento del motivo Estratos */
+  --color-energy:         var(--emerald-500);/* bloques de color / acentos vivos */
+}

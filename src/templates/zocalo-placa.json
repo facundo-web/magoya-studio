@@ -1,0 +1,19 @@
+{
+  "id": "zocalo-placa",
+  "name": "Zócalo sobre foto (placa)",
+  "category": "zocalo",
+  "surface": "photo",
+  "anchor": "bottom-left",
+  "zocalo": true,
+  "roles": ["kicker", "title"],
+  "defaults": {
+    "scheme": "deep",
+    "accent": "emerald",
+    "logo": "cream",
+    "clientLogo": "none",
+    "hasPhoto": true,
+    "treatment": "bw",
+    "kicker": "AI EN CAMPO",
+    "title": "Decisiones agronómicas en tiempo real"
+  }
+}

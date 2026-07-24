@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 200" fill="none">
+  <!-- mancha orgánica para poner DETRÁS de ilustraciones (rellena con fill) -->
+  <path d="M48 36 C 96 8, 168 6, 202 38 C 234 68, 230 116, 198 150 C 162 188, 92 196, 50 168 C 10 142, 4 70, 48 36 Z"
+        fill="currentColor"/>
+</svg>

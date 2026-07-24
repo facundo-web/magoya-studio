@@ -1,0 +1,19 @@
+{
+  "id": "bloque-color",
+  "name": "Bloque de color (anuncio)",
+  "category": "post",
+  "surface": "solid",
+  "anchor": "bottom-left",
+  "motif": true,
+  "roles": ["kicker", "title", "subtitle"],
+  "defaults": {
+    "scheme": "studio",
+    "accent": "emerald",
+    "logo": "black",
+    "clientLogo": "none",
+    "hasPhoto": false,
+    "kicker": "NOVEDAD",
+    "title": "AgTech challenges demand more than code",
+    "subtitle": "Estrategia y ejecución, embebidos en tu equipo."
+  }
+}

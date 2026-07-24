@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 270 120" fill="none">
+  <!-- círculo a mano que encierra una palabra: abierto arriba, con overshoot -->
+  <path d="M196 22 C 120 6, 44 12, 24 44 C 8 70, 46 102, 132 104 C 214 106, 258 78, 246 44 C 240 28, 222 19, 200 15"
+        stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+</svg>

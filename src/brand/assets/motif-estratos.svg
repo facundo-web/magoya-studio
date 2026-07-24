@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 250" fill="none">
+  <!-- ESTRATOS — capas de suelo / datos. Lenguaje visual abstracto de Magoya.
+       Bandas horizontales apiladas con desfase. Multi-tono sobre fondo oscuro. -->
+  <rect x="30"  y="22"  width="244" height="18" rx="9" fill="#235F40"/>
+  <rect x="84"  y="48"  width="246" height="18" rx="9" fill="#2DB14D"/>
+  <rect x="30"  y="74"  width="178" height="18" rx="9" fill="#ECE3DB" fill-opacity="0.25"/>
+  <rect x="58"  y="100" width="272" height="18" rx="9" fill="#00DE68"/>
+  <rect x="30"  y="126" width="214" height="18" rx="9" fill="#235F40"/>
+  <rect x="100" y="152" width="230" height="18" rx="9" fill="#CBF06E"/>
+  <rect x="30"  y="178" width="196" height="18" rx="9" fill="#2DB14D"/>
+  <rect x="72"  y="204" width="258" height="18" rx="9" fill="none" stroke="#ECE3DB" stroke-opacity="0.3" stroke-width="2"/>
+</svg>

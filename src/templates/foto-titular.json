@@ -1,0 +1,20 @@
+{
+  "id": "foto-titular",
+  "name": "Foto con titular",
+  "category": "zocalo",
+  "surface": "photo",
+  "anchor": "bottom-left",
+  "zocalo": false,
+  "roles": ["kicker", "title", "subtitle"],
+  "defaults": {
+    "scheme": "deep",
+    "accent": "emerald",
+    "logo": "cream",
+    "clientLogo": "none",
+    "hasPhoto": true,
+    "treatment": "bw",
+    "kicker": "CASO DE USO",
+    "title": "Menos vueltas, más agronomía",
+    "subtitle": "Cómo un retailer bajó 70% los tickets de soporte."
+  }
+}

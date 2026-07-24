@@ -1,0 +1,18 @@
+{
+  "id": "cita",
+  "name": "Cita / testimonial",
+  "category": "quote",
+  "surface": "solid",
+  "anchor": "center-left",
+  "motif": true,
+  "roles": ["quote", "author"],
+  "defaults": {
+    "scheme": "deep",
+    "accent": "emerald",
+    "logo": "cream",
+    "clientLogo": "none",
+    "hasPhoto": false,
+    "quote": "Cuesta distinguir a un empleado nuestro de uno de Magoya.",
+    "author": "Cliente — Apeel Sciences"
+  }
+}

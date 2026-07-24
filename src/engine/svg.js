@@ -1,0 +1,160 @@
+// ============================================================
+// SVG SERIALIZER — primitivas → string SVG.
+// Fuente única de la pieza: un <svg> con <image> (fotos/logos),
+// <rect> (zócalos/scrim) y <text> (con tracking manual).
+// ============================================================
+
+import { FONT_STACK } from '../brand/brandKit.js'
+
+export function esc(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
+
+// Builder acumula defs + body
+export function createBuilder() {
+  const defs = []
+  const body = []
+  let uid = 0
+  const id = (p) => `${p}${uid++}`
+  return {
+    defs,
+    body,
+    id,
+    rect({ x, y, w, h, fill, rx = 0, opacity = 1 }) {
+      body.push(
+        `<rect x="${n(x)}" y="${n(y)}" width="${n(w)}" height="${n(h)}" rx="${n(rx)}" fill="${fill}" opacity="${opacity}"/>`
+      )
+    },
+    // gradiente lineal (scrim de legibilidad)
+    scrim({ x, y, w, h, dir = 'bottom', from = 'rgba(0,0,0,0)', to = 'rgba(0,0,0,0.72)' }) {
+      const gid = id('scrim')
+      // dir bottom → oscuro abajo
+      const coords =
+        dir === 'bottom'
+          ? 'x1="0" y1="0" x2="0" y2="1"'
+          : dir === 'top'
+          ? 'x1="0" y1="1" x2="0" y2="0"'
+          : 'x1="0" y1="0" x2="1" y2="0'
+      defs.push(
+        `<linearGradient id="${gid}" ${coords}><stop offset="0" stop-color="${from}"/><stop offset="1" stop-color="${to}"/></linearGradient>`
+      )
+      body.push(`<rect x="${n(x)}" y="${n(y)}" width="${n(w)}" height="${n(h)}" fill="url(#${gid})"/>`)
+    },
+    // imagen con cover + focal point + B&N opcional
+    imageCover({ x, y, w, h, href, natural, focal = { x: 0.5, y: 0.5 }, grayscale = false }) {
+      if (!href) {
+        // placeholder si no hay foto
+        this.rect({ x, y, w, h, fill: '#20302A' })
+        return
+      }
+      const clipId = id('clip')
+      defs.push(`<clipPath id="${clipId}"><rect x="${n(x)}" y="${n(y)}" width="${n(w)}" height="${n(h)}"/></clipPath>`)
+      let filterAttr = ''
+      if (grayscale) {
+        const fId = id('bw')
+        defs.push(
+          `<filter id="${fId}"><feColorMatrix type="matrix" values="0.33 0.33 0.33 0 0  0.33 0.33 0.33 0 0  0.33 0.33 0.33 0 0  0 0 0 1 0"/></filter>`
+        )
+        filterAttr = ` filter="url(#${fId})"`
+      }
+      let ix = x
+      let iy = y
+      let iw = w
+      let ih = h
+      if (natural && natural.w && natural.h) {
+        const scale = Math.max(w / natural.w, h / natural.h)
+        iw = natural.w * scale
+        ih = natural.h * scale
+        ix = x - (iw - w) * focal.x
+        iy = y - (ih - h) * focal.y
+      }
+      const par = natural ? 'none' : 'xMidYMid slice'
+      body.push(
+        `<g clip-path="url(#${clipId})"${filterAttr}><image href="${href}" x="${n(ix)}" y="${n(iy)}" width="${n(iw)}" height="${n(ih)}" preserveAspectRatio="${par}"/></g>`
+      )
+    },
+    // imagen de asset (logo/motivo), fit contain
+    asset({ x, y, w, h, href, opacity = 1 }) {
+      if (!href) return
+      body.push(
+        `<image href="${href}" x="${n(x)}" y="${n(y)}" width="${n(w)}" height="${n(h)}" preserveAspectRatio="xMidYMid meet" opacity="${opacity}"/>`
+      )
+    },
+    // degradé overlay a pantalla completa (por encima del fondo)
+    gradientOverlay({ w, h, angle = 180, stops, opacity = 1 }) {
+      const gid = id('grad')
+      // ángulo → vector (0=arriba→abajo? usamos 180 = abajo)
+      const rad = ((angle - 90) * Math.PI) / 180
+      const x1 = 0.5 - Math.cos(rad) / 2
+      const y1 = 0.5 - Math.sin(rad) / 2
+      const x2 = 0.5 + Math.cos(rad) / 2
+      const y2 = 0.5 + Math.sin(rad) / 2
+      const stopsSvg = stops
+        .map((s) => `<stop offset="${s.at}" stop-color="${s.color}" stop-opacity="${s.opacity ?? 1}"/>`)
+        .join('')
+      defs.push(
+        `<linearGradient id="${gid}" x1="${n(x1)}" y1="${n(y1)}" x2="${n(x2)}" y2="${n(y2)}">${stopsSvg}</linearGradient>`
+      )
+      body.push(`<rect x="0" y="0" width="${n(w)}" height="${n(h)}" fill="url(#${gid})" opacity="${opacity}"/>`)
+    },
+    // objeto flotante: ícono en "tile" (app-icon) o imagen, con sombra + rotación
+    object({ cx, cy, size, rotation = 0, href, tile = false, tileColor = '#000', tileRadius = 0.22, shadow = true, iconInset = 0.22 }) {
+      if (!href) return
+      const half = size / 2
+      const x = cx - half
+      const y = cy - half
+      let filterAttr = ''
+      if (shadow) {
+        const fId = id('sh')
+        const blur = size * 0.06
+        defs.push(
+          `<filter id="${fId}" x="-40%" y="-40%" width="180%" height="180%"><feDropShadow dx="0" dy="${n(size * 0.05)}" stdDeviation="${n(blur)}" flood-color="#000000" flood-opacity="0.35"/></filter>`
+        )
+        filterAttr = ` filter="url(#${fId})"`
+      }
+      const transform = rotation ? ` transform="rotate(${n(rotation)} ${n(cx)} ${n(cy)})"` : ''
+      let inner = ''
+      if (tile) {
+        const r = size * tileRadius
+        const pad = size * iconInset
+        inner =
+          `<rect x="${n(x)}" y="${n(y)}" width="${n(size)}" height="${n(size)}" rx="${n(r)}" fill="${tileColor}"/>` +
+          `<image href="${href}" x="${n(x + pad)}" y="${n(y + pad)}" width="${n(size - pad * 2)}" height="${n(size - pad * 2)}" preserveAspectRatio="xMidYMid meet"/>`
+      } else {
+        inner = `<image href="${href}" x="${n(x)}" y="${n(y)}" width="${n(size)}" height="${n(size)}" preserveAspectRatio="xMidYMid meet"/>`
+      }
+      body.push(`<g${transform}${filterAttr}>${inner}</g>`)
+    },
+    // texto multilínea con tracking
+    text({ x, y, lines, px, weight = 400, fill, anchor = 'start', tracking = 0, lineHeight = 1.15 }) {
+      const ls = tracking * px
+      const tspans = lines
+        .map((ln, i) => `<tspan x="${n(x)}" dy="${i === 0 ? 0 : n(px * lineHeight)}">${esc(ln)}</tspan>`)
+        .join('')
+      body.push(
+        `<text x="${n(x)}" y="${n(y + px * 0.8)}" font-family="${FONT_STACK}" font-size="${n(px)}" font-weight="${weight}" letter-spacing="${n(ls)}" fill="${fill}" text-anchor="${anchor}" style="white-space:pre">${tspans}</text>`
+      )
+    },
+  }
+}
+
+function n(v) {
+  return Math.round((Number(v) + Number.EPSILON) * 100) / 100
+}
+
+// arma el documento SVG completo
+export function svgDoc({ w, h, builder, fontFaceCss = '' }) {
+  const defs = builder.defs.join('')
+  const style = fontFaceCss ? `<style>${fontFaceCss}</style>` : ''
+  return (
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">` +
+    style +
+    (defs ? `<defs>${defs}</defs>` : '') +
+    builder.body.join('') +
+    `</svg>`
+  )
+}
