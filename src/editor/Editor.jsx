@@ -124,11 +124,27 @@ export default function Editor({
           <FormatBody format={format} onChangeFormat={onChangeFormat} />
         </Section>
 
-        <Section title="Contenido" defaultOpen help="Editá los textos de la pieza.">
-          <ContentBody template={template} content={content} set={set} />
-        </Section>
+        {template.freeform ? (
+          <>
+            <Section title="Fondo" defaultOpen summary={(content.bg || 'color') === 'photo' ? 'foto' : 'color'}
+              help="Elegí el fondo: un color de marca o una foto.">
+              <BgBody content={content} set={set} inputRef={photoInputRef} onPhotoFile={onPhotoFile} />
+            </Section>
+            <Section title="Textos" defaultOpen summary={`${(content.textBlocks || []).length}`}
+              help="Sumá los textos que quieras. Cada uno con su estilo de marca.">
+              <TextBlocksBody content={content} set={set} />
+            </Section>
+            <Section title="Posición del texto" summary={content.anchor || template.anchor}>
+              <AnchorBody content={content} template={template} set={set} />
+            </Section>
+          </>
+        ) : (
+          <Section title="Contenido" defaultOpen help="Editá los textos de la pieza.">
+            <ContentBody template={template} content={content} set={set} />
+          </Section>
+        )}
 
-        {template.surface === 'photo' && (
+        {!template.freeform && template.surface === 'photo' && (
           <Section title="Foto" defaultOpen summary={content.photo?.src ? '✓ cargada' : 'falta'}
             help="Subí una foto. Sale en B&N (regla de marca) por defecto.">
             <PhotoBody content={content} set={set} inputRef={photoInputRef} onPhotoFile={onPhotoFile} />
@@ -147,9 +163,9 @@ export default function Editor({
             elements={elements} onAddElement={onAddElement} onDeleteElement={onDeleteElement} />
         </Section>
 
-        <Section title="Marca" summary="colores y logos"
-          help="Colores, acento y logos — todo dentro de la marca.">
-          <BrandBody content={content} template={template} set={set} />
+        <Section title={template.freeform ? 'Logo' : 'Marca'} summary={template.freeform ? (content.showLogo === false ? 'oculto' : 'visible') : 'colores y logos'}
+          help={template.freeform ? 'Mostrá u ocultá el logo de Magoya.' : 'Colores, acento y logos — todo dentro de la marca.'}>
+          {template.freeform ? <LogoBody content={content} template={template} set={set} /> : <BrandBody content={content} template={template} set={set} />}
         </Section>
       </div>
 
@@ -198,8 +214,9 @@ export default function Editor({
                 <PiecePreview template={s.template} content={s.content} format={format} />
               </button>
             ))}
-            <button className="add" onClick={() => setChooser('add')} title="Agregar slide con otro diseño">+</button>
-            <button className="btn" style={{ marginLeft: 8 }} onClick={() => setChooser('change')}>Cambiar diseño</button>
+            <button className="add" onClick={() => onAddSlide()} title="Agregar slide en blanco (componer con bloques)">+</button>
+            <button className="btn" style={{ marginLeft: 8 }} onClick={() => setChooser('add')}>Desde plantilla</button>
+            <button className="btn" onClick={() => setChooser('change')}>Cambiar diseño</button>
             {slides.length > 1 && <button className="btn" onClick={() => onDeleteSlide(activeSlide)}>Borrar slide</button>}
           </div>
         )}
@@ -334,8 +351,9 @@ function ObjectsBody({ objects, setObjects, updateObject, selObj, setSelObj, onT
 
   const CATS = { ...ICON_CATEGORIES, custom: 'Mis elementos' }
 
-  const placeImage = (src, elementId) => {
-    setObjects([...objects, { kind: 'image', src, elementId, x: 0.72, y: 0.42, scale: 0.32, rotation: 0, shadow: true }])
+  const placeImage = async (src, elementId) => {
+    const natural = await imageSize(src)
+    setObjects([...objects, { kind: 'image', src, elementId, natural, x: 0.72, y: 0.42, scale: 0.34, rotation: 0, shadow: true, opacity: 1 }])
     setSelObj(objects.length)
   }
   const addIcon = (icon) => {
@@ -384,6 +402,27 @@ function ObjectsBody({ objects, setObjects, updateObject, selObj, setSelObj, onT
               <button className={'chip' + (o.style !== 'plain' ? ' on' : '')} onClick={() => updateObject(i, { style: 'tile' })}>Con fondo (app-icon)</button>
               <button className={'chip' + (o.style === 'plain' ? ' on' : '')} onClick={() => updateObject(i, { style: 'plain' })}>Sin fondo</button>
             </div>
+          )}
+          {o.kind === 'image' && (
+            <>
+              <div className="chips" style={{ marginBottom: 8 }}>
+                <button className={'chip' + (!o.frame ? ' on' : '')} onClick={() => updateObject(i, { frame: false })}>Imagen libre</button>
+                <button className={'chip' + (o.frame ? ' on' : '')} onClick={() => updateObject(i, { frame: true, ratio: o.ratio || 0.62 })} title="Recortá la imagen en un marco, ej: dentro de una pantalla">Recorte / pantalla</button>
+              </div>
+              {o.frame && (
+                <>
+                  <label style={{ fontSize: 11, color: '#4A554D' }}>Proporción (ancho/alto)</label>
+                  <input className="range" type="range" min="0.3" max="1.8" step="0.02" value={o.ratio || 0.62} onChange={(e) => updateObject(i, { ratio: +e.target.value })} />
+                  <label style={{ fontSize: 11, color: '#4A554D' }}>Radio de esquinas</label>
+                  <input className="range" type="range" min="0" max="0.3" step="0.01" value={o.radius || 0} onChange={(e) => updateObject(i, { radius: +e.target.value })} />
+                  <label style={{ fontSize: 11, color: '#4A554D' }}>Zoom de la imagen</label>
+                  <input className="range" type="range" min="1" max="3" step="0.05" value={o.zoom || 1} onChange={(e) => updateObject(i, { zoom: +e.target.value })} />
+                  <label style={{ fontSize: 11, color: '#4A554D' }}>Encuadre X / Y</label>
+                  <input className="range" type="range" min="0" max="1" step="0.01" value={o.focal?.x ?? 0.5} onChange={(e) => updateObject(i, { focal: { ...(o.focal || { x: 0.5, y: 0.5 }), x: +e.target.value } })} />
+                  <input className="range" type="range" min="0" max="1" step="0.01" value={o.focal?.y ?? 0.5} onChange={(e) => updateObject(i, { focal: { ...(o.focal || { x: 0.5, y: 0.5 }), y: +e.target.value } })} />
+                </>
+              )}
+            </>
           )}
           {showTint && (
             <>
@@ -506,6 +545,126 @@ function BrandBody({ content, template, set }) {
           {Object.entries(CLIENT_LOGOS).map(([k, l]) => (<option key={k} value={k}>{l.label}</option>))}
         </select>
       </div>
+    </>
+  )
+}
+
+/* ---------------- Freeform: Fondo / Textos / Posición / Logo ---------------- */
+const TEXT_STYLE_OPTS = [
+  { k: 'title', label: 'Título' },
+  { k: 'subtitle', label: 'Bajada' },
+  { k: 'kicker', label: 'Etiqueta' },
+  { k: 'metric', label: 'Dato (número grande)' },
+  { k: 'metricLabel', label: 'Descripción del dato' },
+  { k: 'quote', label: 'Cita' },
+]
+
+function BgBody({ content, set, inputRef, onPhotoFile }) {
+  const bg = content.bg || 'color'
+  const scheme = content.scheme || 'ink'
+  const accent = content.accent || 'emerald'
+  return (
+    <>
+      <div className="chips" style={{ marginBottom: 10 }}>
+        <button className={'chip' + (bg === 'color' ? ' on' : '')} onClick={() => set({ bg: 'color' })}>Color</button>
+        <button className={'chip' + (bg === 'photo' ? ' on' : '')} onClick={() => set({ bg: 'photo' })}>Foto</button>
+      </div>
+      {bg === 'color' ? (
+        <div className="field"><label>Color de fondo</label>
+          <div className="swatches">
+            {Object.entries(COLOR_SCHEMES).map(([k, s]) => (
+              <button key={k} className={'sw' + (scheme === k ? ' on' : '')} title={s.label} style={{ background: s.surface }} onClick={() => set({ scheme: k })} />
+            ))}
+          </div>
+        </div>
+      ) : (
+        <PhotoBody content={content} set={set} inputRef={inputRef} onPhotoFile={onPhotoFile} />
+      )}
+      <div className="field"><label>Acento</label>
+        <div className="swatches">
+          {Object.entries(ACCENTS).map(([k, a]) => (
+            <button key={k} className={'sw' + (accent === k ? ' on' : '')} title={a.label} style={{ background: a.value }} onClick={() => set({ accent: k })} />
+          ))}
+        </div>
+      </div>
+    </>
+  )
+}
+
+function TextBlocksBody({ content, set }) {
+  const blocks = content.textBlocks || []
+  const update = (i, patch) => set({ textBlocks: blocks.map((b, idx) => (idx === i ? { ...b, ...patch } : b)) })
+  const add = () => set({ textBlocks: [...blocks, { style: 'title', text: 'Nuevo texto' }] })
+  const remove = (i) => set({ textBlocks: blocks.filter((_, idx) => idx !== i) })
+  const move = (i, dir) => { const a = [...blocks]; const j = i + dir; if (j < 0 || j >= a.length) return; [a[i], a[j]] = [a[j], a[i]]; set({ textBlocks: a }) }
+  return (
+    <>
+      {blocks.map((b, i) => (
+        <div key={i} className="obj-card">
+          <div className="obj-head">
+            <select value={b.style} onChange={(e) => update(i, { style: e.target.value })} style={{ fontSize: 12, padding: '4px 6px', flex: 1 }}>
+              {TEXT_STYLE_OPTS.map((o) => <option key={o.k} value={o.k}>{o.label}</option>)}
+            </select>
+            <span style={{ display: 'flex', gap: 4, marginLeft: 6 }}>
+              <button className="btn" style={{ padding: '2px 6px' }} onClick={() => move(i, -1)}>↑</button>
+              <button className="btn" style={{ padding: '2px 6px' }} onClick={() => move(i, 1)}>↓</button>
+              <button className="btn" style={{ padding: '2px 8px' }} onClick={() => remove(i)}>✕</button>
+            </span>
+          </div>
+          <textarea value={b.text} onChange={(e) => update(i, { text: e.target.value })} rows={2} />
+        </div>
+      ))}
+      <button className="btn" onClick={add}>+ Agregar texto</button>
+    </>
+  )
+}
+
+function AnchorBody({ content, template, set }) {
+  const cur = content.anchor || template.anchor || 'bottom-left'
+  const [v, h] = cur.split('-')
+  const setA = (nv, nh) => set({ anchor: `${nv}-${nh}` })
+  return (
+    <>
+      <label style={{ fontSize: 11, color: '#4A554D' }}>Vertical</label>
+      <div className="chips" style={{ marginBottom: 8 }}>
+        {[['top', 'Arriba'], ['center', 'Centro'], ['bottom', 'Abajo']].map(([k, l]) => (
+          <button key={k} className={'chip' + (v === k ? ' on' : '')} onClick={() => setA(k, h)}>{l}</button>
+        ))}
+      </div>
+      <label style={{ fontSize: 11, color: '#4A554D' }}>Horizontal</label>
+      <div className="chips">
+        {[['left', 'Izquierda'], ['center', 'Centro']].map(([k, l]) => (
+          <button key={k} className={'chip' + (h === k ? ' on' : '')} onClick={() => setA(v, k)}>{l}</button>
+        ))}
+      </div>
+    </>
+  )
+}
+
+function LogoBody({ content, template, set }) {
+  const showLogo = content.showLogo !== false
+  const logo = content.logo || template.defaults?.logo || 'cream'
+  const clientLogo = content.clientLogo || 'none'
+  return (
+    <>
+      <div className="chips" style={{ marginBottom: 10 }}>
+        <button className={'chip' + (showLogo ? ' on' : '')} onClick={() => set({ showLogo: true })}>Con logo</button>
+        <button className={'chip' + (!showLogo ? ' on' : '')} onClick={() => set({ showLogo: false })}>Sin logo</button>
+      </div>
+      {showLogo && (
+        <>
+          <div className="field"><label>Logo Magoya</label>
+            <select value={logo} onChange={(e) => set({ logo: e.target.value })}>
+              {Object.entries(WORDMARKS).map(([k, w]) => (<option key={k} value={k}>{w.label}</option>))}
+            </select>
+          </div>
+          <div className="field"><label>Logo de cliente</label>
+            <select value={clientLogo} onChange={(e) => set({ clientLogo: e.target.value })}>
+              {Object.entries(CLIENT_LOGOS).map(([k, l]) => (<option key={k} value={k}>{l.label}</option>))}
+            </select>
+          </div>
+        </>
+      )}
     </>
   )
 }

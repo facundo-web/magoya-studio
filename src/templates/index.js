@@ -11,13 +11,16 @@ import cita from './cita.json'
 import dato from './dato.json'
 import carruselPortada from './carrusel-portada.json'
 import techTitular from './tech-titular.json'
+import blank from './blank.json'
 
-export const TEMPLATES = [zocaloPlaca, fotoTitular, fotoCentrada, carruselPortada, techTitular, bloqueColor, cita, dato]
+export const TEMPLATES = [blank, zocaloPlaca, fotoTitular, fotoCentrada, carruselPortada, techTitular, bloqueColor, cita, dato]
 
 export const TEMPLATES_BY_ID = Object.fromEntries(TEMPLATES.map((t) => [t.id, t]))
+export const BLANK_TEMPLATE = blank
 
 // categorías para agrupar/filtrar en la galería
 export const CATEGORIES = {
+  libre: 'En blanco',
   zocalo: 'Foto + zócalo',
   post: 'Post / anuncio',
   quote: 'Cita',

@@ -130,6 +130,34 @@ export function createBuilder() {
       }
       body.push(`<g${transform}${filterAttr}${op}>${inner}</g>`)
     },
+    // imagen enmascarada en un marco rectangular (pantalla/mockup)
+    framedImage({ cx, cy, w, h, rotation = 0, href, natural, focal = { x: 0.5, y: 0.5 }, radius = 0, zoom = 1, shadow = false, opacity = 1 }) {
+      if (!href) return
+      const x = cx - w / 2
+      const y = cy - h / 2
+      const clipId = id('fclip')
+      defs.push(`<clipPath id="${clipId}"><rect x="${n(x)}" y="${n(y)}" width="${n(w)}" height="${n(h)}" rx="${n(radius)}"/></clipPath>`)
+      let filterAttr = ''
+      if (shadow) {
+        const fId = id('fsh')
+        defs.push(`<filter id="${fId}" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="${n(h * 0.03)}" stdDeviation="${n(Math.min(w, h) * 0.04)}" flood-color="#000000" flood-opacity="0.35"/></filter>`)
+        filterAttr = ` filter="url(#${fId})"`
+      }
+      let ix = x, iy = y, iw = w, ih = h
+      if (natural && natural.w && natural.h) {
+        const scale = Math.max(w / natural.w, h / natural.h) * zoom
+        iw = natural.w * scale
+        ih = natural.h * scale
+        ix = x - (iw - w) * focal.x
+        iy = y - (ih - h) * focal.y
+      }
+      const par = natural ? 'none' : 'xMidYMid slice'
+      const transform = rotation ? ` transform="rotate(${n(rotation)} ${n(cx)} ${n(cy)})"` : ''
+      const op = opacity < 1 ? ` opacity="${opacity}"` : ''
+      body.push(
+        `<g${transform}${filterAttr}${op}><g clip-path="url(#${clipId})"><image href="${href}" x="${n(ix)}" y="${n(iy)}" width="${n(iw)}" height="${n(ih)}" preserveAspectRatio="${par}"/></g></g>`
+      )
+    },
     // texto multilínea con tracking
     text({ x, y, lines, px, weight = 400, fill, anchor = 'start', tracking = 0, lineHeight = 1.15, fontFamily = FONT_STACK }) {
       const ls = tracking * px

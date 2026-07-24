@@ -21,14 +21,20 @@ export function resolvePiece(template, content) {
   const c = content || {}
   const scheme = COLOR_SCHEMES[c.scheme || d.scheme || DEFAULT_SCHEME]
   const accent = (ACCENTS[c.accent || d.accent] || { value: scheme.accent }).value
+  const freeform = !!template.freeform
+  // en freeform el fondo lo decide el usuario (color/foto)
+  const bg = c.bg || d.bg || 'color'
   return {
     scheme,
     accent,
-    surface: template.surface || (d.hasPhoto ? 'photo' : 'solid'),
-    anchor: template.anchor || 'bottom-left',
-    motif: template.motif !== false,
+    freeform,
+    surface: freeform ? (bg === 'photo' ? 'photo' : 'solid') : (template.surface || (d.hasPhoto ? 'photo' : 'solid')),
+    anchor: c.anchor || template.anchor || 'bottom-left',
+    motif: freeform ? false : template.motif !== false,
     zocalo: template.zocalo || false,
-    roles: template.roles || ['kicker', 'title', 'subtitle'],
+    roles: template.roles || (freeform ? [] : ['kicker', 'title', 'subtitle']),
+    textBlocks: c.textBlocks || d.textBlocks || [],
+    showLogo: c.showLogo !== undefined ? c.showLogo : d.showLogo !== false,
     logo: c.logo || d.logo || 'cream',
     clientLogo: c.clientLogo || d.clientLogo || 'none',
     treatment: c.treatment || d.treatment || 'bw',
@@ -92,10 +98,8 @@ export function drawPiece(b, { template, content, format }) {
   // ---- stack de texto ----
   const blocks = []
   const maxTextW = safe.w * (onPhoto ? 0.92 : 0.8)
-  for (const role of STACK_ORDER) {
-    if (!p.roles.includes(role)) continue
-    const txt = p.text[role]
-    if (txt === undefined || txt === null || String(txt).trim() === '') continue
+  const pushBlock = (role, txt) => {
+    if (txt === undefined || txt === null || String(txt).trim() === '') return
     const st = TEXT_STYLES[role] || TEXT_STYLES.body
     const hand = role === 'kicker' && p.handAccent
     const startPx = ref * st.sizeRel * (hand ? 1.9 : 1)
@@ -107,6 +111,14 @@ export function drawPiece(b, { template, content, format }) {
       lineHeight: st.lineHeight || 1.15, maxLines,
     })
     blocks.push({ role, st, value, px: fit.px, lines: fit.lines, lineHeight: st.lineHeight || 1.15, hand })
+  }
+  // roles de la plantilla (piezas clásicas)
+  for (const role of STACK_ORDER) {
+    if (p.roles.includes(role)) pushBlock(role, p.text[role])
+  }
+  // bloques de texto sumados por el usuario (freeform / componentes)
+  for (const tb of p.textBlocks) {
+    pushBlock(tb.style || 'title', tb.text)
   }
 
   // altura total del stack (con gaps proporcionales)
@@ -161,7 +173,7 @@ export function drawPiece(b, { template, content, format }) {
   }
 
   // ---- logo ----
-  drawLogo(b, { p, W, H, safe, ref, textAnchor, hAnchor, vAnchor })
+  if (p.showLogo) drawLogo(b, { p, W, H, safe, ref, textAnchor, hAnchor, vAnchor })
 
   // ---- objetos DELANTE del texto (profundidad) ----
   drawObjects(b, { objects: (p.objects || []).filter((o) => o.front), W, H, ref, accent: p.accent })
@@ -176,7 +188,18 @@ function drawObjects(b, { objects, W, H, ref, accent }) {
     const shadow = o.shadow !== false
     const opacity = o.opacity ?? 1
     if (o.kind === 'image' && o.src) {
-      b.object({ cx, cy, size, rotation, href: o.src, tile: false, shadow, opacity })
+      if (o.frame) {
+        // imagen enmascarada en un marco (pantalla/mockup)
+        const fw = ref * (o.scale || 0.4)
+        const fh = fw * (o.ratio || 0.6)
+        b.framedImage({
+          cx, cy, w: fw, h: fh, rotation, href: o.src, natural: o.natural,
+          focal: o.focal || { x: 0.5, y: 0.5 }, radius: (o.radius || 0) * Math.min(fw, fh),
+          zoom: o.zoom || 1, shadow, opacity,
+        })
+      } else {
+        b.object({ cx, cy, size, rotation, href: o.src, tile: false, shadow, opacity })
+      }
       continue
     }
     const icon = ICONS_BY_ID[o.iconId]

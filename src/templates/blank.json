@@ -1,0 +1,23 @@
+{
+  "id": "blank",
+  "name": "Slide en blanco",
+  "purpose": "Base para componer libremente: elegís fondo y sumás los componentes (texto, ícono, logo).",
+  "category": "libre",
+  "surface": "solid",
+  "anchor": "bottom-left",
+  "motif": false,
+  "freeform": true,
+  "roles": [],
+  "defaults": {
+    "scheme": "ink",
+    "accent": "emerald",
+    "logo": "cream",
+    "clientLogo": "none",
+    "hasPhoto": false,
+    "bg": "color",
+    "showLogo": true,
+    "textBlocks": [
+      { "style": "title", "text": "Tu texto acá" }
+    ]
+  }
+}

@@ -38,7 +38,7 @@ function templateBadges(t) {
   return b
 }
 
-export default function Gallery({ galleryFormat, setGalleryFormat, templates = TEMPLATES, onDeleteTemplate, onPick, projects, onOpenProject, onImport, onDeleteProject }) {
+export default function Gallery({ galleryFormat, setGalleryFormat, templates = TEMPLATES, onDeleteTemplate, onPick, onStartCarousel, projects, onOpenProject, onImport, onDeleteProject }) {
   const fileRef = useRef(null)
   const [filter, setFilter] = React.useState('all')
   const groups = formatsByNetwork()
@@ -53,6 +53,7 @@ export default function Gallery({ galleryFormat, setGalleryFormat, templates = T
       <div className="g-head">
         <div className="g-head-row">
           <h1>Magoya Studio</h1>
+          {onStartCarousel && <button className="btn primary" onClick={() => onStartCarousel(fmt)}>⊞ Armar un carrusel</button>}
           <button className="linklike" onClick={() => fileRef.current?.click()}>¿Te compartieron un proyecto? Abrir .magoya.json</button>
           <input ref={fileRef} type="file" accept=".json,application/json" style={{ display: 'none' }}
             onChange={(e) => e.target.files[0] && onImport(e.target.files[0])} />

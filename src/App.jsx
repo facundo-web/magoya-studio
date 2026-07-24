@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react'
 import Gallery from './editor/Gallery.jsx'
 import Editor from './editor/Editor.jsx'
 import BrandKit from './editor/BrandKit.jsx'
-import { TEMPLATES, TEMPLATES_BY_ID } from './templates/index.js'
-import { FORMATS_BY_ID } from './formats/registry.js'
+import { TEMPLATES, TEMPLATES_BY_ID, BLANK_TEMPLATE } from './templates/index.js'
+import { FORMATS_BY_ID, CAROUSEL_FORMATS } from './formats/registry.js'
 import {
   loadProjects, upsertProject, deleteProject, newProjectId,
   exportProjectFile, importProjectFile, toShareLink, fromShareLink,
@@ -22,6 +22,16 @@ export default function App() {
 
   const allTemplates = [...TEMPLATES, ...customTemplates]
   const allById = Object.fromEntries(allTemplates.map((t) => [t.id, t]))
+
+  // contenido inicial desde una plantilla, clonando arrays (sin refs compartidas)
+  const freshContent = (tpl) => {
+    const d = tpl.defaults || {}
+    return {
+      ...d,
+      textBlocks: (d.textBlocks || []).map((b) => ({ ...b })),
+      objects: (d.objects || []).map((o) => ({ ...o })),
+    }
+  }
 
   // pieza(s) en edición
   const [projectId, setProjectId] = useState(null)
@@ -63,7 +73,7 @@ export default function App() {
     setProjectId(newProjectId())
     setProjectName(template.defaults?.title || template.name)
     setFormatId(chosenFormat?.id || galleryFormatId || DEFAULT_FORMAT)
-    setPieces([{ template, content: { ...template.defaults } }])
+    setPieces([{ template, content: freshContent(template) }])
     setActive(0)
     setCarousel(false)
     setDirty(false)
@@ -107,17 +117,25 @@ export default function App() {
     setDirty(true)
   }
   function addSlide(template) {
-    setPieces((ps) => {
-      const src = ps[active]
-      const tpl = template || src.template
-      // con plantilla elegida → arranca de sus defaults; sin plantilla → copia el contenido
-      const content = template ? { ...template.defaults } : { ...src.content, photo: null }
-      return [...ps, { template: tpl, content }]
-    })
+    // sin plantilla → slide EN BLANCO para componer con bloques
+    const tpl = template || BLANK_TEMPLATE
+    setPieces((ps) => [...ps, { template: tpl, content: freshContent(tpl) }])
     setCarousel(true)
     setActive(pieces.length)
     setDirty(true)
     showToast('Slide agregada')
+  }
+  function startBlankCarousel(fmt) {
+    const format = fmt && CAROUSEL_FORMATS.includes(fmt.id) ? fmt : FORMATS_BY_ID['li-carousel']
+    const blank = () => ({ template: BLANK_TEMPLATE, content: freshContent(BLANK_TEMPLATE) })
+    setProjectId(newProjectId())
+    setProjectName('Carrusel')
+    setFormatId(format.id)
+    setPieces([blank(), blank(), blank()])
+    setActive(0)
+    setCarousel(true)
+    setDirty(false)
+    setView('editor')
   }
   function changeSlideTemplate(template) {
     // cambia el diseño de la slide activa, conservando el contenido (textos/foto/marca)
@@ -224,6 +242,7 @@ export default function App() {
           templates={allTemplates}
           onDeleteTemplate={removeCustomTemplate}
           onPick={pickTemplate}
+          onStartCarousel={startBlankCarousel}
           projects={projects}
           onOpenProject={openFromSerialized}
           onDeleteProject={removeProject}
