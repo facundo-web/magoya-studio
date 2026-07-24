@@ -35,6 +35,7 @@ export function resolvePiece(template, content) {
     roles: template.roles || (freeform ? [] : ['kicker', 'title', 'subtitle']),
     textBlocks: c.textBlocks || d.textBlocks || [],
     showLogo: c.showLogo !== undefined ? c.showLogo : d.showLogo !== false,
+    logoPos: c.logoPos || d.logoPos || 'left',
     logo: c.logo || d.logo || 'cream',
     clientLogo: c.clientLogo || d.clientLogo || 'none',
     treatment: c.treatment || d.treatment || 'bw',
@@ -220,19 +221,21 @@ function drawLogo(b, { p, W, H, safe, ref, hAnchor, vAnchor }) {
   if (!logoUrl) return
   const lw = ref * 0.2
   const lh = lw / WORDMARK_RATIO
-  // logo arriba, opuesto verticalmente al stack de texto
-  const lx = safe.x
+  // vertical: opuesto al stack de texto; horizontal: elegido por el usuario
+  const onRight = p.logoPos === 'right'
+  const lx = onRight ? W - safe.x - lw : safe.x
   const ly = vAnchor === 'top' ? safe.y + safe.h - lh : safe.y
   b.asset({ x: lx, y: ly, w: lw, h: lh, href: logoUrl })
 
-  // logo de cliente al lado (si hay)
+  // logo de cliente del lado opuesto al de Magoya (si hay)
   const cl = CLIENT_LOGOS[p.clientLogo]
   if (cl && cl.url) {
     const clUrl = getAsset(cl.url)
     if (clUrl) {
       const ch = lh * 1.1
       const cw = ch * 2.4
-      b.asset({ x: W - safe.x - cw, y: ly, w: cw, h: ch, href: clUrl })
+      const cx = onRight ? safe.x : W - safe.x - cw
+      b.asset({ x: cx, y: ly, w: cw, h: ch, href: clUrl })
     }
   }
 }

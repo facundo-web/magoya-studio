@@ -540,12 +540,25 @@ function BrandBody({ content, template, set }) {
           {Object.entries(WORDMARKS).map(([k, w]) => (<option key={k} value={k}>{w.label}</option>))}
         </select>
       </div>
+      <LogoPosition content={content} template={template} set={set} />
       <div className="field"><label>Logo de cliente</label>
         <select value={clientLogo} onChange={(e) => set({ clientLogo: e.target.value })}>
           {Object.entries(CLIENT_LOGOS).map(([k, l]) => (<option key={k} value={k}>{l.label}</option>))}
         </select>
       </div>
     </>
+  )
+}
+
+function LogoPosition({ content, template, set }) {
+  const pos = content.logoPos || template.defaults?.logoPos || 'left'
+  return (
+    <div className="field"><label>Posición del logo</label>
+      <div className="chips">
+        <button className={'chip' + (pos === 'left' ? ' on' : '')} onClick={() => set({ logoPos: 'left' })}>Izquierda</button>
+        <button className={'chip' + (pos === 'right' ? ' on' : '')} onClick={() => set({ logoPos: 'right' })}>Derecha</button>
+      </div>
+    </div>
   )
 }
 
@@ -658,6 +671,7 @@ function LogoBody({ content, template, set }) {
               {Object.entries(WORDMARKS).map(([k, w]) => (<option key={k} value={k}>{w.label}</option>))}
             </select>
           </div>
+          <LogoPosition content={content} template={template} set={set} />
           <div className="field"><label>Logo de cliente</label>
             <select value={clientLogo} onChange={(e) => set({ clientLogo: e.target.value })}>
               {Object.entries(CLIENT_LOGOS).map(([k, l]) => (<option key={k} value={k}>{l.label}</option>))}
