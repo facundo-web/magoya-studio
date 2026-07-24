@@ -30,6 +30,11 @@ export default function Editor({
   return (
     <div className="editor">
       <div className="sidebar">
+        <div className="side-head">
+          <div className="sh-name">{template.name}</div>
+          {template.purpose && <div className="sh-purpose">{template.purpose}</div>}
+          <div className="sh-dest">Para <b>{format.network} · {format.label}</b> · {format.w}×{format.h}</div>
+        </div>
         <FormatPanel format={format} onChangeFormat={onChangeFormat} />
         <ContentPanel template={template} content={content} set={set} />
         {template.surface === 'photo' && (
@@ -92,6 +97,7 @@ function FormatPanel({ format, onChangeFormat }) {
   return (
     <div className="panel">
       <h3>Formato / red</h3>
+      <p className="panel-help">Cambiá el tamaño según dónde publiques. La pieza se re-acomoda sola.</p>
       <div className="field">
         <select value={format.id} onChange={(e) => onChangeFormat(FORMATS_BY_ID[e.target.value])}>
           {Object.entries(groups).map(([net, list]) => (
@@ -115,6 +121,7 @@ function ContentPanel({ template, content, set }) {
   return (
     <div className="panel">
       <h3>Contenido</h3>
+      <p className="panel-help">Editá los textos de la pieza.</p>
       {roles.map((role) => {
         const st = TEXT_STYLES[role]
         const long = role === 'title' || role === 'quote' || role === 'subtitle' || role === 'body' || role === 'metricLabel'
@@ -157,6 +164,7 @@ function PhotoPanel({ content, set, mode, onToast }) {
   return (
     <div className="panel">
       <h3>Foto</h3>
+      <p className="panel-help">Subí una foto. Sale en B&N (regla de marca) por defecto.</p>
       <div
         className={'dropzone' + (photo?.src ? ' has' : '')}
         onClick={() => fileRef.current?.click()}
@@ -206,6 +214,7 @@ function GradientPanel({ content, set }) {
   return (
     <div className="panel">
       <h3>Degradé (sobre el fondo)</h3>
+      <p className="panel-help">Un degradé encima del fondo para dar clima y legibilidad.</p>
       <div className="chips">
         <button className={'chip' + (!on ? ' on' : '')} onClick={() => setPreset(null)}>Sin degradé</button>
         {Object.entries(GRADIENTS).map(([k, gr]) => (
@@ -255,6 +264,7 @@ function ObjectsPanel({ content, set, mode, onToast }) {
   return (
     <div className="panel">
       <h3>Objetos · logos & profundidad</h3>
+      <p className="panel-help">Sumá logos (IA / redes) o tu PNG. Dan profundidad y movimiento.</p>
 
       {objects.map((o, i) => (
         <div key={i} style={{ border: '1px solid var(--paper-200,#E6E1D8)', borderRadius: 10, padding: 10, marginBottom: 8, background: '#fff' }}>
@@ -320,6 +330,7 @@ function BrandPanel({ content, template, set, mode }) {
   return (
     <div className="panel">
       <h3>Marca</h3>
+      <p className="panel-help">Colores, acento y logos — todo dentro de la marca.</p>
 
       {(mode === 'designer' || template.surface !== 'photo') && (
         <div className="field">

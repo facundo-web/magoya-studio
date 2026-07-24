@@ -1,11 +1,15 @@
 {
   "id": "foto-centrada",
   "name": "Foto con mensaje centrado",
+  "purpose": "Foto con un mensaje corto centrado. Impacto directo, tipo portada.",
   "category": "zocalo",
   "surface": "photo",
   "anchor": "center-center",
   "zocalo": false,
-  "roles": ["title", "subtitle"],
+  "roles": [
+    "title",
+    "subtitle"
+  ],
   "defaults": {
     "scheme": "deep",
     "accent": "emerald",

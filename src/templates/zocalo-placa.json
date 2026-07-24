@@ -1,11 +1,15 @@
 {
   "id": "zocalo-placa",
   "name": "Zócalo sobre foto (placa)",
+  "purpose": "Foto de fondo con una placa de marca abajo (logo + título). El caso estrella para “AI en campo”.",
   "category": "zocalo",
   "surface": "photo",
   "anchor": "bottom-left",
   "zocalo": true,
-  "roles": ["kicker", "title"],
+  "roles": [
+    "kicker",
+    "title"
+  ],
   "defaults": {
     "scheme": "deep",
     "accent": "emerald",

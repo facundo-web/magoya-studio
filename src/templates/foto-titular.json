@@ -1,11 +1,16 @@
 {
   "id": "foto-titular",
   "name": "Foto con titular",
+  "purpose": "Foto con titular grande y una bajada. Para casos de uso y novedades.",
   "category": "zocalo",
   "surface": "photo",
   "anchor": "bottom-left",
   "zocalo": false,
-  "roles": ["kicker", "title", "subtitle"],
+  "roles": [
+    "kicker",
+    "title",
+    "subtitle"
+  ],
   "defaults": {
     "scheme": "deep",
     "accent": "emerald",

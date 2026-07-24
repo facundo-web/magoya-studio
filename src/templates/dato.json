@@ -1,11 +1,16 @@
 {
   "id": "dato",
   "name": "Dato / métrica",
+  "purpose": "Un número o dato que impacta, bien grande. Para métricas y resultados.",
   "category": "metric",
   "surface": "solid",
   "anchor": "center-left",
   "motif": true,
-  "roles": ["kicker", "metric", "metricLabel"],
+  "roles": [
+    "kicker",
+    "metric",
+    "metricLabel"
+  ],
   "defaults": {
     "scheme": "ink",
     "accent": "emerald",

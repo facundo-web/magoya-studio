@@ -98,5 +98,29 @@ button { font: inherit; cursor: pointer; }
 .strip .slide-thumb svg { width: 100%; height: 100%; }
 .strip .add { width: 64px; height: 64px; border-radius: 8px; border: 1.5px dashed var(--gray-400); background: #fff; font-size: 22px; color: #8A9389; flex: none; }
 
+/* ---------- Gallery: pasos + selector de destino ---------- */
+.step { font-size: 15px; font-weight: 800; letter-spacing: -.01em; margin: 30px 0 12px; color: var(--ink-900); display: flex; align-items: center; gap: 8px; }
+.step::before { content: ''; width: 22px; height: 3px; background: var(--emerald-500); border-radius: 2px; }
+.dest { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px,1fr)); gap: 14px; }
+.netgroup { border: 1px solid var(--paper-200,#E6E1D8); border-radius: 14px; background: #fff; padding: 12px; }
+.netname { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-900); margin-bottom: 8px; }
+.fchips { display: flex; flex-direction: column; gap: 6px; }
+.fchip { display: flex; align-items: center; gap: 8px; border: 1px solid var(--paper-200,#E6E1D8); background: #FBFAF7; border-radius: 10px; padding: 7px 10px; text-align: left; }
+.fchip:hover { border-color: var(--gray-400); }
+.fchip.on { border-color: var(--emerald-500); background: #F0FBF4; box-shadow: inset 0 0 0 1px var(--emerald-500); }
+.fchip .ratio-box { flex: none; border-radius: 3px; }
+.fchip .fl { flex: 1; font-size: 13px; font-weight: 600; }
+.fchip .fd { font-size: 11px; color: #8A9389; font-family: var(--font-mono); }
+.dest-summary { margin-top: 12px; font-size: 13px; color: #5C6B61; background: #F0FBF4; border: 1px solid #CDEBD8; border-radius: 10px; padding: 10px 14px; }
+.tcard .purpose { font-size: 12px; color: #5C6B61; margin-top: 3px; line-height: 1.35; }
+
+/* ---------- Editor: encabezado del sidebar + microcopy ---------- */
+.side-head { background: var(--ink-900); color: var(--cream-50); border-radius: 12px; padding: 12px 14px; margin-bottom: 18px; }
+.side-head .sh-name { font-weight: 800; font-size: 15px; letter-spacing: -.01em; }
+.side-head .sh-purpose { font-size: 12px; color: var(--cream-300); margin-top: 4px; line-height: 1.4; }
+.side-head .sh-dest { font-size: 12px; color: var(--emerald-400); margin-top: 8px; }
+.side-head .sh-dest b { color: var(--emerald-400); }
+.panel-help { font-size: 12px; color: #A79E92; margin: -4px 0 10px; line-height: 1.4; }
+
 .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--ink-900); color: #fff; padding: 10px 18px; border-radius: 999px; font-size: 13px; z-index: 100; box-shadow: 0 10px 30px rgba(0,0,0,.25); }
 .center-note { padding: 40px; font-family: var(--font-mono); color: #8A9389; }

@@ -1,11 +1,16 @@
 {
   "id": "bloque-color",
   "name": "Bloque de color (anuncio)",
+  "purpose": "Anuncio sobre bloque de color (sin foto). Para frases y lanzamientos.",
   "category": "post",
   "surface": "solid",
   "anchor": "bottom-left",
   "motif": true,
-  "roles": ["kicker", "title", "subtitle"],
+  "roles": [
+    "kicker",
+    "title",
+    "subtitle"
+  ],
   "defaults": {
     "scheme": "studio",
     "accent": "emerald",

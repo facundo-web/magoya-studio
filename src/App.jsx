@@ -20,6 +20,7 @@ export default function App() {
   const [projectId, setProjectId] = useState(null)
   const [projectName, setProjectName] = useState('')
   const [formatId, setFormatId] = useState(DEFAULT_FORMAT)
+  const [galleryFormatId, setGalleryFormatId] = useState(DEFAULT_FORMAT)
   const [pieces, setPieces] = useState([]) // [{template, content}]
   const [active, setActive] = useState(0)
   const [carousel, setCarousel] = useState(false)
@@ -41,10 +42,10 @@ export default function App() {
   const current = pieces[active] || null
 
   // ---- iniciar desde template ----
-  function pickTemplate(template) {
+  function pickTemplate(template, chosenFormat) {
     setProjectId(newProjectId())
     setProjectName(template.defaults?.title || template.name)
-    setFormatId(DEFAULT_FORMAT)
+    setFormatId(chosenFormat?.id || galleryFormatId || DEFAULT_FORMAT)
     setPieces([{ template, content: { ...template.defaults } }])
     setActive(0)
     setCarousel(false)
@@ -155,6 +156,8 @@ export default function App() {
 
       {view === 'gallery' ? (
         <Gallery
+          galleryFormat={FORMATS_BY_ID[galleryFormatId] || FORMATS_BY_ID[DEFAULT_FORMAT]}
+          setGalleryFormat={(f) => setGalleryFormatId(f.id)}
           onPick={pickTemplate}
           projects={projects}
           onOpenProject={openFromSerialized}

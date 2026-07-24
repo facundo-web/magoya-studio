@@ -1,11 +1,15 @@
 {
   "id": "cita",
   "name": "Cita / testimonial",
+  "purpose": "Una cita o testimonial destacado. Para prueba social.",
   "category": "quote",
   "surface": "solid",
   "anchor": "center-left",
   "motif": true,
-  "roles": ["quote", "author"],
+  "roles": [
+    "quote",
+    "author"
+  ],
   "defaults": {
     "scheme": "deep",
     "accent": "emerald",
