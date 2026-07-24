@@ -134,6 +134,7 @@ export default function Editor({
     const cx = format.w * (o.x ?? 0.72), cy = format.h * (o.y ?? 0.5)
     return { left: ((cx - w / 2) / format.w) * 100, top: ((cy - h / 2) / format.h) * 100, w: (w / format.w) * 100, h: (h / format.h) * 100, rot: o.rotation || 0 }
   }
+  const onSelectText = (eid) => { setSelText(eid); setSelObj(null) }
   const startDrag = (e, i) => { e.stopPropagation(); setSelObj(i); setSelText(null); dragRef.current.i = i }
   const onFrameMove = (e) => { if (dragRef.current.i != null) updateObject(dragRef.current.i, posFromEvent(e)) }
   const endDrag = () => { dragRef.current.i = null }
@@ -192,16 +193,16 @@ export default function Editor({
               <BgBody content={content} set={set} inputRef={photoInputRef} onPhotoFile={onPhotoFile} />
             </Section>
             <Section title="Textos" defaultOpen summary={`${(content.textBlocks || []).length}`}
-              help="Sumá los textos que quieras. Cada uno con su estilo de marca.">
-              <TextBlocksBody content={content} set={set} />
+              help="Sumá textos y tocalos para ajustarlos a la derecha.">
+              <TextBlocksBody content={content} set={set} onSelectText={onSelectText} selText={selText} />
             </Section>
             <Section title="Posición del texto" summary={content.anchor || template.anchor}>
               <AnchorBody content={content} template={template} set={set} />
             </Section>
           </>
         ) : (
-          <Section title="Contenido" defaultOpen help="Editá los textos de la pieza.">
-            <ContentBody template={template} content={content} set={set} />
+          <Section title="Textos" defaultOpen help="Tocá un texto para editarlo a la derecha.">
+            <ContentBody template={template} content={content} onSelectText={onSelectText} selText={selText} />
           </Section>
         )}
 
@@ -390,25 +391,24 @@ function FormatBody({ format, onChangeFormat }) {
   )
 }
 
-/* ---------------- Content ---------------- */
-function ContentBody({ template, content, set }) {
+/* ---------------- Content: lista de textos (selecciona → edita a la derecha) ---------------- */
+function ContentBody({ template, content, onSelectText, selText }) {
   const roles = template.roles || []
   return (
     <>
-      {roles.map((role) => {
-        const long = ['title', 'quote', 'subtitle', 'body', 'metricLabel'].includes(role)
-        const val = content[role] ?? template.defaults?.[role] ?? ''
-        return (
-          <div className="field" key={role}>
-            <label>{ROLE_LABELS[role] || role}</label>
-            {long ? (
-              <textarea value={val} onChange={(e) => set({ [role]: e.target.value })} rows={role === 'title' || role === 'quote' ? 2 : 1} />
-            ) : (
-              <input type="text" value={val} onChange={(e) => set({ [role]: e.target.value })} />
-            )}
-          </div>
-        )
-      })}
+      <div className="obj-list">
+        {roles.map((role) => {
+          const eid = `role:${role}`
+          const val = content[role] ?? template.defaults?.[role] ?? ''
+          return (
+            <button key={role} className={'obj-row txt-row' + (selText === eid ? ' sel' : '')} onClick={() => onSelectText(eid)}>
+              <span className="row-role">{ROLE_LABELS[role] || role}</span>
+              <span className="row-preview">{String(val).trim() || '—'}</span>
+            </button>
+          )
+        })}
+      </div>
+      <div className="hint">Tocá un texto (acá o en la pieza) → lo editás a la derecha.</div>
     </>
   )
 }
@@ -757,40 +757,33 @@ function BgBody({ content, set, inputRef, onPhotoFile }) {
   )
 }
 
-function TextBlocksBody({ content, set }) {
+function TextBlocksBody({ content, set, onSelectText, selText }) {
   const blocks = content.textBlocks || []
-  const update = (i, patch) => set({ textBlocks: blocks.map((b, idx) => (idx === i ? { ...b, ...patch } : b)) })
-  const add = () => set({ textBlocks: [...blocks, { style: 'title', text: 'Nuevo texto' }] })
+  const add = () => { const n = blocks.length; set({ textBlocks: [...blocks, { style: 'title', text: 'Nuevo texto' }] }); onSelectText && onSelectText('tb:' + n) }
   const remove = (i) => set({ textBlocks: blocks.filter((_, idx) => idx !== i) })
   const move = (i, dir) => { const a = [...blocks]; const j = i + dir; if (j < 0 || j >= a.length) return; [a[i], a[j]] = [a[j], a[i]]; set({ textBlocks: a }) }
   return (
     <>
-      {blocks.map((b, i) => (
-        <div key={i} className="obj-card">
-          <div className="obj-head">
-            <select value={b.style} onChange={(e) => update(i, { style: e.target.value })} style={{ fontSize: 12, padding: '4px 6px', flex: 1 }}>
-              {TEXT_STYLE_OPTS.map((o) => <option key={o.k} value={o.k}>{o.label}</option>)}
-            </select>
-            <span style={{ display: 'flex', gap: 4, marginLeft: 6 }}>
-              <button className="btn" style={{ padding: '2px 6px' }} onClick={() => move(i, -1)}>↑</button>
-              <button className="btn" style={{ padding: '2px 6px' }} onClick={() => move(i, 1)}>↓</button>
-              <button className="btn" style={{ padding: '2px 8px' }} onClick={() => remove(i)}>✕</button>
-            </span>
-          </div>
-          <textarea value={b.text} onChange={(e) => update(i, { text: e.target.value })} rows={2} />
-          {b.style !== 'cta' && (
-            <div style={{ marginTop: 6 }}>
-              <label style={{ fontSize: 11, color: '#4A554D' }}>Resaltado (marcador)</label>
-              <div className="chips">
-                {Object.entries(HIGHLIGHTS).map(([k, hl]) => (
-                  <button key={k} className={'chip' + ((b.highlight || 'none') === k ? ' on' : '')} onClick={() => update(i, { highlight: k })}>{hl.label}</button>
-                ))}
-              </div>
+      <div className="obj-list">
+        {blocks.map((b, i) => {
+          const eid = 'tb:' + i
+          const styleLabel = TEXT_STYLE_OPTS.find((o) => o.k === b.style)?.label || 'Texto'
+          return (
+            <div key={i} className={'obj-row' + (selText === eid ? ' sel' : '')}>
+              <button className="obj-row-name txt-row" onClick={() => onSelectText && onSelectText(eid)}>
+                <span className="row-role">{styleLabel}</span>
+                <span className="row-preview">{String(b.text).trim() || '—'}</span>
+              </button>
+              <span style={{ display: 'flex' }}>
+                <button className="obj-row-del" onClick={() => move(i, -1)} title="Subir">↑</button>
+                <button className="obj-row-del" onClick={() => move(i, 1)} title="Bajar">↓</button>
+                <button className="obj-row-del" onClick={() => remove(i)} title="Quitar">✕</button>
+              </span>
             </div>
-          )}
-        </div>
-      ))}
-      <button className="btn" onClick={add}>+ Agregar texto</button>
+          )
+        })}
+      </div>
+      <button className="btn" onClick={add} style={{ marginTop: 8 }}>+ Agregar texto</button>
     </>
   )
 }

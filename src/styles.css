@@ -102,6 +102,10 @@ button { font: inherit; cursor: pointer; }
 .obj-row-name { flex: 1; text-align: left; background: transparent; border: 0; padding: 8px 10px; font-size: 13px; font-weight: 600; cursor: pointer; }
 .obj-row-del { background: transparent; border: 0; color: #A79E92; padding: 6px 10px; font-size: 11px; cursor: pointer; }
 .obj-row-del:hover { color: var(--color-danger,#D8514E); }
+button.obj-row { width: 100%; cursor: pointer; text-align: left; font: inherit; padding: 8px 10px; }
+.obj-row-name.txt-row, button.obj-row.txt-row { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; }
+.row-role { font-size: 12px; font-weight: 700; color: var(--ink-900); }
+.row-preview { font-size: 11px; color: #8A9389; font-weight: 400; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sidebar { border-right: 1px solid var(--paper-200,#E6E1D8); background: #FBFAF7; overflow: auto; padding: 16px; }
 .stage { display: flex; flex-direction: column; min-width: 0; background: #E9E4DC; }
 .stage-tools { display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-bottom: 1px solid rgba(0,0,0,.06); flex-wrap: wrap; }
