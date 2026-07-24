@@ -257,6 +257,9 @@ button { font: inherit; cursor: pointer; }
 .obj-hit:active { cursor: grabbing; }
 .obj-hit.hover { outline: 2px dashed rgba(0,222,104,.85); outline-offset: 1px; }
 .obj-hit.sel { outline: 2px solid var(--emerald-500); outline-offset: 1px; background: rgba(0,222,104,.06); }
+/* texto editable in-place (doble-click) */
+.piece-frame svg text[data-eid] { cursor: text; }
+.inline-edit { position: absolute; z-index: 20; background: #fff; color: #0D0C0C; border: 2px solid var(--emerald-500); border-radius: 6px; padding: 3px 7px; font-family: var(--font-body); font-weight: 700; line-height: 1.1; resize: none; overflow: hidden; box-shadow: 0 8px 24px rgba(0,0,0,.28); min-height: 1.5em; }
 
 /* download: recomendado */
 .menu-pop button.rec { background: #F0FBF4; border: 1px solid #CDEBD8; }

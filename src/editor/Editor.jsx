@@ -65,6 +65,7 @@ export default function Editor({
   const [busy, setBusy] = useState(false)
   const [selObj, setSelObj] = useState(null)
   const [hoverObj, setHoverObj] = useState(null)
+  const [editing, setEditing] = useState(null) // edición de texto in-place
   const [showSafe, setShowSafe] = useState(false)
   const [chooser, setChooser] = useState(null) // null | 'add' | 'change'
   const frameRef = useRef(null)
@@ -112,6 +113,32 @@ export default function Editor({
   const onFrameMove = (e) => { if (dragRef.current.i != null) updateObject(dragRef.current.i, posFromEvent(e)) }
   const endDrag = () => { dragRef.current.i = null }
   const onFrameDown = (e) => { if (e.target === frameRef.current || e.target.tagName === 'svg' || e.target.tagName === 'IMAGE') setSelObj(null) }
+
+  // ---- editar texto tocándolo sobre la pieza ----
+  const getText = (eid) => {
+    if (eid.startsWith('role:')) { const k = eid.slice(5); return content[k] ?? template.defaults?.[k] ?? '' }
+    if (eid.startsWith('tb:')) { const i = +eid.slice(3); return (content.textBlocks || [])[i]?.text ?? '' }
+    return ''
+  }
+  const setText = (eid, val) => {
+    if (eid.startsWith('role:')) set({ [eid.slice(5)]: val })
+    else if (eid.startsWith('tb:')) { const i = +eid.slice(3); set({ textBlocks: (content.textBlocks || []).map((b, idx) => (idx === i ? { ...b, text: val } : b)) }) }
+  }
+  const onFrameDblClick = (e) => {
+    const t = e.target.closest && e.target.closest('text[data-eid]')
+    if (!t) return
+    const eid = t.getAttribute('data-eid')
+    const fr = frameRef.current.getBoundingClientRect()
+    const r = t.getBoundingClientRect()
+    const scale = fr.width / format.w
+    const fontPx = parseFloat(getComputedStyle(t).fontSize) * scale || 18
+    setEditing({
+      eid, value: getText(eid),
+      left: r.left - fr.left, top: r.top - fr.top,
+      width: Math.max(r.width + fontPx, 90), fontPx,
+      align: (t.getAttribute('text-anchor') === 'middle') ? 'center' : 'left',
+    })
+  }
 
   const needsPhoto = template.surface === 'photo' && !content.photo?.src
 
@@ -192,8 +219,20 @@ export default function Editor({
             onPointerMove={onFrameMove}
             onPointerUp={endDrag}
             onPointerLeave={endDrag}
+            onDoubleClick={onFrameDblClick}
           >
             <PiecePreview template={template} content={content} format={format} />
+            {editing && (
+              <textarea
+                className="inline-edit"
+                autoFocus
+                value={editing.value}
+                style={{ left: editing.left + 'px', top: editing.top + 'px', width: editing.width + 'px', fontSize: editing.fontPx + 'px', textAlign: editing.align }}
+                onChange={(e) => { setEditing({ ...editing, value: e.target.value }); setText(editing.eid, e.target.value) }}
+                onBlur={() => setEditing(null)}
+                onKeyDown={(e) => { if (e.key === 'Escape' || (e.key === 'Enter' && !e.shiftKey)) { e.preventDefault(); setEditing(null) } }}
+              />
+            )}
             {/* áreas de selección/arrastre de objetos (hover marca, click selecciona) */}
             {objects.map((o, i) => {
               const bx = objBox(o)

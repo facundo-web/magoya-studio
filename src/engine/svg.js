@@ -159,13 +159,14 @@ export function createBuilder() {
       )
     },
     // texto multilínea con tracking
-    text({ x, y, lines, px, weight = 400, fill, anchor = 'start', tracking = 0, lineHeight = 1.15, fontFamily = FONT_STACK }) {
+    text({ x, y, lines, px, weight = 400, fill, anchor = 'start', tracking = 0, lineHeight = 1.15, fontFamily = FONT_STACK, eid = null }) {
       const ls = tracking * px
       const tspans = lines
         .map((ln, i) => `<tspan x="${n(x)}" dy="${i === 0 ? 0 : n(px * lineHeight)}">${esc(ln)}</tspan>`)
         .join('')
+      const eidAttr = eid ? ` data-eid="${esc(eid)}"` : ''
       body.push(
-        `<text x="${n(x)}" y="${n(y + px * 0.8)}" font-family="${fontFamily}" font-size="${n(px)}" font-weight="${weight}" letter-spacing="${n(ls)}" fill="${fill}" text-anchor="${anchor}" style="white-space:pre">${tspans}</text>`
+        `<text${eidAttr} x="${n(x)}" y="${n(y + px * 0.8)}" font-family="${fontFamily}" font-size="${n(px)}" font-weight="${weight}" letter-spacing="${n(ls)}" fill="${fill}" text-anchor="${anchor}" style="white-space:pre">${tspans}</text>`
       )
     },
   }

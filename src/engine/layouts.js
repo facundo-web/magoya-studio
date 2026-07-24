@@ -120,16 +120,16 @@ export function drawPiece(b, { template, content, format }) {
       maxWidth: maxTextW, maxHeight: H * 0.5, startPx,
       lineHeight: st.lineHeight || 1.15, maxLines,
     })
-    blocks.push({ role, st, value, px: fit.px, lines: fit.lines, lineHeight: st.lineHeight || 1.15, hand, hl: opts.hl || null })
+    blocks.push({ role, st, value, px: fit.px, lines: fit.lines, lineHeight: st.lineHeight || 1.15, hand, hl: opts.hl || null, eid: opts.eid || null })
   }
   // roles de la plantilla (piezas clásicas)
   for (const role of STACK_ORDER) {
-    if (p.roles.includes(role)) pushBlock(role, p.text[role])
+    if (p.roles.includes(role)) pushBlock(role, p.text[role], { eid: `role:${role}` })
   }
   // bloques de texto sumados por el usuario (freeform / componentes)
-  for (const tb of p.textBlocks) {
-    pushBlock(tb.style || 'title', tb.text, { hl: (HIGHLIGHTS[tb.highlight] || {}).value })
-  }
+  p.textBlocks.forEach((tb, idx) => {
+    pushBlock(tb.style || 'title', tb.text, { hl: (HIGHLIGHTS[tb.highlight] || {}).value, eid: `tb:${idx}` })
+  })
 
   // altura total del stack (con gaps proporcionales)
   const gap = ref * 0.022
@@ -205,6 +205,7 @@ export function drawPiece(b, { template, content, format }) {
       weight, fill, anchor: textAnchor,
       tracking, lineHeight: bl.lineHeight,
       fontFamily: bl.hand ? FONT_HAND_STACK : undefined,
+      eid: bl.eid,
     })
     cursorY += bl.lines.length * lineH + gap + (isCta ? bl.px * 0.5 : 0)
   }
