@@ -1,0 +1,19 @@
+{
+  "id": "whatsapp",
+  "name": "Chat de WhatsApp",
+  "purpose": "Conversación de WhatsApp: pregunta del productor + respuesta. Ideal para carrusel o post.",
+  "category": "chat",
+  "surface": "solid",
+  "roles": [],
+  "defaults": {
+    "scheme": "deep",
+    "accent": "emerald",
+    "showLogo": false,
+    "chatName": "Magoya",
+    "chatStatus": "en línea",
+    "messages": [
+      { "from": "them", "text": "Che, ¿con qué IA armo informes técnicos y planes de manejo?" },
+      { "from": "me", "text": "Usá Claude o ChatGPT: lenguaje claro, estructura sólida y adaptable a tu contexto." }
+    ]
+  }
+}

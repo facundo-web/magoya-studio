@@ -12,8 +12,9 @@ import dato from './dato.json'
 import carruselPortada from './carrusel-portada.json'
 import techTitular from './tech-titular.json'
 import blank from './blank.json'
+import whatsapp from './whatsapp.json'
 
-export const TEMPLATES = [blank, zocaloPlaca, fotoTitular, fotoCentrada, carruselPortada, techTitular, bloqueColor, cita, dato]
+export const TEMPLATES = [blank, zocaloPlaca, fotoTitular, fotoCentrada, carruselPortada, techTitular, bloqueColor, cita, dato, whatsapp]
 
 export const TEMPLATES_BY_ID = Object.fromEntries(TEMPLATES.map((t) => [t.id, t]))
 export const BLANK_TEMPLATE = blank
@@ -45,6 +46,7 @@ export function placeholderContent(t) {
     c.textBlocks = (d.textBlocks || []).map((b) => ({ ...b }))
   }
   c.objects = (d.objects || []).map((o) => ({ ...o }))
+  if (d.messages) c.messages = d.messages.map((m) => ({ ...m }))
   return c
 }
 
@@ -55,4 +57,5 @@ export const CATEGORIES = {
   post: 'Post / anuncio',
   quote: 'Cita',
   metric: 'Dato',
+  chat: 'Chat / WhatsApp',
 }

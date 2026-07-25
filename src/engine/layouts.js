@@ -11,7 +11,7 @@ import { safeRect } from '../formats/registry.js'
 import { COLOR_SCHEMES, DEFAULT_SCHEME, ACCENTS, TEXT_STYLES, WORDMARKS, CLIENT_LOGOS, WORDMARK_RATIO, MOTIF_ESTRATOS, GRADIENTS, FONT_HAND_STACK, HIGHLIGHTS } from '../brand/brandKit.js'
 import { ICONS_BY_ID } from '../brand/iconLibrary.js'
 import { getAsset, coloredIcon } from './assets.js'
-import { fitText, measure } from './textLayout.js'
+import { fitText, measure, wrapText } from './textLayout.js'
 
 // texto oscuro o claro según luminancia del fondo
 function contrastOn(hex) {
@@ -70,6 +70,7 @@ function pick(a, b) {
 
 // dibuja la pieza en el builder
 export function drawPiece(b, { template, content, format }) {
+  if (template.category === 'chat') { drawChat(b, { template, content, format }); return }
   const p = resolvePiece(template, content)
   const { w: W, h: H } = format
   const safe = safeRect(format)
@@ -215,6 +216,58 @@ export function drawPiece(b, { template, content, format }) {
 
   // ---- objetos DELANTE del texto (profundidad) ----
   drawObjects(b, { objects: (p.objects || []).filter((o) => o.front), W, H, ref, accent: p.accent })
+}
+
+// ---- renderer de chat (WhatsApp) ----
+function drawChat(b, { template, content, format }) {
+  const { w: W, h: H } = format
+  const ref = Math.min(W, H)
+  const c = content || {}
+  const d = template.defaults || {}
+  const scheme = COLOR_SCHEMES[c.scheme || d.scheme || DEFAULT_SCHEME]
+  const accent = (ACCENTS[c.accent || d.accent] || { value: scheme.accent }).value
+  const messages = c.messages || d.messages || []
+  const chatName = c.chatName ?? d.chatName ?? 'Magoya'
+  const chatStatus = c.chatStatus ?? d.chatStatus ?? 'en línea'
+
+  // fondo de marca
+  b.rect({ x: 0, y: 0, w: W, h: H, fill: scheme.surface })
+
+  // panel del chat
+  const px = W * 0.06, py = H * 0.055, pw = W * 0.88, ph = H * 0.89
+  const R = ref * 0.045
+  b.rect({ x: px, y: py, w: pw, h: ph, fill: '#E7E0D6', rx: R }) // fondo tipo WhatsApp (beige)
+
+  // header verde
+  const hh = ref * 0.13
+  b.rect({ x: px, y: py, w: pw, h: hh, fill: '#0F5132', rx: R })
+  b.rect({ x: px, y: py + hh - R, w: pw, h: R, fill: '#0F5132' }) // cuadrar la base del header
+  // avatar
+  const av = hh * 0.58, avx = px + ref * 0.03, avy = py + (hh - av) / 2
+  b.rect({ x: avx, y: avy, w: av, h: av, fill: accent, rx: av / 2 })
+  b.text({ x: avx + av / 2, y: avy + av * 0.24, lines: ['m'], px: av * 0.52, weight: 800, fill: '#0F5132', anchor: 'middle' })
+  b.text({ x: avx + av + ref * 0.022, y: py + hh * 0.22, lines: [chatName], px: ref * 0.038, weight: 700, fill: '#FFFFFF' })
+  b.text({ x: avx + av + ref * 0.022, y: py + hh * 0.56, lines: [chatStatus], px: ref * 0.026, weight: 500, fill: 'rgba(255,255,255,.82)' })
+
+  // mensajes (burbujas)
+  let cy = py + hh + ref * 0.045
+  const maxBubbleW = pw * 0.74
+  const padX = ref * 0.03, padY = ref * 0.022
+  const fpx = ref * 0.032
+  const lh = 1.32
+  for (const m of messages) {
+    if (!m || !String(m.text || '').trim()) continue
+    const mine = m.from === 'me'
+    const lines = wrapText(m.text, { px: fpx, weight: 500, tracking: 0, maxWidth: maxBubbleW - padX * 2 })
+    const contentW = Math.max(...lines.map((l) => measure(l, { px: fpx, weight: 500 })))
+    const tw = Math.min(maxBubbleW, contentW + padX * 2)
+    const th = lines.length * fpx * lh + padY * 2
+    const bx = mine ? px + pw - ref * 0.03 - tw : px + ref * 0.03
+    b.rect({ x: bx, y: cy, w: tw, h: th, fill: mine ? '#DcF8C6' : '#FFFFFF', rx: ref * 0.024 })
+    b.text({ x: bx + padX, y: cy + padY, lines, px: fpx, weight: 500, fill: '#111111', lineHeight: lh })
+    cy += th + ref * 0.022
+    if (cy > py + ph - ref * 0.06) break
+  }
 }
 
 function drawObjects(b, { objects, W, H, ref, accent }) {

@@ -186,7 +186,17 @@ export default function Editor({
           <FormatBody format={format} onChangeFormat={onChangeFormat} />
         </Section>
 
-        {template.freeform ? (
+        {template.category === 'chat' ? (
+          <>
+            <Section title="Chat" defaultOpen help="Nombre y estado del contacto.">
+              <div className="field"><label>Nombre</label><input type="text" value={content.chatName ?? template.defaults?.chatName ?? 'Magoya'} onChange={(e) => set({ chatName: e.target.value })} /></div>
+              <div className="field"><label>Estado</label><input type="text" value={content.chatStatus ?? template.defaults?.chatStatus ?? 'en línea'} onChange={(e) => set({ chatStatus: e.target.value })} /></div>
+            </Section>
+            <Section title="Mensajes" defaultOpen summary={`${(content.messages || template.defaults?.messages || []).length}`} help="Sumá los mensajes de la conversación.">
+              <ChatBody content={content} template={template} set={set} />
+            </Section>
+          </>
+        ) : template.freeform ? (
           <>
             <Section title="Fondo" defaultOpen summary={(content.bg || 'color') === 'photo' ? 'foto' : 'color'}
               help="Elegí el fondo: un color de marca o una foto.">
@@ -871,6 +881,39 @@ function TextProps({ eid, content, set, getText, setText }) {
       ) : (
         <div className="hint">El estilo y el tamaño de este texto los define la plantilla (marca bloqueada).</div>
       )}
+    </>
+  )
+}
+
+/* ---------------- Chat (WhatsApp) ---------------- */
+function ChatBody({ content, template, set }) {
+  const msgs = content.messages || template.defaults?.messages || []
+  const update = (i, patch) => set({ messages: msgs.map((m, idx) => (idx === i ? { ...m, ...patch } : m)) })
+  const add = (from) => set({ messages: [...msgs, { from, text: 'Nuevo mensaje' }] })
+  const remove = (i) => set({ messages: msgs.filter((_, idx) => idx !== i) })
+  const move = (i, dir) => { const a = [...msgs]; const j = i + dir; if (j < 0 || j >= a.length) return; [a[i], a[j]] = [a[j], a[i]]; set({ messages: a }) }
+  return (
+    <>
+      {msgs.map((m, i) => (
+        <div key={i} className="obj-card">
+          <div className="obj-head">
+            <div className="chips">
+              <button className={'chip' + (m.from === 'them' ? ' on' : '')} onClick={() => update(i, { from: 'them' })}>Recibido</button>
+              <button className={'chip' + (m.from === 'me' ? ' on' : '')} onClick={() => update(i, { from: 'me' })}>Enviado</button>
+            </div>
+            <span style={{ display: 'flex' }}>
+              <button className="obj-row-del" onClick={() => move(i, -1)} title="Subir">↑</button>
+              <button className="obj-row-del" onClick={() => move(i, 1)} title="Bajar">↓</button>
+              <button className="obj-row-del" onClick={() => remove(i)} title="Quitar">✕</button>
+            </span>
+          </div>
+          <textarea value={m.text} onChange={(e) => update(i, { text: e.target.value })} rows={2} />
+        </div>
+      ))}
+      <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+        <button className="btn" onClick={() => add('them')}>+ Recibido</button>
+        <button className="btn" onClick={() => add('me')}>+ Enviado</button>
+      </div>
     </>
   )
 }
