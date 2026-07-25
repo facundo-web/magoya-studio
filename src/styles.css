@@ -85,7 +85,20 @@ button { font: inherit; cursor: pointer; }
 .col-resize { flex: none; width: 7px; cursor: col-resize; background: transparent; position: relative; z-index: 6; }
 .col-resize::before { content: ''; position: absolute; left: 3px; top: 0; bottom: 0; width: 1px; background: var(--paper-200,#E6E1D8); }
 .col-resize:hover::before, .col-resize:active::before { background: var(--emerald-500); width: 2px; left: 2.5px; }
-@media (max-width: 860px) { .editor { flex-direction: column; } .editor .sidebar, .editor .inspector { width: auto !important; } .col-resize { display: none; } .editor .stage { order: -1; } }
+/* rail de inserción (siempre visible, patrón Canva) */
+.insert-rail { flex: none; width: 64px; display: flex; flex-direction: column; gap: 2px; padding: 10px 6px; border-right: 1px solid var(--paper-200,#E6E1D8); background: #fff; overflow: auto; }
+.rail-btn { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 9px 4px; border: 0; background: transparent; border-radius: 10px; cursor: pointer; color: #5C6B61; }
+.rail-btn:hover { background: rgba(13,12,12,.05); }
+.rail-btn.on { background: var(--ink-900); color: var(--cream-50); }
+.rail-ico { font-size: 16px; font-weight: 800; line-height: 1; }
+.rail-label { font-size: 9.5px; font-weight: 700; }
+.panel-title { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-900); margin-bottom: 8px; }
+/* handles de resize en la selección */
+.rs-handle { position: absolute; width: 12px; height: 12px; border-radius: 999px; background: #fff; border: 2px solid var(--emerald-500); z-index: 5; touch-action: none; }
+.rs-handle.nw { left: -6px; top: -6px; cursor: nwse-resize; }
+.rs-handle.ne { right: -6px; top: -6px; cursor: nesw-resize; }
+.rs-handle.sw { left: -6px; bottom: -6px; cursor: nesw-resize; }
+.rs-handle.se { right: -6px; bottom: -6px; cursor: nwse-resize; }
 /* inspector (panel derecho de propiedades) */
 .inspector { border-left: 1px solid var(--paper-200,#E6E1D8); background: #FBFAF7; overflow: auto; padding: 16px; }
 .inspector label { display: block; font-size: 11px; font-weight: 600; color: #4A554D; margin: 8px 0 4px; }
@@ -260,7 +273,7 @@ button.obj-row { width: 100%; cursor: pointer; text-align: left; font: inherit; 
 .tcard:hover .use-btn, .tcard:focus-within .use-btn { opacity: 1; }
 .tcard:hover { border-color: var(--emerald-500); }
 .empty-filters { grid-column: 1 / -1; padding: 26px; text-align: center; font-size: 13px; color: #8A9389; display: flex; flex-direction: column; align-items: center; gap: 8px; }
-@media (max-width: 860px) {
+@media (max-width: 900px) {
   .gallery.home2 { display: flex; flex-direction: column; overflow: visible; height: auto; }
   .g-rail { flex-direction: row; flex-wrap: wrap; gap: 4px; padding: 10px 0; }
   .rail-hr, .rail-sub { display: none; }
@@ -394,20 +407,26 @@ button.obj-row { width: 100%; cursor: pointer; text-align: left; font: inherit; 
   .topbar .btn { padding: 7px 12px; font-size: 12px; }
   .crumbs { order: 3; width: 100%; }
 }
-@media (max-width: 820px) {
-  /* permitir scroll de página en pantallas chicas */
+/* breakpoint ÚNICO de colapso del editor (auditoría UX): 900px */
+@media (max-width: 900px) {
   html, body, #root { height: auto; }
   .app { height: auto; min-height: 100vh; }
   .gallery.compact { height: auto; overflow: visible; padding: 14px 16px 24px; }
-  .tgrid { overflow: visible; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
-  /* editor: apilar preview arriba, controles abajo */
-  .editor { grid-template-columns: 1fr; }
-  .stage { order: -1; }
+  .tgrid, .tgrid2 { overflow: visible; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+  /* editor apilado: pieza arriba, rail de inserción abajo fijo,
+     inspector como bottom-sheet al seleccionar */
+  .editor { flex-direction: column; padding-bottom: 64px; }
+  .editor .sidebar, .editor .inspector { width: auto !important; }
+  .col-resize { display: none; }
+  .editor .stage { order: -1; }
   .stage-canvas { padding: 14px; min-height: 42vh; }
   .piece-frame svg { max-height: 46vh; }
   .sidebar { border-right: 0; border-top: 1px solid var(--paper-200,#E6E1D8); overflow: visible; }
   .stage-tools { position: sticky; top: 0; background: #E9E4DC; z-index: 5; }
   .dest, .palette-grid { grid-template-columns: 1fr; }
+  .insert-rail { position: fixed; bottom: 0; left: 0; right: 0; flex-direction: row; justify-content: space-around; width: auto; height: 58px; border-right: 0; border-top: 1px solid var(--paper-200,#E6E1D8); z-index: 55; padding: 4px 8px; }
+  .editor.has-sel .inspector { position: fixed; bottom: 58px; left: 0; right: 0; max-height: 45vh; overflow: auto; border-radius: 16px 16px 0 0; z-index: 60; box-shadow: 0 -12px 32px rgba(0,0,0,.22); border-top: 1px solid var(--paper-200,#E6E1D8); }
+  .editor:not(.has-sel) .inspector { display: none; }
 }
 @media (max-width: 520px) {
   .gallery.compact h1 { font-size: 20px; }

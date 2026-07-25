@@ -90,6 +90,7 @@ export default function Editor({
   const [chooser, setChooser] = useState(null) // null | 'add' | 'change'
   const [mockupOpen, setMockupOpen] = useState(false)
   const [mockup, setMockup] = useState('phone')
+  const [panel, setPanel] = useState('text') // rail de inserción: un panel a la vez
   const frameRef = useRef(null)
   const photoInputRef = useRef(null)
   const dragRef = useRef({ i: null })
@@ -163,6 +164,55 @@ export default function Editor({
     try { addObjectAt(JSON.parse(raw), posFromEvent(e)) } catch {}
   }
 
+  // atajos de teclado sobre el canvas (no cuando escribís en un input)
+  React.useEffect(() => {
+    const onKey = (e) => {
+      const tag = document.activeElement?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
+      if (e.key === 'Escape') { setSelObj(null); setSelText(null); setEditing(null); return }
+      if (selObj == null || !objects[selObj]) return
+      const o = objects[selObj]
+      if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); objRemove(selObj); return }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'd') {
+        e.preventDefault()
+        setObjects([...objects, { ...o, x: Math.min(1, (o.x ?? 0.5) + 0.05), y: Math.min(1, (o.y ?? 0.5) + 0.05) }])
+        setSelObj(objects.length)
+        return
+      }
+      const step = e.shiftKey ? 0.05 : 0.01
+      const mv = { ArrowLeft: { x: -step }, ArrowRight: { x: step }, ArrowUp: { y: -step }, ArrowDown: { y: step } }[e.key]
+      if (mv) {
+        e.preventDefault()
+        updateObject(selObj, {
+          x: Math.min(1, Math.max(0, (o.x ?? 0.5) + (mv.x || 0))),
+          y: Math.min(1, Math.max(0, (o.y ?? 0.5) + (mv.y || 0))),
+        })
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  })
+
+  // handles de resize: arrastrás una esquina y cambia la escala
+  const startHandleResize = (e, i) => {
+    e.stopPropagation()
+    e.preventDefault()
+    const o = objects[i]
+    if (!o) return
+    const fr = frameRef.current.getBoundingClientRect()
+    const cx = fr.left + fr.width * (o.x ?? 0.5)
+    const cy = fr.top + fr.height * (o.y ?? 0.5)
+    const d0 = Math.hypot(e.clientX - cx, e.clientY - cy)
+    const s0 = o.scale || 0.3
+    const move = (ev) => {
+      const d = Math.hypot(ev.clientX - cx, ev.clientY - cy)
+      updateObject(i, { scale: Math.min(1.2, Math.max(0.05, s0 * (d / Math.max(d0, 1)))) })
+    }
+    const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up) }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
+  }
+
   const onSelectText = (eid) => { setSelText(eid); setSelObj(null) }
   const startDrag = (e, i) => { e.stopPropagation(); setSelObj(i); setSelText(null); dragRef.current.i = i }
   const onFrameMove = (e) => { if (dragRef.current.i != null) updateObject(dragRef.current.i, posFromEvent(e)) }
@@ -202,7 +252,21 @@ export default function Editor({
   const needsPhoto = template.surface === 'photo' && !content.photo?.src
 
   return (
-    <div className={'editor' + (selObj != null ? ' has-sel' : '')}>
+    <div className={'editor' + (selObj != null || selText ? ' has-sel' : '')}>
+      <nav className="insert-rail">
+        {[
+          ['text', 'T', 'Texto'],
+          ['bg', '▣', 'Fondo'],
+          ['elements', '✳', 'Elementos'],
+          ['brand', 'M', 'Marca'],
+          ['settings', '⚙', 'Ajustes'],
+        ].map(([k, ico, label]) => (
+          <button key={k} className={'rail-btn' + (panel === k ? ' on' : '')} onClick={() => setPanel(k)} title={label}>
+            <span className="rail-ico">{ico}</span>
+            <span className="rail-label">{label}</span>
+          </button>
+        ))}
+      </nav>
       <div className="sidebar" style={{ width: panelW.left }}>
         <div className="side-head">
           <div className="sh-name">{template.name}</div>
@@ -210,64 +274,80 @@ export default function Editor({
           <div className="sh-dest">Para <b>{format.network} · {format.label}</b> · {format.w}×{format.h}</div>
         </div>
 
-        <Section title="Formato / red" defaultOpen summary={`${format.network} · ${format.label}`}
-          help="Cambiá el tamaño según dónde publiques. La pieza se re-acomoda sola.">
-          <FormatBody format={format} onChangeFormat={onChangeFormat} />
-        </Section>
-
-        {template.category === 'chat' ? (
-          <>
-            <Section title="Chat" defaultOpen help="Nombre y estado del contacto.">
+        {panel === 'text' && (
+          template.category === 'chat' ? (
+            <>
+              <div className="panel-title">Chat</div>
               <div className="field"><label>Nombre</label><input type="text" value={content.chatName ?? template.defaults?.chatName ?? 'Magoya'} onChange={(e) => set({ chatName: e.target.value })} /></div>
               <div className="field"><label>Estado</label><input type="text" value={content.chatStatus ?? template.defaults?.chatStatus ?? 'en línea'} onChange={(e) => set({ chatStatus: e.target.value })} /></div>
-            </Section>
-            <Section title="Mensajes" defaultOpen summary={`${(content.messages || template.defaults?.messages || []).length}`} help="Sumá los mensajes de la conversación.">
+              <div className="panel-title">Mensajes</div>
               <ChatBody content={content} template={template} set={set} />
-            </Section>
-          </>
-        ) : template.freeform ? (
-          <>
-            <Section title="Fondo" defaultOpen summary={(content.bg || 'color') === 'photo' ? 'foto' : 'color'}
-              help="Elegí el fondo: un color de marca o una foto.">
-              <BgBody content={content} set={set} inputRef={photoInputRef} onPhotoFile={onPhotoFile} />
-            </Section>
-            <Section title="Textos" defaultOpen summary={`${(content.textBlocks || []).length}`}
-              help="Sumá textos y tocalos para ajustarlos a la derecha.">
+            </>
+          ) : template.freeform ? (
+            <>
+              <div className="panel-title">Textos</div>
+              <p className="panel-help">Sumá textos y tocalos para ajustarlos a la derecha.</p>
               <TextBlocksBody content={content} set={set} onSelectText={onSelectText} selText={selText} />
-            </Section>
-            <Section title="Posición del texto" summary={content.anchor || template.anchor}>
+              <div className="panel-title" style={{ marginTop: 16 }}>Posición del bloque</div>
               <AnchorBody content={content} template={template} set={set} />
-            </Section>
+            </>
+          ) : (
+            <>
+              <div className="panel-title">Textos</div>
+              <p className="panel-help">Tocá un texto (acá o en la pieza) para editarlo a la derecha.</p>
+              <ContentBody template={template} content={content} onSelectText={onSelectText} selText={selText} />
+            </>
+          )
+        )}
+
+        {panel === 'bg' && (
+          template.freeform ? (
+            <>
+              <div className="panel-title">Fondo</div>
+              <BgBody content={content} set={set} inputRef={photoInputRef} onPhotoFile={onPhotoFile} />
+            </>
+          ) : template.surface === 'photo' ? (
+            <>
+              <div className="panel-title">Foto de fondo</div>
+              <p className="panel-help">Subí una foto o elegí de la biblioteca. Sale en B&N (regla de marca).</p>
+              <PhotoBody content={content} set={set} inputRef={photoInputRef} onPhotoFile={onPhotoFile} />
+            </>
+          ) : (
+            <>
+              <div className="panel-title">Fondo</div>
+              <p className="panel-help">Esta plantilla usa un color de marca como fondo.</p>
+              <BrandBody content={content} template={template} set={set} onlyColors />
+            </>
+          )
+        )}
+
+        {panel === 'elements' && (
+          <>
+            <div className="panel-title">Elementos</div>
+            <p className="panel-help">Tocá o arrastrá a la pieza. Logos, trazos, dispositivos y los tuyos.</p>
+            <ObjectsBody objects={objects} setObjects={setObjects}
+              selObj={selObj} setSelObj={setSelObj} objRemove={objRemove} onToast={onToast}
+              elements={elements} onAddElement={onAddElement} onDeleteElement={onDeleteElement}
+              alwaysOpen />
           </>
-        ) : (
-          <Section title="Textos" defaultOpen help="Tocá un texto para editarlo a la derecha.">
-            <ContentBody template={template} content={content} onSelectText={onSelectText} selText={selText} />
-          </Section>
         )}
 
-        {!template.freeform && template.surface === 'photo' && (
-          <Section title="Foto" defaultOpen summary={content.photo?.src ? '✓ cargada' : 'falta'}
-            help="Subí una foto. Sale en B&N (regla de marca) por defecto.">
-            <PhotoBody content={content} set={set} inputRef={photoInputRef} onPhotoFile={onPhotoFile} />
-          </Section>
+        {panel === 'brand' && (
+          <>
+            <div className="panel-title">Marca</div>
+            {template.freeform ? <LogoBody content={content} template={template} set={set} /> : <BrandBody content={content} template={template} set={set} />}
+          </>
         )}
 
-        <Section title="Degradé" summary={content.gradient?.preset ? (GRADIENTS[content.gradient.preset]?.label || 'sí') : 'no'}
-          help="Un degradé encima del fondo para dar clima y legibilidad.">
-          <GradientBody content={content} set={set} />
-        </Section>
-
-        <Section title="Objetos · logos & profundidad" summary={objects.length ? `${objects.length}` : 'ninguno'}
-          help="Sumá logos (IA / redes) o tu PNG. Arrastralos en la pieza y con Profundidad traelos al frente o atrás del texto.">
-          <ObjectsBody objects={objects} setObjects={setObjects}
-            selObj={selObj} setSelObj={setSelObj} objRemove={objRemove} onToast={onToast}
-            elements={elements} onAddElement={onAddElement} onDeleteElement={onDeleteElement} />
-        </Section>
-
-        <Section title={template.freeform ? 'Logo' : 'Marca'} summary={template.freeform ? (content.showLogo === false ? 'oculto' : 'visible') : 'colores y logos'}
-          help={template.freeform ? 'Mostrá u ocultá el logo de Magoya.' : 'Colores, acento y logos — todo dentro de la marca.'}>
-          {template.freeform ? <LogoBody content={content} template={template} set={set} /> : <BrandBody content={content} template={template} set={set} />}
-        </Section>
+        {panel === 'settings' && (
+          <>
+            <div className="panel-title">Formato / red</div>
+            <p className="panel-help">Cambiá el tamaño según dónde publiques. La pieza se re-acomoda sola.</p>
+            <FormatBody format={format} onChangeFormat={onChangeFormat} />
+            <div className="panel-title" style={{ marginTop: 16 }}>Clima (degradé)</div>
+            <GradientBody content={content} set={set} />
+          </>
+        )}
       </div>
 
       <div className="col-resize" onPointerDown={(e) => startResize('left', e)} title="Arrastrá para ajustar el panel" />
@@ -315,7 +395,11 @@ export default function Editor({
                   className={'obj-hit' + (selObj === i ? ' sel' : '') + (hoverObj === i ? ' hover' : '')}
                   style={{ left: bx.left + '%', top: bx.top + '%', width: bx.w + '%', height: bx.h + '%', transform: `rotate(${bx.rot}deg)` }}
                   onMouseEnter={() => setHoverObj(i)} onMouseLeave={() => setHoverObj(null)}
-                  onPointerDown={(e) => startDrag(e, i)} />
+                  onPointerDown={(e) => startDrag(e, i)}>
+                  {selObj === i && ['nw', 'ne', 'sw', 'se'].map((c) => (
+                    <span key={c} className={'rs-handle ' + c} onPointerDown={(e) => startHandleResize(e, i)} />
+                  ))}
+                </div>
               )
             })}
             {showSafe && (
@@ -531,8 +615,8 @@ function GradientBody({ content, set }) {
 }
 
 /* ---------------- Objects: insertar + lista (izquierda) ---------------- */
-function ObjectsBody({ objects, setObjects, selObj, setSelObj, objRemove, onToast, elements = [], onAddElement, onDeleteElement }) {
-  const [picking, setPicking] = useState(false)
+function ObjectsBody({ objects, setObjects, selObj, setSelObj, objRemove, onToast, elements = [], onAddElement, onDeleteElement, alwaysOpen = false }) {
+  const [picking, setPicking] = useState(alwaysOpen)
   const [cat, setCat] = useState('ai')
   const fileRef = useRef(null)
   const CATS = { ...ICON_CATEGORIES, custom: 'Mis elementos' }
@@ -577,7 +661,7 @@ function ObjectsBody({ objects, setObjects, selObj, setSelObj, objRemove, onToas
       )}
 
       <div style={{ display: 'flex', gap: 6, marginTop: objects.length ? 8 : 0 }}>
-        <button className="btn" onClick={() => setPicking((v) => !v)}>+ Elemento (logos, trazos…)</button>
+        {!alwaysOpen && <button className="btn" onClick={() => setPicking((v) => !v)}>+ Elemento (logos, trazos…)</button>}
         <button className="btn" onClick={() => fileRef.current?.click()}>+ Subir PNG</button>
         <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => e.target.files[0] && addImage(e.target.files[0])} />
       </div>
@@ -705,11 +789,31 @@ function ObjectProps({ o, i, updateObject, objRemove, objBringFront, objSendBack
 }
 
 /* ---------------- Brand ---------------- */
-function BrandBody({ content, template, set }) {
+function BrandBody({ content, template, set, onlyColors = false }) {
   const scheme = content.scheme || template.defaults?.scheme || 'deep'
   const accent = content.accent || template.defaults?.accent || 'emerald'
   const logo = content.logo || template.defaults?.logo || 'cream'
   const clientLogo = content.clientLogo || template.defaults?.clientLogo || 'none'
+  if (onlyColors) {
+    return (
+      <>
+        <div className="field"><label>Color de fondo</label>
+          <div className="swatches">
+            {Object.entries(COLOR_SCHEMES).map(([k, s]) => (
+              <button key={k} className={'sw' + (scheme === k ? ' on' : '')} title={s.label} style={{ background: s.surface }} onClick={() => set({ scheme: k })} />
+            ))}
+          </div>
+        </div>
+        <div className="field"><label>Acento</label>
+          <div className="swatches">
+            {Object.entries(ACCENTS).map(([k, a]) => (
+              <button key={k} className={'sw' + (accent === k ? ' on' : '')} title={a.label} style={{ background: a.value }} onClick={() => set({ accent: k })} />
+            ))}
+          </div>
+        </div>
+      </>
+    )
+  }
   return (
     <>
       <div className="field"><label>Esquema de color</label>
