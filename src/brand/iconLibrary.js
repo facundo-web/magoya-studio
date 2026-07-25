@@ -62,7 +62,16 @@ export const MAGOYA_OBJECTS = Object.entries(WORDMARKS).map(([k, w]) => ({
   id: `magoya:${k}`, slug: k, category: 'magoya', label: `Magoya ${w.label}`, url: w.url, color: null, isWordmark: true,
 }))
 
-export const ALL_OBJECTS = [...ICONS, ...MARKS, ...MAGOYA_OBJECTS]
+// ---- dispositivos (celular / notebook / tablet) — se colocan como imagen,
+// y adentro se les mete una foto/gráfico con "Recorte / pantalla" ----
+const deviceModules = import.meta.glob('./assets/devices/*.svg', { eager: true, query: '?url', import: 'default' })
+const DEVICE_NAMES = { phone: 'Celular', laptop: 'Notebook', tablet: 'Tablet' }
+export const DEVICES = Object.entries(deviceModules).map(([path, url]) => {
+  const slug = path.match(/([^/]+)\.svg$/)[1]
+  return { id: `devices:${slug}`, slug, category: 'devices', label: DEVICE_NAMES[slug] || slug, url, color: '#1B1B1B', isDevice: true }
+})
+
+export const ALL_OBJECTS = [...ICONS, ...MARKS, ...MAGOYA_OBJECTS, ...DEVICES]
 export const ICONS_BY_ID = Object.fromEntries(ALL_OBJECTS.map((i) => [i.id, i]))
-export const ICON_CATEGORIES = { ai: 'Logos de IA', social: 'Redes sociales', marks: 'Trazos y marcas', magoya: 'Logo Magoya' }
+export const ICON_CATEGORIES = { ai: 'Logos de IA', social: 'Redes sociales', trazos: 'Trazos', misc: 'Misceláneas', devices: 'Dispositivos', magoya: 'Logo Magoya' }
 export const ICON_URLS = ALL_OBJECTS.map((i) => i.url)

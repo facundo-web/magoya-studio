@@ -59,7 +59,7 @@ function Section({ title, help, summary, defaultOpen = false, children }) {
 
 export default function Editor({
   template, format, content, slides, activeSlide,
-  onChangeContent, onChangeFormat, onSelectSlide, onAddSlide, onChangeSlideTemplate, onDeleteSlide, onToast,
+  onChangeContent, onChangeFormat, onSelectSlide, onAddSlide, onDuplicateSlide, onChangeSlideTemplate, onDeleteSlide, onToast,
   elements = [], onAddElement, onDeleteElement,
   templates = TEMPLATES, onSaveTemplate, onShare, onExportFile,
 }) {
@@ -134,6 +134,35 @@ export default function Editor({
     const cx = format.w * (o.x ?? 0.72), cy = format.h * (o.y ?? 0.5)
     return { left: ((cx - w / 2) / format.w) * 100, top: ((cy - h / 2) / format.h) * 100, w: (w / format.w) * 100, h: (h / format.h) * 100, rot: o.rotation || 0 }
   }
+  // drop desde el picker (drag & drop) → agregar el objeto donde cayó
+  const addObjectAt = async (data, pos) => {
+    if (data.type === 'element') {
+      const el = elements.find((x) => x.id === data.id)
+      if (!el) return
+      const natural = await imageSize(el.src)
+      setObjects([...objects, { kind: 'image', src: el.src, elementId: el.id, natural, ...pos, scale: 0.34, rotation: 0, shadow: true, opacity: 1 }])
+      setSelObj(objects.length)
+      return
+    }
+    const icon = ICONS_BY_ID[data.id]
+    if (!icon) return
+    if (icon.category === 'magoya' || icon.isDevice) {
+      const src = getAsset(icon.url) || icon.url
+      const natural = await imageSize(src)
+      setObjects([...objects, { kind: 'image', src, natural, ...pos, scale: icon.isDevice ? 0.5 : 0.34, rotation: 0, shadow: true, opacity: 1 }])
+    } else {
+      const isMark = !!icon.isMark
+      setObjects([...objects, { kind: 'icon', iconId: icon.id, style: isMark ? 'plain' : 'tile', tint: isMark ? 'accent' : undefined, ...pos, scale: isMark ? 0.34 : 0.3, rotation: isMark ? 0 : -8, shadow: true, opacity: 1 }])
+    }
+    setSelObj(objects.length)
+  }
+  const onFrameDrop = (e) => {
+    const raw = e.dataTransfer.getData('application/x-magoya')
+    if (!raw) return
+    e.preventDefault()
+    try { addObjectAt(JSON.parse(raw), posFromEvent(e)) } catch {}
+  }
+
   const onSelectText = (eid) => { setSelText(eid); setSelObj(null) }
   const startDrag = (e, i) => { e.stopPropagation(); setSelObj(i); setSelText(null); dragRef.current.i = i }
   const onFrameMove = (e) => { if (dragRef.current.i != null) updateObject(dragRef.current.i, posFromEvent(e)) }
@@ -263,6 +292,8 @@ export default function Editor({
             onPointerUp={endDrag}
             onPointerLeave={endDrag}
             onDoubleClick={onFrameDblClick}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={onFrameDrop}
           >
             <PiecePreview template={template} content={content} format={format} />
             {editing && (
@@ -313,7 +344,8 @@ export default function Editor({
               </button>
             ))}
             <button className="add" onClick={() => onAddSlide()} title="Agregar slide en blanco (componer con bloques)">+</button>
-            <button className="btn" style={{ marginLeft: 8 }} onClick={() => setChooser('add')}>Desde plantilla</button>
+            {onDuplicateSlide && <button className="btn" style={{ marginLeft: 8 }} onClick={onDuplicateSlide} title="Duplica esta slide para continuar la historia (ej: el chat que sigue)">⧉ Duplicar slide</button>}
+            <button className="btn" onClick={() => setChooser('add')}>Desde plantilla</button>
             <button className="btn" onClick={() => setChooser('change')}>Cambiar diseño</button>
             {slides.length > 1 && <button className="btn" onClick={() => onDeleteSlide(activeSlide)}>Borrar slide</button>}
           </div>
@@ -511,7 +543,8 @@ function ObjectsBody({ objects, setObjects, selObj, setSelObj, objRemove, onToas
     setSelObj(objects.length)
   }
   const addIcon = (icon) => {
-    if (icon.category === 'magoya') { placeImage(getAsset(icon.url) || icon.url); setPicking(false); return }
+    // logo Magoya y dispositivos se colocan como imagen (mantienen colores)
+    if (icon.category === 'magoya' || icon.isDevice) { placeImage(getAsset(icon.url) || icon.url); setPicking(false); return }
     const isMark = !!icon.isMark
     setObjects([...objects, { kind: 'icon', iconId: icon.id, style: isMark ? 'plain' : 'tile', tint: isMark ? 'accent' : undefined, x: 0.72, y: 0.42, scale: isMark ? 0.34 : 0.3, rotation: isMark ? 0 : -8, shadow: true, opacity: 1 }])
     setSelObj(objects.length)
@@ -561,7 +594,8 @@ function ObjectsBody({ objects, setObjects, selObj, setSelObj, objRemove, onToas
               <div className="icon-grid">
                 <button className="icon-pick upload" title="Subir un elemento" onClick={() => fileRef.current?.click()}><span>＋</span></button>
                 {elements.map((el) => (
-                  <div key={el.id} className="icon-pick custom" title={el.name}>
+                  <div key={el.id} className="icon-pick custom" title={el.name + ' — tocá o arrastrá a la pieza'}
+                    draggable onDragStart={(e) => e.dataTransfer.setData('application/x-magoya', JSON.stringify({ type: 'element', id: el.id }))}>
                     <img src={el.src} alt={el.name} onClick={() => placeImage(el.src, el.id)} />
                     <button className="el-del" title="Quitar de la biblioteca" onClick={(e) => { e.stopPropagation(); onDeleteElement && onDeleteElement(el.id) }}>✕</button>
                   </div>
@@ -572,13 +606,18 @@ function ObjectsBody({ objects, setObjects, selObj, setSelObj, objRemove, onToas
           ) : (
             <>
               <div className="icon-grid">
-                {iconsInCat.map((icon) => (
-                  <button key={icon.id} title={icon.label} onClick={() => addIcon(icon)} className="icon-pick" style={{ background: icon.color }}>
-                    <img src={icon.url} alt={icon.label} />
-                  </button>
-                ))}
+                {iconsInCat.map((icon) => {
+                  const asset = icon.isDevice || icon.category === 'magoya'
+                  return (
+                    <button key={icon.id} title={icon.label + ' — tocá o arrastrá a la pieza'} onClick={() => addIcon(icon)}
+                      className={'icon-pick' + (asset ? ' asset' : '')} style={asset ? undefined : { background: icon.color }}
+                      draggable onDragStart={(e) => e.dataTransfer.setData('application/x-magoya', JSON.stringify({ type: 'icon', id: icon.id }))}>
+                      <img src={icon.url} alt={icon.label} />
+                    </button>
+                  )
+                })}
               </div>
-              <div className="hint">¿Falta un logo? Subí el tuyo en <b>Mis elementos</b> — queda guardado para reusar.</div>
+              <div className="hint">Tocá para agregar o <b>arrastrá directo a la pieza</b>. ¿Falta un logo? Subilo en <b>Mis elementos</b>.</div>
             </>
           )}
         </div>

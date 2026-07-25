@@ -135,6 +135,21 @@ export default function App() {
     setDirty(false)
     setView('editor')
   }
+  function duplicateSlide() {
+    // clona la slide activa (deep) para continuar la historia (ej: chat que sigue)
+    setPieces((ps) => {
+      const src = ps[active]
+      if (!src) return ps
+      const content = JSON.parse(JSON.stringify(src.content))
+      const next = [...ps]
+      next.splice(active + 1, 0, { template: src.template, content })
+      return next
+    })
+    setCarousel(true)
+    setActive((a) => a + 1)
+    setDirty(true)
+    showToast('Slide duplicada — seguí la historia')
+  }
   function changeSlideTemplate(template) {
     // cambia el diseño de la slide activa, conservando el contenido (textos/foto/marca)
     setPieces((ps) => ps.map((p, i) => (i === active ? { template, content: p.content } : p)))
@@ -285,6 +300,7 @@ export default function App() {
           onChangeFormat={(f) => { setFormatId(f.id); setDirty(true) }}
           onSelectSlide={setActive}
           onAddSlide={addSlide}
+          onDuplicateSlide={duplicateSlide}
           onChangeSlideTemplate={changeSlideTemplate}
           onDeleteSlide={deleteSlide}
           onToast={showToast}
