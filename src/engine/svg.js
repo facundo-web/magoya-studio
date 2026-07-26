@@ -66,8 +66,15 @@ export function createBuilder() {
       return fid
     },
     // ---- path genérico (flechas, badges, formas paramétricas) ----
-    path({ d, fill = 'none', stroke = null, sw = 0, cap = 'round', join = 'round', rotation = 0, cx = 0, cy = 0, opacity = 1, filterId = null, evenodd = false }) {
-      const t = rotation ? ` transform="rotate(${n(rotation)} ${n(cx)} ${n(cy)})"` : ''
+    // tx/ty trasladan el path: los generadores dibujan en el origen y acá se
+    // ubican. Antes se reescribían los números del `d` con una regex, y eso
+    // también movía los RADIOS de los arcos (A r,r …) → formas rotas.
+    path({ d, fill = 'none', stroke = null, sw = 0, cap = 'round', join = 'round', rotation = 0, cx = 0, cy = 0, tx = 0, ty = 0, flipX = false, opacity = 1, filterId = null, evenodd = false }) {
+      const parts = []
+      if (rotation) parts.push(`rotate(${n(rotation)} ${n(cx)} ${n(cy)})`)
+      if (flipX) parts.push(`translate(${n(2 * cx)} 0) scale(-1 1)`)
+      if (tx || ty) parts.push(`translate(${n(tx)} ${n(ty)})`)
+      const t = parts.length ? ` transform="${parts.join(' ')}"` : ''
       const f = filterId ? ` filter="url(#${filterId})"` : ''
       const st = stroke ? ` stroke="${stroke}" stroke-width="${n(sw)}" stroke-linecap="${cap}" stroke-linejoin="${join}"` : ''
       const fr = evenodd ? ' fill-rule="evenodd"' : ''
@@ -169,7 +176,7 @@ export function createBuilder() {
       body.push(`<rect x="0" y="0" width="${n(w)}" height="${n(h)}" fill="url(#${gid})" opacity="${opacity}"/>`)
     },
     // objeto flotante: ícono en "tile" (app-icon) o imagen, con sombra + rotación
-    object({ cx, cy, size, rotation = 0, href, tile = false, tileColor = '#000', tileRadius = 0.22, shadow = true, iconInset = 0.22, opacity = 1, aspect = 1, extraFilter = null }) {
+    object({ cx, cy, size, rotation = 0, flipX = false, href, tile = false, tileColor = '#000', tileRadius = 0.22, shadow = true, iconInset = 0.22, opacity = 1, aspect = 1, extraFilter = null }) {
       if (!href) return
       const w = size
       const h = size * aspect
@@ -185,7 +192,10 @@ export function createBuilder() {
         )
         filterAttr = ` filter="url(#${fId})"`
       }
-      const transform = rotation ? ` transform="rotate(${n(rotation)} ${n(cx)} ${n(cy)})"` : ''
+      const tp = []
+      if (rotation) tp.push(`rotate(${n(rotation)} ${n(cx)} ${n(cy)})`)
+      if (flipX) tp.push(`translate(${n(2 * cx)} 0) scale(-1 1)`)
+      const transform = tp.length ? ` transform="${tp.join(' ')}"` : ''
       const op = opacity < 1 ? ` opacity="${opacity}"` : ''
       let inner = ''
       if (tile) {
@@ -195,12 +205,15 @@ export function createBuilder() {
           `<rect x="${n(x)}" y="${n(y)}" width="${n(size)}" height="${n(size)}" rx="${n(r)}" fill="${tileColor}"/>` +
           `<image href="${href}" x="${n(x + pad)}" y="${n(y + pad)}" width="${n(size - pad * 2)}" height="${n(size - pad * 2)}" preserveAspectRatio="xMidYMid meet"/>`
       } else {
-        inner = `<image href="${href}" x="${n(x)}" y="${n(y)}" width="${n(size)}" height="${n(size)}" preserveAspectRatio="xMidYMid meet"/>`
+        // OJO: usa w×h, no size×size. Con `aspect` (dispositivos) el alto no
+        // es el ancho: dibujarlo cuadrado dejaba el objeto centrado en otro
+        // lado que su caja, y la selección quedaba corrida respecto al dibujo.
+        inner = `<image href="${href}" x="${n(x)}" y="${n(y)}" width="${n(w)}" height="${n(h)}" preserveAspectRatio="xMidYMid meet"/>`
       }
       body.push(`<g${transform}${filterAttr}${op}>${inner}</g>`)
     },
     // imagen enmascarada en un marco rectangular (pantalla/mockup)
-    framedImage({ cx, cy, w, h, rotation = 0, href, natural, focal = { x: 0.5, y: 0.5 }, radius = 0, zoom = 1, shadow = false, opacity = 1 }) {
+    framedImage({ cx, cy, w, h, rotation = 0, flipX = false, href, natural, focal = { x: 0.5, y: 0.5 }, radius = 0, zoom = 1, shadow = false, opacity = 1 }) {
       if (!href) return
       const x = cx - w / 2
       const y = cy - h / 2
@@ -221,7 +234,10 @@ export function createBuilder() {
         iy = y - (ih - h) * focal.y
       }
       const par = natural ? 'none' : 'xMidYMid slice'
-      const transform = rotation ? ` transform="rotate(${n(rotation)} ${n(cx)} ${n(cy)})"` : ''
+      const ftp = []
+      if (rotation) ftp.push(`rotate(${n(rotation)} ${n(cx)} ${n(cy)})`)
+      if (flipX) ftp.push(`translate(${n(2 * cx)} 0) scale(-1 1)`)
+      const transform = ftp.length ? ` transform="${ftp.join(' ')}"` : ''
       const op = opacity < 1 ? ` opacity="${opacity}"` : ''
       body.push(
         `<g${transform}${filterAttr}${op}><g clip-path="url(#${clipId})"><image href="${href}" x="${n(ix)}" y="${n(iy)}" width="${n(iw)}" height="${n(ih)}" preserveAspectRatio="${par}"/></g></g>`

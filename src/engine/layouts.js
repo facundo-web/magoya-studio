@@ -339,6 +339,7 @@ function drawObjects(b, { objects, W, H, ref, accent, scheme }) {
     const cx = W * (o.x ?? 0.72)
     const cy = H * (o.y ?? 0.5)
     const rotation = o.rotation || 0
+    const flipX = !!o.flipX
     const shadow = o.shadow !== false
     const opacity = o.opacity ?? 1
     // DISPOSITIVO: marco + foto adentro de la pantalla (automático)
@@ -353,7 +354,7 @@ function drawObjects(b, { objects, W, H, ref, accent, scheme }) {
       if (o.src) {
         b.framedImage({
           cx: dx + (sc.x + sc.w / 2) * dw, cy: dy + (sc.y + sc.h / 2) * dh,
-          w: sc.w * dw, h: sc.h * dh, rotation, href: o.src, natural: o.natural,
+          w: sc.w * dw, h: sc.h * dh, rotation, flipX, href: o.src, natural: o.natural,
           focal: o.focal || { x: 0.5, y: 0.5 }, radius: sc.r * sc.w * dw, zoom: o.zoom || 1, shadow: false, opacity,
         })
       } else {
@@ -361,7 +362,7 @@ function drawObjects(b, { objects, W, H, ref, accent, scheme }) {
       }
       // 2) marco del dispositivo encima
       const frameUrl = getAsset(dev.url) || dev.url
-      b.object({ cx, cy, size: dw, rotation, href: frameUrl, tile: false, shadow, opacity, aspect: 1 / (sc.ratio || 1) })
+      b.object({ cx, cy, size: dw, rotation, flipX, href: frameUrl, tile: false, shadow, opacity, aspect: 1 / (sc.ratio || 1) })
       continue
     }
     if (o.kind === 'image' && o.src) {
@@ -370,7 +371,7 @@ function drawObjects(b, { objects, W, H, ref, accent, scheme }) {
         const fw = ref * (o.scale || 0.4)
         const fh = fw * (o.ratio || 0.6)
         b.framedImage({
-          cx, cy, w: fw, h: fh, rotation, href: o.src, natural: o.natural,
+          cx, cy, w: fw, h: fh, rotation, flipX, href: o.src, natural: o.natural,
           focal: o.focal || { x: 0.5, y: 0.5 }, radius: (o.radius || 0) * Math.min(fw, fh),
           zoom: o.zoom || 1, shadow, opacity,
         })
@@ -380,7 +381,7 @@ function drawObjects(b, { objects, W, H, ref, accent, scheme }) {
         if (o.fx === 'outline') extraFilter = b.filter({ kind: 'outline', r: ref * 0.008, color: o.fxColor || '#FFFFFF' })
         else if (o.fx === 'glow') extraFilter = b.filter({ kind: 'glow', r: ref * 0.05, color: o.fxColor || accent, opacity: 0.85 })
         else if (o.fx === 'hard') extraFilter = b.filter({ kind: 'hard', dx: ref * 0.018, dy: ref * 0.018, color: o.fxColor || '#0D0C0C' })
-        b.object({ cx, cy, size, rotation, href: o.src, tile: false, shadow: shadow && !extraFilter, opacity, extraFilter })
+        b.object({ cx, cy, size, rotation, flipX, href: o.src, tile: false, shadow: shadow && !extraFilter, opacity, extraFilter })
       }
       continue
     }
@@ -388,10 +389,11 @@ function drawObjects(b, { objects, W, H, ref, accent, scheme }) {
     if (!icon) continue
     const tint = o.tint === 'accent' ? accent : (o.tint || null)
     if (o.style === 'plain') {
-      b.object({ cx, cy, size, rotation, href: coloredIcon(icon.url, tint || icon.color), tile: false, shadow: icon.isMark ? false : shadow, opacity })
+      // trazos y marcas: sin tile, sin sombra y con grosor de trazo ajustable
+      b.object({ cx, cy, size, rotation, flipX, href: coloredIcon(icon.url, tint || icon.color, o.sw || 1), tile: false, shadow: icon.isMark ? false : shadow, opacity })
     } else {
       // tile app-icon: squircle color de marca + glifo blanco
-      b.object({ cx, cy, size, rotation, href: coloredIcon(icon.url, '#FFFFFF'), tile: true, tileColor: o.tileColor || icon.color, shadow, opacity })
+      b.object({ cx, cy, size, rotation, flipX, href: coloredIcon(icon.url, '#FFFFFF'), tile: true, tileColor: o.tileColor || icon.color, shadow, opacity })
     }
   }
 }
@@ -401,25 +403,28 @@ function drawShape(b, { o, W, H, ref, accent, scheme }) {
   const size = ref * (o.scale || 0.3)
   const cx = W * (o.x ?? 0.5), cy = H * (o.y ?? 0.5)
   const rot = o.rotation || 0
+  const flipX = !!o.flipX
   const color = o.tint === 'accent' ? accent : (o.tint || accent)
   const op = o.opacity ?? 1
-  const shadowF = o.shadow ? b.filter({ kind: 'hard', dx: ref * 0.012, dy: ref * 0.012, color: '#0D0C0C', opacity: 0.9 }) : null
+  const swMul = o.sw || 1 // grosor de trazo ajustable por el usuario
+  const hardShadow = o.shadow ? b.filter({ kind: 'hard', dx: ref * 0.012, dy: ref * 0.012, color: '#0D0C0C', opacity: 0.9 }) : null
+  const g = { rotation: rot, cx, cy, flipX, opacity: op }
 
   if (o.shape === 'arrow' || o.shape === 'handArrow') {
     const w = size, h = size * 0.5
+    const tx = cx - w / 2, ty = cy - h / 2
     if (o.shape === 'arrow') {
-      const d = arrowPath(w, h)
-      b.path({ d: shiftPath(d, cx - w / 2, cy - h / 2), fill: color, rotation: rot, cx, cy, opacity: op, filterId: shadowF })
+      b.path({ d: arrowPath(w, h), fill: color, tx, ty, ...g, filterId: hardShadow })
     } else {
       const { body, head } = handArrowPath(w, h)
-      const sw = Math.max(3, ref * 0.012)
-      b.path({ d: shiftPath(body, cx - w / 2, cy - h / 2), stroke: color, sw, rotation: rot, cx, cy, opacity: op })
-      b.path({ d: shiftPath(head, cx - w / 2, cy - h / 2), stroke: color, sw, rotation: rot, cx, cy, opacity: op })
+      const sw = Math.max(3, ref * 0.012 * swMul)
+      b.path({ d: body, stroke: color, sw, tx, ty, ...g })
+      b.path({ d: head, stroke: color, sw, tx, ty, ...g })
     }
     return
   }
   if (o.shape === 'sparkle') {
-    b.path({ d: shiftPath(sparklePath(size / 2), cx, cy), fill: color, rotation: rot, cx, cy, opacity: op })
+    b.path({ d: sparklePath(size / 2), fill: color, tx: cx, ty: cy, ...g })
     return
   }
   if (o.shape === 'badge') {
@@ -428,8 +433,8 @@ function drawShape(b, { o, W, H, ref, accent, scheme }) {
     const w = measure(txt, { px, weight: 800, tracking: 0.06 }) + px * 1.5
     const h = px * 2
     const solid = o.style !== 'outline'
-    b.rect({ x: cx - w / 2, y: cy - h / 2, w, h, rx: h / 2, fill: solid ? color : 'none' })
-    if (!solid) b.path({ d: roundRect(cx - w / 2, cy - h / 2, w, h, h / 2), stroke: color, sw: Math.max(2, ref * 0.006) })
+    if (solid) b.rect({ x: cx - w / 2, y: cy - h / 2, w, h, rx: h / 2, fill: color, opacity: op })
+    else b.path({ d: roundRect(cx - w / 2, cy - h / 2, w, h, h / 2), stroke: color, sw: Math.max(2, ref * 0.006 * swMul), opacity: op })
     b.text({ x: cx, y: cy - px * 0.62, lines: [txt], px, weight: 800, tracking: 0.06,
       fill: solid ? contrastOn(color) : color, anchor: 'middle' })
     return
@@ -440,7 +445,7 @@ function drawShape(b, { o, W, H, ref, accent, scheme }) {
     const x0 = cx - w / 2, y0 = cy - h / 2
     barsRects(w, h, vals).forEach((r, i) => {
       b.rect({ x: x0 + r.x, y: y0 + r.y, w: r.w, h: r.h, rx: r.rx,
-        fill: i === vals.length - 1 ? color : (scheme?.muted || color), opacity: i === vals.length - 1 ? 1 : 0.45 })
+        fill: i === vals.length - 1 ? color : (scheme?.muted || color), opacity: (i === vals.length - 1 ? 1 : 0.45) * op })
     })
     return
   }
@@ -449,25 +454,29 @@ function drawShape(b, { o, W, H, ref, accent, scheme }) {
     const w = size, h = size * 0.5
     const x0 = cx - w / 2, y0 = cy - h / 2
     const { line, last } = sparkline(w, h, vals)
-    b.path({ d: shiftPath(line, x0, y0), stroke: color, sw: Math.max(3, ref * 0.01) })
-    b.rect({ x: x0 + last[0] - ref * 0.012, y: y0 + last[1] - ref * 0.012, w: ref * 0.024, h: ref * 0.024, rx: ref * 0.012, fill: color })
+    b.path({ d: line, stroke: color, sw: Math.max(3, ref * 0.01 * swMul), tx: x0, ty: y0, ...g })
+    b.rect({ x: x0 + last[0] - ref * 0.012, y: y0 + last[1] - ref * 0.012, w: ref * 0.024, h: ref * 0.024, rx: ref * 0.012, fill: color, opacity: op })
     return
   }
   if (o.shape === 'callout') {
-    const w = size, h = size * 0.62
+    // el bocadillo se ajusta AL TEXTO (como una burbuja de verdad): el ancho
+    // lo fija el usuario con el tamaño, el alto sale de las líneas que entran.
+    const w = size
+    const px = w * 0.115
+    const padX = w * 0.09, padY = w * 0.075
+    const txt = String(o.text || '').trim()
+    const lines = txt ? wrapText(txt, { px, weight: 600, maxWidth: w - padX * 2 }) : []
+    const lh = 1.28
+    // se descuenta medio interlineado: si no, el aire de abajo se ve mayor
+    const h = Math.max(w * 0.42, lines.length * px * lh + padY * 2 - px * (lh - 1) * 0.5)
     const x0 = cx - w / 2, y0 = cy - h / 2
-    b.path({ d: shiftPath(calloutPath(w, h, { r: ref * 0.03 }), x0, y0), fill: o.fill || '#FFFFFF', filterId: shadowF })
-    if (o.text) {
-      const px = size * 0.09
-      const lines = wrapText(String(o.text), { px, weight: 600, maxWidth: w * 0.84 })
-      b.text({ x: x0 + w * 0.08, y: y0 + h * 0.2, lines, px, weight: 600, fill: '#0D0C0C', lineHeight: 1.3 })
+    const soft = o.shadow ? b.filter({ kind: 'soft', r: ref * 0.012, dy: ref * 0.008, opacity: 0.28 }) : null
+    b.path({ d: calloutPath(w, h, { r: w * 0.09 }), fill: o.fill || '#FFFFFF', tx: x0, ty: y0, ...g, filterId: soft })
+    if (lines.length) {
+      b.text({ x: x0 + padX, y: y0 + padY, lines, px, weight: 600, fill: '#0D0C0C', lineHeight: lh })
     }
     return
   }
-}
-// desplaza un path (los generadores dibujan en origen 0,0)
-function shiftPath(d, dx, dy) {
-  return d.replace(/(-?[\d.]+),(-?[\d.]+)/g, (m, x, y) => `${(+x + dx).toFixed(2)},${(+y + dy).toFixed(2)}`)
 }
 function roundRect(x, y, w, h, r) {
   return `M${x + r},${y} H${x + w - r} A${r},${r} 0 0 1 ${x + w},${y + r} V${y + h - r} A${r},${r} 0 0 1 ${x + w - r},${y + h} H${x + r} A${r},${r} 0 0 1 ${x},${y + h - r} V${y + r} A${r},${r} 0 0 1 ${x + r},${y} Z`

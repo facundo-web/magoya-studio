@@ -46,7 +46,7 @@ export const ICONS = Object.entries(modules).map(([path, url]) => {
 })
 
 // ---- trazos y misceláneas (currentColor → se tiñen con el acento/negro) ----
-const MARK_NAMES = { 'flourish-arrow': 'Flecha', 'flourish-circle': 'Círculo', 'flourish-underline': 'Subrayado', 'flourish-navarrow': 'Flecha siguiente', 'doodle-dots': 'Dots de carrusel' }
+const MARK_NAMES = { 'flourish-arrow': 'Flecha', 'flourish-circle': 'Círculo', 'flourish-underline': 'Subrayado', 'flourish-navarrow': 'Botón flecha', 'doodle-dots': 'Dots de carrusel' }
 export const MARKS = Object.entries(markModules)
   .map(([path, url]) => {
     const m = path.match(/\/((?:flourish|doodle)-[^/]+)\.svg$/)
@@ -54,7 +54,7 @@ export const MARKS = Object.entries(markModules)
   })
   .filter(Boolean)
   .filter((x) => MARK_NAMES[x.slug])
-  .map((x) => ({ id: `marks:${x.slug}`, slug: x.slug, category: x.slug.startsWith('flourish') ? 'trazos' : 'misc', label: MARK_NAMES[x.slug], url: x.url, color: '#0D0C0C', isMark: true }))
+  .map((x) => ({ id: `marks:${x.slug}`, slug: x.slug, category: (x.slug.startsWith('flourish') && x.slug !== 'flourish-navarrow') ? 'trazos' : 'misc', label: MARK_NAMES[x.slug], url: x.url, color: '#0D0C0C', isMark: true }))
 
 // ---- marca de Magoya como elemento colocable (wordmark + isotipo) ----
 import { WORDMARKS, ISOTIPOS } from './brandKit.js'
@@ -76,7 +76,7 @@ const DEVICE_NAMES = { phone: 'Celular', laptop: 'Notebook', tablet: 'Tablet' }
 // para meter la foto adentro automáticamente, sin que el usuario recorte nada
 const DEVICE_SCREENS = {
   phone: { x: 11 / 232, y: 11 / 468, w: 210 / 232, h: 446 / 468, r: 0.19, ratio: 232 / 468 },
-  laptop: { x: 82 / 520, y: 18 / 322, w: 356 / 520, h: 220 / 322, r: 0.011, ratio: 520 / 322 },
+  laptop: { x: 78 / 560, y: 18 / 336, w: 404 / 560, h: 274 / 336, r: 0.006, ratio: 560 / 336 },
   tablet: { x: 16 / 344, y: 16 / 468, w: 312 / 344, h: 436 / 468, r: 0.045, ratio: 344 / 468 },
 }
 export const DEVICES = Object.entries(deviceModules).map(([path, url]) => {

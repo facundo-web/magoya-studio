@@ -6,7 +6,9 @@
   "surface": "solid",
   "anchor": "bottom-left",
   "motif": false,
-  "roles": ["subtitle"],
+  "roles": [
+    "subtitle"
+  ],
   "defaults": {
     "scheme": "cream",
     "accent": "deep",
@@ -14,7 +16,19 @@
     "hasPhoto": false,
     "subtitle": "Respuesta corta: sí, pero con el contexto de tu lote.",
     "objects": [
-      { "kind": "shape", "shape": "callout", "tint": "#FFFFFF", "x": 0.5, "y": 0.34, "scale": 0.78, "rotation": 0, "shadow": true, "opacity": 1, "text": "¿La IA me sirve si no tengo los datos ordenados?" }
+      {
+        "kind": "shape",
+        "shape": "callout",
+        "tint": "#FFFFFF",
+        "x": 0.52,
+        "y": 0.4,
+        "scale": 0.72,
+        "rotation": 0,
+        "shadow": true,
+        "opacity": 1,
+        "text": "¿La IA me sirve si no tengo los datos ordenados?",
+        "front": true
+      }
     ]
   }
 }

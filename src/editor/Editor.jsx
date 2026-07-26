@@ -34,6 +34,8 @@ const ROLE_LABELS = {
 
 // grilla de posiciones (para ubicar objetos rápido)
 const SHAPE_NAMES = { arrow: 'Flecha gruesa', handArrow: 'Flecha a mano', sparkle: 'Destello', badge: 'Etiqueta', bars: 'Barras', sparkline: 'Curva', callout: 'Bocadillo' }
+// formas dibujadas con trazo (tienen grosor ajustable)
+const STROKE_SHAPES = ['handArrow', 'sparkline']
 
 const POS_GRID = [
   [0.22, 0.2], [0.5, 0.2], [0.78, 0.2],
@@ -128,10 +130,12 @@ export default function Editor({
   const isCarousel = slides && slides.length > 0
   const canCarousel = CAROUSEL_FORMATS.includes(format.id)
 
-  const set = (patch) => onChangeContent({ ...content, ...patch })
+  // `tag` = nombre de la interacción en curso; agrupa todo el gesto en un
+  // solo paso de deshacer (ver changeContent en App.jsx).
+  const set = (patch, tag) => onChangeContent({ ...content, ...patch }, tag)
   const objects = content.objects || []
-  const setObjects = (next) => set({ objects: next })
-  const updateObject = (i, patch) => setObjects(objects.map((o, idx) => (idx === i ? { ...o, ...patch } : o)))
+  const setObjects = (next, tag) => set({ objects: next }, tag)
+  const updateObject = (i, patch, tag) => setObjects(objects.map((o, idx) => (idx === i ? { ...o, ...patch } : o)), tag)
   const objRemove = (i) => { setObjects(objects.filter((_, idx) => idx !== i)); setSelObj(null) }
   const objBringFront = (i) => { const a = [...objects]; const [it] = a.splice(i, 1); a.push(it); setObjects(a); setSelObj(a.length - 1) }
   const objSendBack = (i) => { const a = [...objects]; const [it] = a.splice(i, 1); a.unshift(it); setObjects(a); setSelObj(0) }
@@ -179,9 +183,12 @@ export default function Editor({
     const icon = ICONS_BY_ID[data.id]
     if (!icon) return
     if (icon.isShape) {
-      setObjects([...objects, { kind: 'shape', shape: icon.shape, tint: 'accent', ...pos, scale: 0.3, rotation: 0, shadow: false, opacity: 1,
-        ...(icon.shape === 'badge' ? { text: 'NUEVO' } : {}) }])
-      setSelObj(objects.length); return
+      // `pos` no existe acá (venía copiado del drop): sin x/y explícitos esto
+      // tiraba ReferenceError y NINGUNA forma se podía agregar tocándola.
+      setObjects([...objects, { kind: 'shape', shape: icon.shape, tint: 'accent', x: 0.5, y: 0.42, scale: 0.34, rotation: 0, shadow: false, opacity: 1,
+        ...(icon.shape === 'badge' ? { text: 'NUEVO' } : {}),
+        ...(icon.shape === 'callout' ? { text: '¿Y si el dato ya lo tenías?', tint: '#FFFFFF', shadow: true } : {}) }])
+      setSelObj(objects.length); closePicker(); return
     }
     if (icon.isDevice) {
       setObjects([...objects, { kind: 'device', deviceId: icon.id, ...pos, scale: 0.55, rotation: 0, shadow: true, opacity: 1, focal: { x: 0.5, y: 0.5 }, zoom: 1 }])
@@ -247,7 +254,7 @@ export default function Editor({
     const s0 = o.scale || 0.3
     const move = (ev) => {
       const d = Math.hypot(ev.clientX - cx, ev.clientY - cy)
-      updateObject(i, { scale: Math.min(1.2, Math.max(0.05, s0 * (d / Math.max(d0, 1)))) })
+      updateObject(i, { scale: Math.min(1.2, Math.max(0.05, s0 * (d / Math.max(d0, 1)))) }, 'resize')
     }
     const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up) }
     window.addEventListener('pointermove', move)
@@ -266,7 +273,7 @@ export default function Editor({
     if (snapV) pos.x = 0.5
     if (snapH) pos.y = 0.5
     setGuides({ v: snapV, h: snapH })
-    updateObject(dragRef.current.i, pos)
+    updateObject(dragRef.current.i, pos, 'drag')
   }
   const endDrag = () => { dragRef.current.i = null; setGuides({ v: false, h: false }) }
   const onFrameDown = (e) => {
@@ -277,7 +284,13 @@ export default function Editor({
       if (selText === eid) { openTextEditor(t) } else { setSelText(eid); setSelObj(null) }
       return
     }
-    if (e.target === frameRef.current || e.target.tagName === 'svg' || e.target.tagName === 'IMAGE') { setSelObj(null); setSelText(null) }
+    // cualquier click que no caiga sobre un objeto o un texto DESELECCIONA:
+    // sin esto nunca se ve la pieza limpia, siempre queda un marco encima.
+    if (!e.target.closest('.obj-hit') && !e.target.closest('.rs-handle')) { setSelObj(null); setSelText(null) }
+  }
+  const onStageDown = (e) => {
+    if (e.target.closest('.piece-frame') || e.target.closest('.stage-tools') || e.target.closest('.strip')) return
+    setSelObj(null); setSelText(null); setEditing(null)
   }
 
   // ---- editar texto tocándolo sobre la pieza ----
@@ -334,10 +347,11 @@ export default function Editor({
         ))}
       </nav>
       <div className="sidebar" style={{ width: panelW.left }}>
+        {/* la tarjeta negra con nombre + propósito + formato era redundante:
+            el formato ya está en la barra del lienzo y el nombre en el breadcrumb.
+            Queda una línea silenciosa, y el espacio se lo lleva el panel. */}
         <div className="side-head">
-          <div className="sh-name">{template.name}</div>
-          {template.purpose && <div className="sh-purpose">{template.purpose}</div>}
-          <div className="sh-dest">Para <b>{format.network} · {format.label}</b> · {format.w}×{format.h}</div>
+          <span className="sh-name" title={template.purpose}>{template.name}</span>
         </div>
 
         {panel === 'style' && (
@@ -467,7 +481,7 @@ export default function Editor({
           <DownloadMenu template={template} content={content} format={format} slides={slides} busy={busy} setBusy={setBusy} onToast={onToast} />
         </div>
 
-        <div className="stage-canvas">
+        <div className="stage-canvas" onPointerDown={onStageDown}>
           <div
             className={'piece-frame' + (selObj != null ? ' dragging-ready' : '')}
             ref={frameRef}
@@ -759,36 +773,43 @@ function ObjectsBody({ objects, setObjects, selObj, setSelObj, objRemove, onToas
   const fileRef = useRef(null)
   const CATS = { ...ICON_CATEGORIES, custom: 'Mis elementos' }
 
-  const placeImage = async (src, elementId) => {
+  // `label` = cómo se llama en el inspector (antes todo decía "Logo")
+  const placeImage = async (src, elementId, label) => {
     const natural = await imageSize(src)
-    setObjects([...objects, { kind: 'image', src, elementId, natural, x: 0.72, y: 0.42, scale: 0.34, rotation: 0, shadow: true, opacity: 1 }])
+    setObjects([...objects, { kind: 'image', src, elementId, label, natural, x: 0.72, y: 0.42, scale: 0.34, rotation: 0, shadow: true, opacity: 1 }])
     setSelObj(objects.length)
   }
+  // el picker sólo se cierra si vive dentro de una sección colapsable
+  const closePicker = () => { if (!alwaysOpen) setPicking(false) }
   const addIcon = (icon) => {
     // dispositivo: objeto con PANTALLA (la foto va adentro automáticamente)
     if (icon.isShape) {
-      setObjects([...objects, { kind: 'shape', shape: icon.shape, tint: 'accent', ...pos, scale: 0.3, rotation: 0, shadow: false, opacity: 1,
-        ...(icon.shape === 'badge' ? { text: 'NUEVO' } : {}) }])
-      setSelObj(objects.length); return
+      // `pos` no existe acá (venía copiado del drop): sin x/y explícitos esto
+      // tiraba ReferenceError y NINGUNA forma se podía agregar tocándola.
+      setObjects([...objects, { kind: 'shape', shape: icon.shape, tint: 'accent', x: 0.5, y: 0.42, scale: 0.34, rotation: 0, shadow: false, opacity: 1,
+        ...(icon.shape === 'badge' ? { text: 'NUEVO' } : {}),
+        ...(icon.shape === 'callout' ? { text: '¿Y si el dato ya lo tenías?', tint: '#FFFFFF', shadow: true } : {}) }])
+      setSelObj(objects.length); closePicker(); return
     }
     if (icon.isDevice) {
       setObjects([...objects, { kind: 'device', deviceId: icon.id, x: 0.5, y: 0.5, scale: 0.55, rotation: 0, shadow: true, opacity: 1, focal: { x: 0.5, y: 0.5 }, zoom: 1 }])
       setSelObj(objects.length)
-      setPicking(false)
+      closePicker()
       return
     }
-    if (icon.category === 'magoya' && !icon.isMark) { placeImage(getAsset(icon.url) || icon.url); setPicking(false); return }
+    if (icon.category === 'magoya' && !icon.isMark) { placeImage(getAsset(icon.url) || icon.url, undefined, icon.label); closePicker(); return }
     const isMark = !!icon.isMark
     setObjects([...objects, { kind: 'icon', iconId: icon.id, style: isMark ? 'plain' : 'tile', tint: isMark ? 'accent' : undefined, x: 0.72, y: 0.42, scale: isMark ? 0.34 : 0.3, rotation: 0, shadow: false, opacity: 1 }])
     setSelObj(objects.length)
-    setPicking(false)
+    closePicker()
   }
   const addImage = async (file) => {
     if (!file || !file.type.startsWith('image/')) return onToast('No es una imagen')
     const src = await new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(file) })
     let elementId
-    if (onAddElement) { const el = onAddElement({ name: file.name.replace(/\.[^.]+$/, ''), src }); elementId = el?.id }
-    placeImage(src, elementId)
+    const nice = file.name.replace(/\.[^.]+$/, '')
+    if (onAddElement) { const el = onAddElement({ name: nice, src }); elementId = el?.id }
+    placeImage(src, elementId, nice)
   }
   const iconsInCat = cat === 'custom' ? [] : ALL_OBJECTS.filter((i) => i.category === cat)
 
@@ -797,10 +818,10 @@ function ObjectsBody({ objects, setObjects, selObj, setSelObj, objRemove, onToas
       {objects.length > 0 && (
         <div className="obj-list">
           {objects.map((o, i) => {
-            const oi = o.kind === 'icon' ? ICONS_BY_ID[o.iconId] : null
+            const oi = (o.kind === 'icon' || o.kind === 'device') ? ICONS_BY_ID[o.iconId || o.deviceId] : null
             return (
               <div key={i} className={'obj-row' + (selObj === i ? ' sel' : '')}>
-                <button className="obj-row-name" onClick={() => setSelObj(i)}>{selObj === i ? '◉ ' : '○ '}{o.kind === 'image' ? 'PNG / foto' : (oi?.label || 'Logo')}</button>
+                <button className="obj-row-name" onClick={() => setSelObj(i)}>{selObj === i ? '◉ ' : '○ '}{objectName(o, oi)}</button>
                 <button className="obj-row-del" onClick={() => objRemove(i)} title="Quitar">✕</button>
               </div>
             )
@@ -1007,7 +1028,7 @@ function ObjectProps({ o, i, updateObject, objRemove, objBringFront, objSendBack
   return (
     <>
       <div className="insp-head">
-        <span className="insp-name">{o.kind === 'shape' ? (SHAPE_NAMES[o.shape] || 'Forma') : o.kind === 'device' ? (objIcon?.label || 'Dispositivo') : o.kind === 'image' ? 'PNG / foto' : (objIcon?.label || 'Logo')}</span>
+        <span className="insp-name">{objectName(o, objIcon)}</span>
         <button className="btn" style={{ padding: '2px 8px' }} onClick={() => objRemove(i)}>Quitar</button>
       </div>
       {o.kind === 'device' && (
@@ -1122,7 +1143,15 @@ function ObjectProps({ o, i, updateObject, objRemove, objBringFront, objSendBack
                 style={{ background: t.sw }} onClick={() => updateObject(i, { tint: t.value })} />
             ))}
           </div>
+          {STROKE_SHAPES.includes(o.shape) && (
+            <Ctl label="Grosor del trazo" value={Math.round((o.sw || 1) * 100)} min={40} max={300} step={10} suffix="%"
+              onChange={(v) => updateObject(i, { sw: v / 100 }, 'sw')} />
+          )}
         </>
+      )}
+      {o.kind === 'icon' && isMark && (
+        <Ctl label="Grosor del trazo" value={Math.round((o.sw || 1) * 100)} min={40} max={300} step={10} suffix="%"
+          onChange={(v) => updateObject(i, { sw: v / 100 }, 'sw')} />
       )}
       <label>Profundidad</label>
       <div className="chips" style={{ marginBottom: 6 }}>
@@ -1139,20 +1168,20 @@ function ObjectProps({ o, i, updateObject, objRemove, objBringFront, objSendBack
           <button key={k} className={'posdot' + (Math.abs((o.x ?? 0.5) - px) < 0.02 && Math.abs((o.y ?? 0.5) - py) < 0.02 ? ' on' : '')} onClick={() => updateObject(i, { x: px, y: py })} title="Ubicar acá" />
         ))}
       </div>
-      <Ctl label="Tamaño" value={Math.round((o.scale ?? 0.3) * 100)} min={5} max={120} suffix="%" onChange={(v) => updateObject(i, { scale: v / 100 })} />
-      <div className="ictl">
-        <div className="ictl-top">
-          <label>Rotación</label>
-          <input className="ictl-num" type="number" min={-45} max={45} value={Math.round(o.rotation || 0)}
-            onChange={(e) => e.target.value !== '' && updateObject(i, { rotation: Math.min(45, Math.max(-45, +e.target.value)) })} />
-        </div>
-        <div className="chips" style={{ marginTop: 6 }}>
-          {[-15, 0, 15].map((d) => (
-            <button key={d} className={'chip' + ((o.rotation || 0) === d ? ' on' : '')} onClick={() => updateObject(i, { rotation: d })}>{d > 0 ? `+${d}°` : `${d}°`}</button>
-          ))}
-        </div>
+      <Ctl label="Tamaño" value={Math.round((o.scale ?? 0.3) * 100)} min={5} max={120} suffix="%" onChange={(v) => updateObject(i, { scale: v / 100 }, 'scale')} />
+      <Ctl label="Rotación" value={Math.round(o.rotation || 0)} min={-180} max={180} step={1} suffix="°"
+        onChange={(v) => updateObject(i, { rotation: v }, 'rot')} />
+      <div className="chips" style={{ marginTop: -4, marginBottom: 10 }}>
+        {[-90, -15, 0, 15, 90].map((d) => (
+          <button key={d} className={'chip' + ((o.rotation || 0) === d ? ' on' : '')} onClick={() => updateObject(i, { rotation: d })}>{d > 0 ? `+${d}°` : `${d}°`}</button>
+        ))}
       </div>
-      <Ctl label="Opacidad" value={Math.round((o.opacity ?? 1) * 100)} min={10} max={100} step={5} suffix="%" onChange={(v) => updateObject(i, { opacity: v / 100 })} />
+      <label>Reflejar</label>
+      <div className="chips" style={{ marginBottom: 10 }}>
+        <button className={'chip' + (o.flipX ? ' on' : '')} onClick={() => updateObject(i, { flipX: !o.flipX })} title="Espeja el elemento (útil para que una flecha apunte al otro lado)">⇄ Horizontal</button>
+        <button className="chip" onClick={() => updateObject(i, { rotation: ((o.rotation || 0) + 180) % 360 > 180 ? ((o.rotation || 0) + 180) - 360 : (o.rotation || 0) + 180 })} title="Gira 180°">⇅ Vertical</button>
+      </div>
+      <Ctl label="Opacidad" value={Math.round((o.opacity ?? 1) * 100)} min={10} max={100} step={5} suffix="%" onChange={(v) => updateObject(i, { opacity: v / 100 }, 'op')} />
       <label>Sombra (profundidad)</label>
       <div className="chips">
         <button className={'chip' + (o.shadow !== false ? ' on' : '')} onClick={() => updateObject(i, { shadow: true })}>Con sombra</button>
@@ -1160,6 +1189,27 @@ function ObjectProps({ o, i, updateObject, objRemove, objBringFront, objSendBack
       </div>
     </>
   )
+}
+
+// Nombre exacto de lo que hay seleccionado: antes casi todo decía "Logo".
+function objectName(o, icon) {
+  if (!o) return 'Elemento'
+  if (o.kind === 'shape') return SHAPE_NAMES[o.shape] || 'Forma'
+  if (o.kind === 'device') return icon?.label ? `Dispositivo · ${icon.label}` : 'Dispositivo'
+  if (o.kind === 'image') {
+    if (o.cutout) return o.label ? `Recorte · ${o.label}` : 'Recorte (fondo quitado)'
+    if (o.label) return o.label
+    if (o.frame) return 'Imagen en marco'
+    return o.elementId ? 'Elemento propio' : 'Imagen'
+  }
+  if (!icon) return 'Elemento'
+  if (icon.isIsotipo) return `Isotipo Magoya · ${icon.label}`
+  if (icon.isWordmark) return icon.label
+  if (icon.category === 'ai') return `Logo de IA · ${icon.label}`
+  if (icon.category === 'social') return `Logo de red · ${icon.label}`
+  if (icon.category === 'trazos') return `Trazo · ${icon.label}`
+  if (icon.category === 'misc') return `Misceláneo · ${icon.label}`
+  return icon.label || 'Elemento'
 }
 
 /* ---------------- Brand ---------------- */

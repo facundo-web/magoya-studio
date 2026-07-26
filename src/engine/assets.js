@@ -31,12 +31,17 @@ async function fetchDataURL(url) {
 }
 
 // devuelve un data-URL del ícono coloreado (o blanco)
-export function coloredIcon(url, color) {
+// strokeMul: multiplica el grosor de trazo del SVG (solo tiene efecto en los
+// trazos/marcas, que se dibujan con stroke; los logos macizos no lo usan).
+export function coloredIcon(url, color, strokeMul = 1) {
   if (!url) return null
-  const key = url + '|' + color
+  const key = url + '|' + color + '|' + strokeMul
   if (coloredCache.has(key)) return coloredCache.get(key)
   let text = iconText.get(url)
   if (!text) return cache.get(url) || null // fallback sin recolorear
+  if (strokeMul !== 1) {
+    text = text.replace(/stroke-width="([\d.]+)"/g, (m, w) => `stroke-width="${(+w * strokeMul).toFixed(2)}"`)
+  }
   let colored
   if (text.includes('currentColor')) {
     // trazos/doodles (stroke o fill = currentColor): solo reemplazar el color,

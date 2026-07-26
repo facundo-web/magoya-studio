@@ -140,9 +140,24 @@ export default function App() {
   }
 
   // ---- editar ----
-  function changeContent(next) {
+  // `tag` agrupa una MISMA interacción (arrastrar, mover un slider) en un
+  // solo paso de deshacer. Sin esto, arrastrar un objeto dejaba un estado
+  // por cada píxel y Deshacer tenía que recorrerlos todos uno por uno.
+  const lastTagRef = useRef(null)
+  // El gesto termina cuando soltás el mouse o la tecla; ahí se abre un paso
+  // de deshacer nuevo. (No se usa reloj: algunos navegadores redondean
+  // Date.now() a 1s por privacidad y una ventana temporal no cierra nunca.)
+  useEffect(() => {
+    const end = () => { lastTagRef.current = null }
+    window.addEventListener('pointerup', end)
+    window.addEventListener('keyup', end)
+    return () => { window.removeEventListener('pointerup', end); window.removeEventListener('keyup', end) }
+  }, [])
+  function changeContent(next, tag) {
+    const sameGesture = !!tag && lastTagRef.current === tag
+    lastTagRef.current = tag || null
     setPieces((ps) => {
-      pushHistory(ps)
+      if (!sameGesture) pushHistory(ps)
       return ps.map((p, i) => (i === active ? { ...p, content: next } : p))
     })
     if (active === 0 && next.title) setProjectName(next.title)
@@ -426,7 +441,12 @@ export default function App() {
           <nav className="crumbs" aria-label="Ubicación">
             <button className="crumb-link" onClick={() => setView('gallery')}>Inicio</button>
             <span className="crumb-sep">›</span>
-            <span className="crumb-cur">{current.template.name}</span>
+            {/* C3 · el nombre del proyecto es editable acá (antes mostraba,
+                sin poder cambiarlo, el nombre de la plantilla) */}
+            <input className="crumb-name" value={projectName}
+              placeholder="Sin título"
+              title="Nombre de esta pieza"
+              onChange={(e) => { setProjectName(e.target.value); setDirty(true) }} />
           </nav>
         )}
         <div className="spacer" />

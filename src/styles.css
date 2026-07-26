@@ -597,3 +597,12 @@ button.obj-row { width: 100%; cursor: pointer; text-align: left; font: inherit; 
 .var-card.on .var-thumb { border-color: var(--emerald-500,#00DE68); box-shadow: 0 0 0 3px rgba(0,222,104,.18); }
 .var-label { font-size: 11px; color: #5C6B61; line-height: 1.2; }
 .var-card.on .var-label { color: #0D0C0C; font-weight: 700; }
+
+/* nombre del proyecto editable en el breadcrumb */
+.crumb-name { background: transparent; border: 1px solid transparent; color: var(--cream-100,#F6F1EB); font: inherit; font-weight: 700; font-size: 13px; padding: 3px 7px; border-radius: 7px; min-width: 90px; max-width: 280px; }
+.crumb-name:hover { border-color: rgba(255,255,255,.18); }
+.crumb-name:focus { outline: none; border-color: var(--emerald-500,#00DE68); background: rgba(255,255,255,.06); }
+.crumb-name::placeholder { color: rgba(255,255,255,.42); font-weight: 500; }
+/* cabecera del panel: una línea, no una tarjeta */
+.side-head { padding: 0 0 10px; border-bottom: 1px solid var(--paper-200,#E6E1D8); margin-bottom: 12px; background: none; }
+.side-head .sh-name { font-size: 12px; font-weight: 700; color: #5C6B61; letter-spacing: .02em; }
