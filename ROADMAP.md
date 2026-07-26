@@ -76,7 +76,7 @@ su propio prefijo de id.
 
 ---
 
-## 🟠 BLOQUE D (D1 y D2 hechos) — Carrusel y revisión
+## ✅ BLOQUE D (HECHO) — Carrusel y revisión
 
 - **D1** **Reordenar slides arrastrando** + numeración 1/5 en la tira. **M**
 - **D2** El preview compartido muestra **solo la slide 1**: que muestre el
@@ -89,7 +89,7 @@ su propio prefijo de id.
 
 ---
 
-## 🟠 BLOQUE E (E2 hecho: íconos SVG) — Sistema visual (que se vea 5 niveles arriba)
+## ✅ BLOQUE E (HECHO) — Sistema visual (que se vea 5 niveles arriba)
 
 - **E1** Unificar componentes: hay **7 implementaciones del mismo pill** y 5
   tipos de card → `.u-btn` / `.u-card` (CSS ya especificado). **M**
@@ -101,7 +101,7 @@ su propio prefijo de id.
 
 ---
 
-## 🟠 BLOQUE F (F1 hecho: 2 plantillas) — Contenido y plantillas
+## ✅ BLOQUE F (HECHO) — Contenido y plantillas
 
 - **F1** 2 plantillas más: **"Mito vs realidad"** (el formato de mayor
   engagement en LinkedIn B2B) e **"Insight con fuente"** (dato externo
@@ -114,12 +114,13 @@ su propio prefijo de id.
 
 ---
 
-## 🔵 BLOQUE G — Mobile
+## ✅ BLOQUE G (HECHO) — Mobile
 
 - **G1** La **vista de revisión** tiene que ser perfecta en celular
   (marketing revisa desde el teléfono). **M**
-- **G2** El editor de 3 columnas queda desktop-only con un cartel honesto, o
-  se hace la versión mobile con bottom sheet. **L**
+- **G2** El editor de 3 columnas pasa a **una columna con bottom sheets**
+  (no se esconde detrás de un cartel): el rail es una barra inferior, tocar
+  un panel abre su hoja, seleccionar un elemento abre la de propiedades. ✅
 
 ---
 
@@ -146,12 +147,30 @@ su propio prefijo de id.
 
 ---
 
-## Orden recomendado
+## Estado: el roadmap A–G está completo
 
-1. **Bloque A completo** (A1→A3 primero: es el salto visual grande y son
-   pocos días). Es el foco declarado de la etapa.
-2. **Bloque B** (variantes) — el mayor multiplicador de catálogo.
-3. **C + D3** (que no se pierda trabajo, y una sola puerta para compartir).
-4. **E1/E2** (unificar componentes + íconos) — sube el nivel percibido.
-5. **F + D1/D2/D4**.
-6. **G** al final.
+Todo lo planificado (A, B, C, D, E, F, G) está implementado, verificado en
+el navegador y desplegado en https://facundo-web.github.io/magoya-studio/
+
+**Bugs de fondo que aparecieron y se arreglaron en el camino** (no estaban
+en el plan y afectaban a toda la app):
+
+- Los ids de `<defs>` (filtros, clips, degradés) viven en el namespace del
+  DOCUMENTO: con varias piezas inline, `url(#f0)` resolvía al defs de otra
+  pieza y las fotos se recortaban con coordenadas ajenas.
+- `shiftPath` movía los números del `d` con una regex y también corría los
+  RADIOS de los arcos → el bocadillo salía deforme.
+- `object()` dibujaba la imagen cuadrada aunque el objeto tuviera otro alto
+  → el dibujo quedaba corrido respecto a su caja de selección.
+- Agregar una forma desde el panel tiraba `ReferenceError`: **ninguna** se
+  podía sumar tocándola.
+- Deshacer guardaba un estado por píxel de arrastre; ahora cada gesto es un
+  paso (y no se usa reloj: el navegador redondea `Date.now()` a 1s).
+- El isotipo salía espejado en Y (la `m` se leía como `w`).
+- Compartir decía "no se pudo subir" cuando la pieza **sí** se había subido
+  y lo único que había fallado era el portapapeles.
+
+## Lo que sigue (ronda de feedback)
+
+Nada del plan original queda pendiente. Los próximos cambios salen de usar
+la herramienta: ahí decidimos qué merece Fase 3.
