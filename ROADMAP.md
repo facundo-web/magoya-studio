@@ -219,7 +219,67 @@ revisión con comentarios anclados, export PNG @3x / ZIP / PDF, y mobile.
 - Sin control de concurrencia: si dos personas comentan la misma pieza a la
   vez, los comentarios conviven pero no hay aviso en vivo.
 
-## Lo que sigue
+---
 
-Nada del plan original queda pendiente. Los próximos cambios salen de usar
-la herramienta: ahí decidimos qué merece Fase 3.
+# Plan en curso — "que nada haya que aprenderlo"
+
+Sale de dos investigaciones: cómo muestran el preview las plataformas y las
+herramientas reales, y una auditoría de usabilidad de toda la app.
+
+## ✅ Hecho en esta tanda
+
+- **Dispositivos con volumen**: sombra de 6 capas apiladas (una sola siempre
+  se lee como ícono) y reflejo de pantalla con **corte duro al 35%** — el
+  borde neto es lo que el ojo lee como vidrio.
+- **El preview dejó de ser un teléfono enano.** Hallazgo del research: en el
+  feed **ninguna herramienta buena dibuja el teléfono**. Feed IG y LinkedIn
+  ahora son la tarjeta de la red con medidas reales, sobre el fondo real de
+  la app y con las piezas vecinas cortadas. El marco queda para Story/Reel,
+  a 405×720 y siempre 9:16.
+- **Historial estilo Figma**: el paso se cierra cuando termina el gesto.
+- **7 arreglos de usabilidad** (historial cruzado entre proyectos, selección
+  que sobrevivía al cambio de slide, resize desde la esquina opuesta,
+  captura de puntero al arrastrar, marco del texto seleccionado, un solo
+  control de capas, el formato en la barra del lienzo).
+
+## 🔵 BLOQUE H — El lienzo se maneja solo
+
+- **H1 Zoom** (50 / 100 / Ajustar + ⌘scroll). Hoy una story 1080×1920 en una
+  notebook entra al ~35% y ajustar el borde de un recorte es imposible: la
+  única salida es exportar, mirar y volver. **M**
+- **H2 Tirador de rotación** en el lienzo, con snap cada 15° con Shift. Hoy
+  sólo se rota desde un slider del panel. **M**
+- **H3 Escape cancela** la edición de texto (hoy ya escribió) y Enter hace
+  lo mismo en el lienzo y en el panel. **S**
+
+## 🔵 BLOQUE I — Una sola forma de hacer cada cosa
+
+- **I1 Fondo + Fotos son un solo panel.** Hoy los dos muestran la MISMA
+  biblioteca con dos resultados distintos: en uno la foto es el fondo, en el
+  otro es un objeto encima. Hay que aprender la distinción antes de poder
+  elegir el panel. Se resuelve preguntando en el momento. **M**
+- **I2 Un solo control de encuadre** (el punto arrastrable), no dos sliders
+  X/Y en un lado y el punto en el otro. **S**
+- **I3 Todo borrado ofrece Deshacer** — hoy hay tres mecanismos según qué
+  borres, y el objeto (el caso más frecuente) es el único sin red. **S**
+- **I4 Carrusel + formato incompatible**: hoy podés quedar con 5 slides en
+  formato "Miniatura de YouTube" y nadie avisa. **S**
+
+## 🔵 BLOQUE J — Las palabras del equipo, no las del diseñador
+
+- **J1** volanta→etiqueta (¡el mismo campo tiene dos nombres!), placa,
+  scrim/degradé, "clima", tratamiento, app-icon, glow, opacidad, esquema de
+  color vs color de fondo, imagen libre / recorte-pantalla. **S**
+- **J2 Selector de logo con swatches + "Automático"** — hoy es una lista de
+  texto donde hay que deducir cuál contrasta con el fondo. **S**
+- **J3 Nombres de color visibles**, no sólo en el tooltip (en celular no hay
+  hover: son puntitos anónimos). **S**
+
+## 🔵 BLOQUE K — Que el estado sea visible
+
+- **K1 Progreso real al exportar** un carrusel: hoy el aviso se va a los
+  2,2 s y un ZIP de 8 slides tarda mucho más; parece colgado. **M**
+- **K2 "Aprobar" tiene que aprobar.** Hoy abre WhatsApp y no guarda nada: el
+  que revisa cree que terminó y el que espera no se entera. **M**
+- **K3 Miniaturas de galería con foto** — hoy todas las plantillas con foto
+  se ven como la misma tarjeta gris. **S**

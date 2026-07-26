@@ -26,6 +26,7 @@ const P = {
   check: 'M4 12l5 5L20 6',
   flipH: 'M12 3v18M8 7L4 12l4 5M16 7l4 5-4 5',
   flipV: 'M3 12h18M7 8l5-4 5 4M7 16l5 4 5-4',
+  rotate: 'M20 12a8 8 0 11-2.3-5.6M20 3v4h-4',
   scissors: 'M6 3l12 12M6 21L18 9M8 6a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0zM8 18a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z',
 }
 export default function Icon({ n, size = 20, ...rest }) {

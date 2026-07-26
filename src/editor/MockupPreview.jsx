@@ -1,5 +1,8 @@
 import React from 'react'
 import PiecePreview from './PiecePreview.jsx'
+// el avatar es la marca de verdad, no un punto de color: es lo primero que
+// mira cualquiera para saber si el preview es creíble
+import avatarUrl from '../brand/assets/magoya-avatar.svg?url'
 
 // ============================================================
 // PREVIEW REAL — no es un dibujo de un teléfono, es el chrome de la app
@@ -39,7 +42,7 @@ const I = {
 function Vecino({ alto, cortadoArriba = false }) {
   return (
     <div className={'mk-vecino' + (cortadoArriba ? ' corte-arriba' : '')} aria-hidden="true">
-      {!cortadoArriba && <div className="mk-ig-head"><span className="mk-av ring" /><span className="mk-ph n" /></div>}
+      {!cortadoArriba && <div className="mk-ig-head"><span className="mk-av neutro" /><span className="mk-ph n" /></div>}
       <div className="mk-vecino-img" style={{ height: alto }} />
       {cortadoArriba && <div className="mk-ig-actions"><span>{I.heart}</span><span>{I.comment}</span><span>{I.send}</span><span className="mk-save">{I.save}</span></div>}
     </div>
@@ -62,7 +65,7 @@ export default function MockupPreview({ template, content, format, mockup = 'ig'
                 arriba 250 px (13%), abajo 340 px (17,7%) */}
             {safeZones && (<><div className="mk-safe top" /><div className="mk-safe bottom" /></>)}
             <div className="mk-story-top"><span /><span /><span /></div>
-            <div className="mk-story-user"><span className="mk-av" />magoya <span className="mk-time">2 h</span></div>
+            <div className="mk-story-user"><img className="mk-av" src={avatarUrl} alt="Magoya" />magoya <span className="mk-time">2 h</span></div>
             <div className="mk-story-reply">
               <span className="mk-reply-input">Enviar mensaje</span>
               <span className="mk-story-ic">{I.heart}</span>
@@ -82,7 +85,7 @@ export default function MockupPreview({ template, content, format, mockup = 'ig'
         <Vecino alto={90} cortadoArriba />
         <div className="mk-igcard">
           <div className="mk-ig-head">
-            <span className="mk-av ring" />
+            <img className="mk-av ring" src={avatarUrl} alt="Magoya" />
             <span className="mk-ig-name">magoya</span>
             <span className="mk-dots">···</span>
           </div>
@@ -103,10 +106,10 @@ export default function MockupPreview({ template, content, format, mockup = 'ig'
     <div className={'mk-li-stage' + dk}>
       <div className="mk-licard">
         <div className="mk-li-head">
-          <span className="mk-av lg sq" />
+          <img className="mk-av lg sq" src={avatarUrl} alt="Magoya" />
           <div className="mk-li-who">
             <div className="mk-li-name">Magoya</div>
-            <div className="mk-li-sub">Product studio · 2.412 seguidores</div>
+            <div className="mk-li-sub">Product studio · 9.184 seguidores</div>
             <div className="mk-li-sub">1 h · <span className="mk-li-globe">{I.world}</span></div>
           </div>
           <span className="mk-li-follow">+ Seguir</span>

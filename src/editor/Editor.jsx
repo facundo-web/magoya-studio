@@ -112,6 +112,20 @@ function FormatPicker({ format, onChangeFormat }) {
   )
 }
 
+// H1 · control de zoom. "Ajustar" es el default y siempre se puede volver.
+function ZoomCtl({ zoom, setZoom, fit }) {
+  const pct = Math.round((zoom || fit()) * 100)
+  return (
+    <span className="zoom-ctl" title="⌘ + rueda para acercar · ⌘0 para ajustar">
+      <button className="zbtn" onClick={() => setZoom((z) => Math.max(0.1, (z || fit()) * 0.83))} aria-label="Alejar">−</button>
+      <button className={'zval' + (zoom ? '' : ' fit')} onClick={() => setZoom(zoom ? 0 : 1)}>
+        {zoom ? pct + '%' : 'Ajustar'}
+      </button>
+      <button className="zbtn" onClick={() => setZoom((z) => Math.min(4, (z || fit()) * 1.2))} aria-label="Acercar">+</button>
+    </span>
+  )
+}
+
 /* ---------------- Sección colapsable ---------------- */
 function Section({ title, help, summary, defaultOpen = false, children }) {
   const [open, setOpen] = useState(defaultOpen)
@@ -196,10 +210,26 @@ export default function Editor({
   const [dragSlide, setDragSlide] = useState(null) // rail de inserción: un panel a la vez
   // G2 · en celular los paneles son hojas que suben desde abajo
   const [sheet, setSheet] = useState(false)
+  // H1 · Zoom. Sin esto, una story 1080×1920 entra al ~35% en una notebook
+  // y ajustar el borde de un recorte es imposible: la única salida era
+  // exportar, mirar y volver.
+  const [zoom, setZoom] = useState(0)   // 0 = ajustar a la pantalla
+  const stageRef = useRef(null)
   const frameRef = useRef(null)
   const photoInputRef = useRef(null)
   const dragRef = useRef({ i: null })
   const textDragRef = useRef(null)
+
+  // cuánto entra en el lienzo (lo que hace hoy el CSS), para arrancar el
+  // zoom manual desde el valor que ya estabas viendo
+  const fitZoom = () => {
+    const el = stageRef.current
+    if (!el) return 1
+    const pad = 48
+    return Math.min((el.clientWidth - pad) / format.w, (el.clientHeight - pad) / format.h, 1)
+  }
+  // al cambiar de formato se vuelve a ajustar: es lo que espera cualquiera
+  useEffect(() => { setZoom(0) }, [format.id])
 
   const isCarousel = slides && slides.length > 0
   const canCarousel = CAROUSEL_FORMATS.includes(format.id)
@@ -305,6 +335,11 @@ export default function Editor({
       const tag = document.activeElement?.tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
       if (e.key === 'Escape') { setSelObj(null); setSelText(null); setEditing(null); return }
+      if (e.metaKey || e.ctrlKey) {
+        if (e.key === '0') { e.preventDefault(); setZoom(0); return }
+        if (e.key === '+' || e.key === '=') { e.preventDefault(); setZoom((z) => Math.min(4, (z || fitZoom()) * 1.2)); return }
+        if (e.key === '-') { e.preventDefault(); setZoom((z) => Math.max(0.1, (z || fitZoom()) * 0.83)); return }
+      }
       if (selObj == null || !objects[selObj]) return
       const o = objects[selObj]
       if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); objRemove(selObj); return }
@@ -359,6 +394,30 @@ export default function Editor({
       const k = d / d0
       // el ancla no se mueve: el centro se recalcula a mitad de camino
       updateObject(i, { scale: clampScale(s0 * k), x: ax + (px - ax) / 2, y: ay + (py - ay) / 2 }, 'resize')
+    }
+    const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up) }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
+  }
+
+  // H2 · girar agarrando, que es el gesto de todos los editores. El slider
+  // del panel queda como control fino.
+  const startRotate = (e, i) => {
+    e.stopPropagation(); e.preventDefault()
+    const o = objects[i]
+    if (!o) return
+    try { e.currentTarget.setPointerCapture(e.pointerId) } catch {}
+    const fr = frameRef.current.getBoundingClientRect()
+    const cx = fr.left + fr.width * (o.x ?? 0.5)
+    const cy = fr.top + fr.height * (o.y ?? 0.5)
+    const ang = (ev) => (Math.atan2(ev.clientY - cy, ev.clientX - cx) * 180) / Math.PI + 90
+    const a0 = ang(e)
+    const r0 = o.rotation || 0
+    const move = (ev) => {
+      let r = r0 + (ang(ev) - a0)
+      if (ev.shiftKey) r = Math.round(r / 15) * 15
+      r = ((r + 180) % 360 + 360) % 360 - 180
+      updateObject(i, { rotation: Math.round(r) }, 'rotate')
     }
     const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up) }
     window.addEventListener('pointermove', move)
@@ -448,7 +507,7 @@ export default function Editor({
     const scale = fr.width / format.w
     const fontPx = parseFloat(getComputedStyle(t).fontSize) * scale || 18
     setEditing({
-      eid, value: getText(eid),
+      eid, value: getText(eid), original: getText(eid),
       left: r.left - fr.left, top: r.top - fr.top,
       width: Math.max(r.width + fontPx, 90), fontPx,
       align: (t.getAttribute('text-anchor') === 'middle') ? 'center' : 'left',
@@ -614,6 +673,7 @@ export default function Editor({
               <button className="btn icon-btn" onClick={onRedo} disabled={!canRedo} title="Rehacer (⇧⌘Z)"><Icon n="redo" size={16} /></button>
             </span>
           )}
+          <ZoomCtl zoom={zoom} setZoom={setZoom} fit={fitZoom} />
           <label className="safe-toggle"><input type="checkbox" checked={showSafe} onChange={(e) => setShowSafe(e.target.checked)} /> Ver zona segura</label>
           <div style={{ flex: 1 }} />
           {canCarousel && !isCarousel && <button className="btn" onClick={onConvertToCarousel}>+ Convertir en carrusel</button>}
@@ -628,9 +688,18 @@ export default function Editor({
           <DownloadMenu template={template} content={content} format={format} slides={slides} busy={busy} setBusy={setBusy} onToast={onToast} />
         </div>
 
-        <div className="stage-canvas" onPointerDown={onStageDown}>
+        <div className="stage-canvas" onPointerDown={onStageDown} ref={stageRef}
+          onWheel={(e) => {
+            if (!(e.ctrlKey || e.metaKey)) return   // ⌘/ctrl + rueda, como en todos lados
+            e.preventDefault()
+            setZoom((z) => {
+              const base = z || fitZoom()
+              return Math.min(4, Math.max(0.1, base * (e.deltaY > 0 ? 0.9 : 1.1)))
+            })
+          }}>
           <div
-            className={'piece-frame' + (selObj != null ? ' dragging-ready' : '')}
+            className={'piece-frame' + (selObj != null ? ' dragging-ready' : '') + (zoom ? ' zoomed' : '')}
+            style={zoom ? { width: format.w * zoom, height: format.h * zoom } : undefined}
             ref={frameRef}
             onPointerDown={onFrameDown}
             onPointerMove={onFrameMove}
@@ -648,7 +717,14 @@ export default function Editor({
                 style={{ left: editing.left + 'px', top: editing.top + 'px', width: editing.width + 'px', fontSize: editing.fontPx + 'px', textAlign: editing.align }}
                 onChange={(e) => { setEditing({ ...editing, value: e.target.value }); setText(editing.eid, e.target.value) }}
                 onBlur={() => setEditing(null)}
-                onKeyDown={(e) => { if (e.key === 'Escape' || (e.key === 'Enter' && !e.shiftKey)) { e.preventDefault(); setEditing(null) } }}
+                onKeyDown={(e) => {
+                  // Escape = "dejalo como estaba", en todos lados. Antes
+                  // sólo cerraba el cuadro: el texto ya había cambiado.
+                  if (e.key === 'Escape') { e.preventDefault(); setText(editing.eid, editing.original); setEditing(null); return }
+                  // Enter hace salto de línea (igual que en el panel);
+                  // se cierra con ⌘Enter o tocando afuera.
+                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); setEditing(null) }
+                }}
               />
             )}
             {/* áreas de selección/arrastre de objetos (hover marca, click selecciona) */}
@@ -663,6 +739,10 @@ export default function Editor({
                   {selObj === i && ['nw', 'ne', 'sw', 'se'].map((c) => (
                     <span key={c} className={'rs-handle ' + c} onPointerDown={(e) => startHandleResize(e, i, c)} />
                   ))}
+                  {selObj === i && (
+                    <span className="rot-handle" title="Girar · con Shift salta de 15 en 15"
+                      onPointerDown={(e) => startRotate(e, i)}><Icon n="rotate" size={13} /></span>
+                  )}
                 </div>
               )
             })}

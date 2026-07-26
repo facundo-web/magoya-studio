@@ -466,7 +466,7 @@ button.obj-row { width: 100%; cursor: pointer; text-align: left; font: inherit; 
   padding: 0; border-radius: 0 0 16px 16px; }
 .mk-piece > div { display: contents; }
 .mk-piece svg { width: 100%; height: 100%; display: block; }
-.mk-av { width: 26px; height: 26px; border-radius: 999px; background: linear-gradient(135deg,#00DE68,#133825); display: inline-block; border: 2px solid #fff; flex: none; }
+.mk-av { width: 26px; height: 26px; border-radius: 999px; display: inline-block; object-fit: cover; background: #0D0C0C; flex: none; }
 .mk-ph { display: block; height: 10px; border-radius: 5px; background: rgba(0,0,0,.10); }
 .mk-ph.n { width: 82px; }
 
@@ -550,7 +550,7 @@ button.obj-row { width: 100%; cursor: pointer; text-align: left; font: inherit; 
   border: 1px solid #E6E6E6; border-radius: 8px; padding: 12px 16px 0; height: max-content;
   font-family: -apple-system, system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
 .mk-li-head { display: flex; align-items: flex-start; gap: 8px; height: 64px; }
-.mk-av.lg.sq { width: 48px; height: 48px; border-radius: 999px; border: 0; }
+.mk-av.lg.sq { width: 48px; height: 48px; border-radius: 8px; border: 0; }
 .mk-li-who { flex: 1; min-width: 0; }
 .mk-li-name { font-size: 14px; line-height: 21px; font-weight: 600; color: rgba(0,0,0,.9); }
 .mk-li-sub { font-size: 12px; line-height: 16px; color: rgba(0,0,0,.6); display: flex; align-items: center; gap: 4px; }
@@ -870,3 +870,23 @@ button.obj-row { width: 100%; cursor: pointer; text-align: left; font: inherit; 
 .fmt-cur { font-size: var(--fs-3); font-weight: 600; color: var(--ui-fg); }
 .fmt-dim { font-size: var(--fs-2); color: var(--ui-fg-3); font-family: var(--font-mono); }
 .fmt-picker select { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; min-height: 0; }
+
+/* ---- H1 · zoom del lienzo ---- */
+.zoom-ctl { display: inline-flex; align-items: center; gap: 2px; border: 1px solid var(--ui-line); border-radius: var(--r-pill); padding: 2px; background: var(--ui-surface); }
+.zbtn { width: 26px; height: 26px; border: 0; background: transparent; border-radius: var(--r-pill); color: var(--ui-fg-2); font-size: 15px; line-height: 1; }
+.zbtn:hover { background: rgba(13,12,12,.06); }
+.zval { border: 0; background: transparent; font-size: var(--fs-2); font-weight: 600; color: var(--ui-fg); padding: 0 8px; min-width: 56px; border-radius: var(--r-pill); }
+.zval:hover { background: rgba(13,12,12,.06); }
+.zval.fit { color: var(--ui-fg-2); }
+/* con zoom manual el marco manda: el lienzo scrollea alrededor */
+.piece-frame.zoomed { max-width: none; max-height: none; flex: none; }
+.piece-frame.zoomed svg { max-width: none; max-height: none; width: 100%; height: 100%; }
+.stage-canvas { align-items: safe center; justify-content: safe center; }
+/* H2 · tirador de rotación (arriba, fuera de la caja, como en todos lados) */
+.rot-handle { position: absolute; top: -30px; left: 50%; transform: translateX(-50%);
+  width: 24px; height: 24px; border-radius: 999px; background: var(--ui-surface);
+  border: 1.5px solid var(--ui-accent,#00DE68); color: var(--ui-fg);
+  display: flex; align-items: center; justify-content: center; cursor: grab; z-index: 5; }
+.rot-handle:active { cursor: grabbing; }
+.mk-av.neutro { width: 38px; height: 38px; background: rgba(0,0,0,.10); }
+.mk-feed-stage.dark .mk-av.neutro { background: rgba(255,255,255,.12); }
