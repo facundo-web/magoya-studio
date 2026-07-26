@@ -16,7 +16,7 @@ const TINTS = [
   { k: 'blue', label: 'Azul', value: '#2E7DD1', sw: '#2E7DD1' },
   { k: 'yellow', label: 'Amarillo', value: '#F2C14E', sw: '#F2C14E' },
 ]
-import { imageSize, getAsset } from '../engine/assets.js'
+import { imageSize, getAsset, compressImage, removeBackground } from '../engine/assets.js'
 import { exportPiece, exportCarousel } from '../engine/export.js'
 
 const ROLE_LABELS = {
@@ -59,9 +59,9 @@ function Section({ title, help, summary, defaultOpen = false, children }) {
 
 export default function Editor({
   template, format, content, slides, activeSlide,
-  onChangeContent, onChangeFormat, onSelectSlide, onAddSlide, onDuplicateSlide, onChangeSlideTemplate, onDeleteSlide, onToast,
+  onChangeContent, onChangeFormat, onSelectSlide, onAddSlide, onDuplicateSlide, onConvertToCarousel, onBackToSingle, onChangeSlideTemplate, onDeleteSlide, onToast,
   elements = [], onAddElement, onDeleteElement,
-  templates = TEMPLATES, onSaveTemplate, onShare, onExportFile,
+  templates = TEMPLATES, onSaveTemplate, onShare, onShareReview, onExportFile,
 }) {
   const [busy, setBusy] = useState(false)
   const [selObj, setSelObj] = useState(null)
@@ -110,11 +110,9 @@ export default function Editor({
   // foto: subir → dataURL (compartido entre panel y overlay)
   const onPhotoFile = async (file) => {
     if (!file || !file.type.startsWith('image/')) return onToast('Ese archivo no es una imagen')
-    const src = await new Promise((res) => {
-      const r = new FileReader()
-      r.onload = () => res(r.result)
-      r.readAsDataURL(file)
-    })
+    const big = file.size > 8 * 1024 * 1024
+    const src = await compressImage(file)
+    if (big) onToast('Achicamos la foto para que entre — se ve igual de bien')
     const natural = await imageSize(src)
     set({ photo: { src, natural, focal: content.photo?.focal || { x: 0.5, y: 0.5 } } })
   }
@@ -131,7 +129,10 @@ export default function Editor({
   const refDim = Math.min(format.w, format.h)
   const objBox = (o) => {
     let w, h
-    if (o.kind === 'image' && o.frame) { w = refDim * (o.scale || 0.4); h = w * (o.ratio || 0.6) }
+    if (o.kind === 'device') {
+      const dev = ICONS_BY_ID[o.deviceId]
+      w = refDim * (o.scale || 0.5); h = w / (dev?.screen?.ratio || 1)
+    } else if (o.kind === 'image' && o.frame) { w = refDim * (o.scale || 0.4); h = w * (o.ratio || 0.6) }
     else { w = refDim * (o.scale || 0.3); h = w }
     const cx = format.w * (o.x ?? 0.72), cy = format.h * (o.y ?? 0.5)
     return { left: ((cx - w / 2) / format.w) * 100, top: ((cy - h / 2) / format.h) * 100, w: (w / format.w) * 100, h: (h / format.h) * 100, rot: o.rotation || 0 }
@@ -148,7 +149,12 @@ export default function Editor({
     }
     const icon = ICONS_BY_ID[data.id]
     if (!icon) return
-    if (icon.category === 'magoya' || icon.isDevice) {
+    if (icon.isDevice) {
+      setObjects([...objects, { kind: 'device', deviceId: icon.id, ...pos, scale: 0.55, rotation: 0, shadow: true, opacity: 1, focal: { x: 0.5, y: 0.5 }, zoom: 1 }])
+      setSelObj(objects.length)
+      return
+    }
+    if (icon.category === 'magoya') {
       const src = getAsset(icon.url) || icon.url
       const natural = await imageSize(src)
       setObjects([...objects, { kind: 'image', src, natural, ...pos, scale: icon.isDevice ? 0.5 : 0.34, rotation: 0, shadow: true, opacity: 1 }])
@@ -323,13 +329,13 @@ export default function Editor({
           template.freeform ? (
             <>
               <div className="panel-title">Fondo</div>
-              <BgBody content={content} set={set} inputRef={photoInputRef} onPhotoFile={onPhotoFile} />
+              <BgBody content={content} set={set} inputRef={photoInputRef} onPhotoFile={onPhotoFile} onToast={onToast} />
             </>
           ) : template.surface === 'photo' ? (
             <>
               <div className="panel-title">Foto de fondo</div>
               <p className="panel-help">Subí una foto o elegí de la biblioteca. Sale en B&N (regla de marca).</p>
-              <PhotoBody content={content} set={set} inputRef={photoInputRef} onPhotoFile={onPhotoFile} />
+              <PhotoBody content={content} set={set} inputRef={photoInputRef} onPhotoFile={onPhotoFile} onToast={onToast} />
             </>
           ) : (
             <>
@@ -376,9 +382,14 @@ export default function Editor({
           <span style={{ fontSize: 13, color: '#5C6B61' }}>{format.network} · {format.label} · {format.w}×{format.h}</span>
           <label className="safe-toggle"><input type="checkbox" checked={showSafe} onChange={(e) => setShowSafe(e.target.checked)} /> Ver zona segura</label>
           <div style={{ flex: 1 }} />
-          {canCarousel && !isCarousel && <button className="btn" onClick={() => setChooser('add')}>+ Convertir en carrusel</button>}
+          {canCarousel && !isCarousel && <button className="btn" onClick={onConvertToCarousel}>+ Convertir en carrusel</button>}
+          {isCarousel && (
+            <span className="mode-pill">▦ Carrusel · {slides.length} {slides.length === 1 ? 'slide' : 'slides'}
+              {slides.length === 1 && onBackToSingle && <button className="linklike" onClick={onBackToSingle}>Volver a pieza simple</button>}
+            </span>
+          )}
           <button className="btn" onClick={() => setMockupOpen(true)}>👁 Ver en mockup</button>
-          <MoreMenu onSaveTemplate={onSaveTemplate} onShare={onShare} onExportFile={onExportFile} />
+          <MoreMenu onSaveTemplate={onSaveTemplate} onShare={onShare} onShareReview={onShareReview ? () => onShareReview(mockup) : undefined} onExportFile={onExportFile} />
           <DownloadMenu template={template} content={content} format={format} slides={slides} busy={busy} setBusy={setBusy} onToast={onToast} />
         </div>
 
@@ -562,7 +573,7 @@ function ContentBody({ template, content, onSelectText, selText }) {
 }
 
 /* ---------------- Photo ---------------- */
-function PhotoBody({ content, set, inputRef, onPhotoFile }) {
+function PhotoBody({ content, set, inputRef, onPhotoFile, onToast }) {
   const photo = content.photo
   const treatment = content.treatment || 'bw'
   // foto de la biblioteca → dataURL (para que exporte bien) + dims naturales
@@ -599,6 +610,7 @@ function PhotoBody({ content, set, inputRef, onPhotoFile }) {
           <button className={'chip' + (treatment === 'color' ? ' on' : '')} onClick={() => set({ treatment: 'color' })}>Color</button>
         </div>
       </div>
+      {photo?.src && <CutoutButton src={photo.src} onDone={(src, natural) => set({ photo: { ...photo, src, natural } })} onToast={onToast} />}
 
       {photo?.src && (
         <>
@@ -611,6 +623,31 @@ function PhotoBody({ content, set, inputRef, onPhotoFile }) {
         </>
       )}
     </>
+  )
+}
+
+/* ---------------- Quitar fondo (recorte IA, 100% en el navegador) ------------- */
+function CutoutButton({ src, onDone, onToast }) {
+  const [busy, setBusy] = useState(false)
+  const [pct, setPct] = useState(0)
+  const run = async () => {
+    setBusy(true); setPct(0)
+    onToast && onToast('Quitando el fondo… la primera vez tarda un poco')
+    try {
+      const out = await removeBackground(src, setPct)
+      const natural = await imageSize(out)
+      onDone(out, natural)
+      onToast && onToast('✓ Fondo quitado')
+    } catch (e) {
+      console.error(e)
+      onToast && onToast('⚠ No se pudo quitar el fondo')
+    } finally { setBusy(false) }
+  }
+  return (
+    <button className="btn" style={{ marginTop: 8, width: '100%' }} onClick={run} disabled={busy}
+      title="Recorta la persona u objeto y deja el fondo transparente">
+      {busy ? `Quitando fondo… ${pct}%` : '✂ Quitar fondo'}
+    </button>
   )
 }
 
@@ -649,8 +686,14 @@ function ObjectsBody({ objects, setObjects, selObj, setSelObj, objRemove, onToas
     setSelObj(objects.length)
   }
   const addIcon = (icon) => {
-    // logo Magoya y dispositivos se colocan como imagen (mantienen colores)
-    if (icon.category === 'magoya' || icon.isDevice) { placeImage(getAsset(icon.url) || icon.url); setPicking(false); return }
+    // dispositivo: objeto con PANTALLA (la foto va adentro automáticamente)
+    if (icon.isDevice) {
+      setObjects([...objects, { kind: 'device', deviceId: icon.id, x: 0.5, y: 0.5, scale: 0.55, rotation: 0, shadow: true, opacity: 1, focal: { x: 0.5, y: 0.5 }, zoom: 1 }])
+      setSelObj(objects.length)
+      setPicking(false)
+      return
+    }
+    if (icon.category === 'magoya') { placeImage(getAsset(icon.url) || icon.url); setPicking(false); return }
     const isMark = !!icon.isMark
     setObjects([...objects, { kind: 'icon', iconId: icon.id, style: isMark ? 'plain' : 'tile', tint: isMark ? 'accent' : undefined, x: 0.72, y: 0.42, scale: isMark ? 0.34 : 0.3, rotation: isMark ? 0 : -8, shadow: true, opacity: 1 }])
     setSelObj(objects.length)
@@ -732,17 +775,89 @@ function ObjectsBody({ objects, setObjects, selObj, setSelObj, objRemove, onToas
   )
 }
 
+/* ---------------- Controles del inspector (spec: slider + valor numérico) ------- */
+function Ctl({ label, value, min, max, step = 1, suffix = '', onChange }) {
+  const pct = ((value - min) / (max - min)) * 100
+  const clamp = (v) => Math.min(max, Math.max(min, v))
+  return (
+    <div className="ictl">
+      <div className="ictl-top">
+        <label>{label}</label>
+        <input className="ictl-num" type="number" min={min} max={max} step={step} value={Math.round(value)}
+          onChange={(e) => e.target.value !== '' && onChange(clamp(+e.target.value))} />
+      </div>
+      <input className="rng" type="range" min={min} max={max} step={step} value={value}
+        style={{ '--p': pct + '%' }} onChange={(e) => onChange(+e.target.value)} />
+    </div>
+  )
+}
+
+function Pad2D({ x = 0.5, y = 0.5, onChange }) {
+  const ref = useRef(null)
+  const move = (e) => {
+    const r = ref.current.getBoundingClientRect()
+    onChange({ x: Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)), y: Math.min(1, Math.max(0, (e.clientY - r.top) / r.height)) })
+  }
+  return (
+    <div ref={ref} className="pad2d" onPointerDown={(e) => { e.currentTarget.setPointerCapture(e.pointerId); move(e) }}
+      onPointerMove={(e) => e.buttons === 1 && move(e)}>
+      <div className="pad2d-dot" style={{ left: x * 100 + '%', top: y * 100 + '%' }} />
+    </div>
+  )
+}
+
 /* ---------------- Object properties (panel derecho / inspector) ---------------- */
 function ObjectProps({ o, i, updateObject, objRemove, objBringFront, objSendBack }) {
-  const objIcon = o.kind === 'icon' ? ICONS_BY_ID[o.iconId] : null
+  const objIcon = (o.kind === 'icon' || o.kind === 'device') ? ICONS_BY_ID[o.iconId || o.deviceId] : null
   const isMark = !!objIcon?.isMark
   const showTint = o.kind === 'icon' && (isMark || o.style === 'plain')
+  const devPhotoRef = useRef(null)
+  const setDevPhoto = async (src) => {
+    const natural = await imageSize(src)
+    updateObject(i, { src, natural })
+  }
+  const onDevFile = async (file) => {
+    if (!file || !file.type.startsWith('image/')) return
+    const src = await new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(file) })
+    setDevPhoto(src)
+  }
+  const useLibPhoto = async (url) => {
+    const res = await fetch(url); const blob = await res.blob()
+    const src = await new Promise((r) => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(blob) })
+    setDevPhoto(src)
+  }
   return (
     <>
       <div className="insp-head">
-        <span className="insp-name">{o.kind === 'image' ? 'PNG / foto' : (objIcon?.label || 'Logo')}</span>
+        <span className="insp-name">{o.kind === 'device' ? (objIcon?.label || 'Dispositivo') : o.kind === 'image' ? 'PNG / foto' : (objIcon?.label || 'Logo')}</span>
         <button className="btn" style={{ padding: '2px 8px' }} onClick={() => objRemove(i)}>Quitar</button>
       </div>
+      {o.kind === 'device' && (
+        <>
+          <label>Foto en la pantalla</label>
+          <div className={'dropzone' + (o.src ? ' has' : '')} onClick={() => devPhotoRef.current?.click()}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => { e.preventDefault(); e.dataTransfer.files[0] && onDevFile(e.dataTransfer.files[0]) }}>
+            {o.src ? '✓ Foto en pantalla — click para cambiar' : 'Subí una foto (entra sola en la pantalla)'}
+          </div>
+          <input ref={devPhotoRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => e.target.files[0] && onDevFile(e.target.files[0])} />
+          <label style={{ marginTop: 8 }}>o elegí de la biblioteca</label>
+          <div className="photo-lib">
+            {PHOTOS.slice(0, 9).map((p) => (
+              <button key={p.slug} className="photo-lib-item" title={p.label} onClick={() => useLibPhoto(p.url)}>
+                <img src={p.url} alt={p.label} loading="lazy" />
+              </button>
+            ))}
+          </div>
+          {o.src && (
+            <>
+              <Ctl label="Zoom de la foto" value={Math.round((o.zoom || 1) * 100)} min={100} max={300} step={5} onChange={(v) => updateObject(i, { zoom: v / 100 })} />
+              <label>Encuadre (arrastrá el punto)</label>
+              <Pad2D x={o.focal?.x ?? 0.5} y={o.focal?.y ?? 0.5} onChange={(f) => updateObject(i, { focal: f })} />
+            </>
+          )}
+        </>
+      )}
       {o.kind === 'icon' && !isMark && (
         <div className="chips" style={{ marginBottom: 8 }}>
           <button className={'chip' + (o.style !== 'plain' ? ' on' : '')} onClick={() => updateObject(i, { style: 'tile' })}>Con fondo (app-icon)</button>
@@ -757,15 +872,11 @@ function ObjectProps({ o, i, updateObject, objRemove, objBringFront, objSendBack
           </div>
           {o.frame && (
             <>
-              <label>Proporción (ancho/alto)</label>
-              <input className="range" type="range" min="0.3" max="1.8" step="0.02" value={o.ratio || 0.62} onChange={(e) => updateObject(i, { ratio: +e.target.value })} />
-              <label>Radio de esquinas</label>
-              <input className="range" type="range" min="0" max="0.3" step="0.01" value={o.radius || 0} onChange={(e) => updateObject(i, { radius: +e.target.value })} />
-              <label>Zoom de la imagen</label>
-              <input className="range" type="range" min="1" max="3" step="0.05" value={o.zoom || 1} onChange={(e) => updateObject(i, { zoom: +e.target.value })} />
-              <label>Encuadre X / Y</label>
-              <input className="range" type="range" min="0" max="1" step="0.01" value={o.focal?.x ?? 0.5} onChange={(e) => updateObject(i, { focal: { ...(o.focal || { x: 0.5, y: 0.5 }), x: +e.target.value } })} />
-              <input className="range" type="range" min="0" max="1" step="0.01" value={o.focal?.y ?? 0.5} onChange={(e) => updateObject(i, { focal: { ...(o.focal || { x: 0.5, y: 0.5 }), y: +e.target.value } })} />
+              <Ctl label="Proporción" value={Math.round((o.ratio || 0.62) * 100)} min={30} max={180} suffix="%" onChange={(v) => updateObject(i, { ratio: v / 100 })} />
+              <Ctl label="Esquinas redondeadas" value={Math.round((o.radius || 0) * 100)} min={0} max={30} suffix="%" onChange={(v) => updateObject(i, { radius: v / 100 })} />
+              <Ctl label="Zoom de la imagen" value={Math.round((o.zoom || 1) * 100)} min={100} max={300} step={5} suffix="%" onChange={(v) => updateObject(i, { zoom: v / 100 })} />
+              <label>Encuadre (arrastrá el punto)</label>
+              <Pad2D x={o.focal?.x ?? 0.5} y={o.focal?.y ?? 0.5} onChange={(f) => updateObject(i, { focal: f })} />
             </>
           )}
         </>
@@ -795,12 +906,20 @@ function ObjectProps({ o, i, updateObject, objRemove, objBringFront, objSendBack
           <button key={k} className={'posdot' + (Math.abs((o.x ?? 0.5) - px) < 0.02 && Math.abs((o.y ?? 0.5) - py) < 0.02 ? ' on' : '')} onClick={() => updateObject(i, { x: px, y: py })} title="Ubicar acá" />
         ))}
       </div>
-      <label>Tamaño</label>
-      <input className="range" type="range" min="0.08" max="0.7" step="0.01" value={o.scale} onChange={(e) => updateObject(i, { scale: +e.target.value })} />
-      <label>Rotación</label>
-      <input className="range" type="range" min="-45" max="45" step="1" value={o.rotation} onChange={(e) => updateObject(i, { rotation: +e.target.value })} />
-      <label>Opacidad (para fondos tenues)</label>
-      <input className="range" type="range" min="0.1" max="1" step="0.05" value={o.opacity ?? 1} onChange={(e) => updateObject(i, { opacity: +e.target.value })} />
+      <Ctl label="Tamaño" value={Math.round((o.scale ?? 0.3) * 100)} min={5} max={120} suffix="%" onChange={(v) => updateObject(i, { scale: v / 100 })} />
+      <div className="ictl">
+        <div className="ictl-top">
+          <label>Rotación</label>
+          <input className="ictl-num" type="number" min={-45} max={45} value={Math.round(o.rotation || 0)}
+            onChange={(e) => e.target.value !== '' && updateObject(i, { rotation: Math.min(45, Math.max(-45, +e.target.value)) })} />
+        </div>
+        <div className="chips" style={{ marginTop: 6 }}>
+          {[-15, 0, 15].map((d) => (
+            <button key={d} className={'chip' + ((o.rotation || 0) === d ? ' on' : '')} onClick={() => updateObject(i, { rotation: d })}>{d > 0 ? `+${d}°` : `${d}°`}</button>
+          ))}
+        </div>
+      </div>
+      <Ctl label="Opacidad" value={Math.round((o.opacity ?? 1) * 100)} min={10} max={100} step={5} suffix="%" onChange={(v) => updateObject(i, { opacity: v / 100 })} />
       <label>Sombra (profundidad)</label>
       <div className="chips">
         <button className={'chip' + (o.shadow !== false ? ' on' : '')} onClick={() => updateObject(i, { shadow: true })}>Con sombra</button>
@@ -900,7 +1019,7 @@ const TEXT_STYLE_OPTS = [
   { k: 'cta', label: 'Botón / CTA' },
 ]
 
-function BgBody({ content, set, inputRef, onPhotoFile }) {
+function BgBody({ content, set, inputRef, onPhotoFile, onToast }) {
   const bg = content.bg || 'color'
   const scheme = content.scheme || 'ink'
   const accent = content.accent || 'emerald'
@@ -919,7 +1038,7 @@ function BgBody({ content, set, inputRef, onPhotoFile }) {
           </div>
         </div>
       ) : (
-        <PhotoBody content={content} set={set} inputRef={inputRef} onPhotoFile={onPhotoFile} />
+        <PhotoBody content={content} set={set} inputRef={inputRef} onPhotoFile={onPhotoFile} onToast={onToast} />
       )}
       <div className="field"><label>Acento</label>
         <div className="swatches">
@@ -1084,7 +1203,7 @@ function ChatBody({ content, template, set }) {
 }
 
 /* ---------------- More menu (acciones de proyecto) ---------------- */
-function MoreMenu({ onSaveTemplate, onShare, onExportFile }) {
+function MoreMenu({ onSaveTemplate, onShare, onShareReview, onExportFile }) {
   const [open, setOpen] = useState(false)
   const act = (fn) => { setOpen(false); fn && fn() }
   return (
@@ -1093,7 +1212,8 @@ function MoreMenu({ onSaveTemplate, onShare, onExportFile }) {
       {open && (
         <div className="menu-pop" onMouseLeave={() => setOpen(false)}>
           <div className="grp">Compartir</div>
-          <button onClick={() => act(onShare)}><span>Copiar link de la pieza</span><span>↗</span></button>
+          {onShareReview && <button className="rec" onClick={() => act(onShareReview)}><span>Compartir para revisión (foto + comentarios)</span><span>☁</span></button>}
+          <button onClick={() => act(onShare)}><span>Copiar link liviano (sin foto)</span><span>↗</span></button>
           <button onClick={() => act(onExportFile)}><span>Exportar proyecto (.json)</span><span>↓</span></button>
           <div className="grp">Reusar</div>
           <button onClick={() => act(onSaveTemplate)}><span>Guardar como plantilla</span><span>☆</span></button>

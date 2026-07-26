@@ -3,6 +3,7 @@ import Gallery from './editor/Gallery.jsx'
 import Editor from './editor/Editor.jsx'
 import BrandKit from './editor/BrandKit.jsx'
 import MockupPreview from './editor/MockupPreview.jsx'
+import { createShare, loadShare, listComments, addComment } from './lib/supabase.js'
 import { TEMPLATES, TEMPLATES_BY_ID, BLANK_TEMPLATE, placeholderContent } from './templates/index.js'
 import { FORMATS_BY_ID, CAROUSEL_FORMATS } from './formats/registry.js'
 import {
@@ -21,7 +22,16 @@ export default function App() {
   const [customTemplates, setCustomTemplates] = useState([])
   const [toast, setToast] = useState(null)
   const [preview, setPreview] = useState(null) // pieza compartida en modo preview (mockup)
+  // revisión con comentarios (share en la nube)
+  const [comments, setComments] = useState([])
+  const [pin, setPin] = useState(null) // {x,y} en % del mockup, pendiente de comentar
+  const [cAuthor, setCAuthor] = useState(() => localStorage.getItem('magoya_author') || '')
+  const [cText, setCText] = useState('')
   const importRef = useRef(null)
+
+  useEffect(() => {
+    if (preview?.shareId) listComments(preview.shareId).then(setComments).catch(() => {})
+  }, [preview?.shareId])
 
   const allTemplates = [...TEMPLATES, ...customTemplates]
   const allById = Object.fromEntries(allTemplates.map((t) => [t.id, t]))
@@ -44,7 +54,15 @@ export default function App() {
     setProjects(loadProjects())
     setElements(loadElements())
     setCustomTemplates(loadCustomTemplates())
-    // ¿link compartido?
+    // ¿link de revisión en la nube? (#r=<id>, con foto y comentarios)
+    const rm = location.hash.match(/[#&]r=([\w-]+)/)
+    if (rm) {
+      loadShare(rm[1])
+        .then((p) => setPreview({ ...p, shareId: rm[1], preview: true }))
+        .catch(() => showToast('⚠ No se encontró la pieza compartida'))
+      return
+    }
+    // ¿link liviano embebido?
     const shared = fromShareLink()
     if (shared?.preview) setPreview(shared)
     else if (shared) openFromSerialized(shared)
@@ -135,6 +153,11 @@ export default function App() {
     setDirty(false)
     setView('editor')
   }
+  function convertToCarousel() {
+    setCarousel(true); setDirty(true)
+    showToast('Listo: ya es un carrusel. Sumá la slide 2 con el +')
+  }
+  function backToSingle() { setCarousel(false); setActive(0); setDirty(true) }
   function duplicateSlide() {
     // clona la slide activa (deep) para continuar la historia (ej: chat que sigue)
     setPieces((ps) => {
@@ -162,7 +185,7 @@ export default function App() {
       return next.length ? next : ps
     })
     setActive((a) => Math.max(0, a - (i <= a ? 1 : 0)))
-    if (pieces.length - 1 <= 1) setCarousel(false)
+    if (pieces.length - 1 < 1) setCarousel(false)
     setDirty(true)
   }
 
@@ -217,6 +240,34 @@ export default function App() {
     showToast('Plantilla eliminada')
   }
 
+  // ---- compartir para revisión (nube: con foto + comentarios) ----
+  async function shareForReview(mockup) {
+    showToast('Subiendo pieza…')
+    try {
+      const payload = { ...serialize(), mockup: typeof mockup === 'string' ? mockup : 'phone' }
+      const id = await createShare(payload)
+      const link = location.origin + location.pathname + '#r=' + id
+      await navigator.clipboard?.writeText(link)
+      showToast('✓ Link de revisión copiado — con foto y comentarios')
+    } catch (e) {
+      console.error(e)
+      showToast('⚠ No se pudo subir la pieza')
+    }
+  }
+  async function sendComment() {
+    if (!pin || !cText.trim()) return
+    try {
+      await addComment({ share_id: preview.shareId, author: cAuthor.trim() || 'Anónimo', text: cText.trim(), x: pin.x, y: pin.y })
+      localStorage.setItem('magoya_author', cAuthor.trim())
+      setCText(''); setPin(null)
+      setComments(await listComments(preview.shareId))
+      showToast('✓ Comentario enviado')
+    } catch (e) {
+      console.error(e)
+      showToast('⚠ No se pudo enviar el comentario')
+    }
+  }
+
   // ---- pantalla de PREVIEW (link compartido con mockup) ----
   if (preview) {
     const pc = preview.pieces?.[0]
@@ -240,12 +291,43 @@ export default function App() {
           <button className="btn ghost-light" onClick={() => { const p = preview; setPreview(null); if (location.hash) location.hash = ''; openFromSerialized(p) }}>Editar esta pieza</button>
         </div>
         <div className="preview-stage">
-          {t ? <MockupPreview template={t} content={pc.content} format={pfmt} mockup={preview.mockup || 'phone'} dark={!!preview.dark} /> : <div className="center-note">No se pudo cargar la pieza compartida.</div>}
+          <div className="review-wrap"
+            onClick={(e) => {
+              if (!preview.shareId) return
+              if (e.target.closest('.c-pin') || e.target.closest('.pin-form')) return
+              const r = e.currentTarget.getBoundingClientRect()
+              setPin({ x: ((e.clientX - r.left) / r.width) * 100, y: ((e.clientY - r.top) / r.height) * 100 })
+            }}>
+            {t ? <MockupPreview template={t} content={pc.content} format={pfmt} mockup={preview.mockup || 'phone'} dark={!!preview.dark} /> : <div className="center-note">No se pudo cargar la pieza compartida.</div>}
+            {preview.shareId && comments.map((c, i) => (
+              <span key={c.id} className="c-pin" style={{ left: c.x + '%', top: c.y + '%' }} title={`${c.author}: ${c.text}`}>{i + 1}</span>
+            ))}
+            {pin && (
+              <div className="pin-form" style={{ left: Math.min(pin.x, 60) + '%', top: Math.min(pin.y, 70) + '%' }} onClick={(e) => e.stopPropagation()}>
+                <input type="text" placeholder="Tu nombre" value={cAuthor} onChange={(e) => setCAuthor(e.target.value)} />
+                <textarea placeholder="Tu comentario sobre este punto…" value={cText} onChange={(e) => setCText(e.target.value)} rows={2} autoFocus />
+                <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                  <button className="btn" onClick={() => setPin(null)}>Cancelar</button>
+                  <button className="btn primary" onClick={sendComment}>Comentar</button>
+                </div>
+              </div>
+            )}
+          </div>
+          {preview.shareId && (
+            <p className="preview-note"><b>Tocá un punto de la pieza para dejar un comentario ahí</b> — quedan anclados como en Figma.</p>
+          )}
+          {preview.shareId && comments.length > 0 && (
+            <div className="c-list">
+              {comments.map((c, i) => (
+                <div key={c.id} className="c-item"><span className="c-num">{i + 1}</span><div><b>{c.author}</b> {c.text}</div></div>
+              ))}
+            </div>
+          )}
           <div className="verdict-row">
             <button className="btn primary" onClick={() => verdict(true)}>✓ Aprobar (responde por WhatsApp)</button>
             <button className="btn" onClick={() => verdict(false)}>✏️ Pedir cambios</button>
           </div>
-          <p className="preview-note">Así se ve publicada. La foto no viaja en el link — pedila por archivo (.magoya.json) para verla completa.</p>
+          {!preview.shareId && <p className="preview-note">Así se ve publicada. La foto no viaja en este link — usá "Compartir para revisión" para verla completa.</p>}
         </div>
         {toast && <div className="toast">{toast}</div>}
       </div>
@@ -305,12 +387,15 @@ export default function App() {
           onSelectSlide={setActive}
           onAddSlide={addSlide}
           onDuplicateSlide={duplicateSlide}
+          onConvertToCarousel={convertToCarousel}
+          onBackToSingle={backToSingle}
           onChangeSlideTemplate={changeSlideTemplate}
           onDeleteSlide={deleteSlide}
           onToast={showToast}
           templates={allTemplates}
           onSaveTemplate={saveAsTemplate}
           onShare={share}
+          onShareReview={shareForReview}
           onExportFile={() => exportProjectFile(serialize())}
           elements={elements}
           onAddElement={addCustomElement}

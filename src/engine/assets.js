@@ -82,6 +82,44 @@ export async function preloadBrandAssets() {
   ])
 }
 
+// comprime una foto subida (máx 2048px, JPEG .85) → dataURL liviano
+export function compressImage(file, maxSide = 2048, quality = 0.85) {
+  return new Promise((resolve) => {
+    const r = new FileReader()
+    r.onload = () => {
+      const img = new Image()
+      img.onload = () => {
+        const scale = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight))
+        if (scale === 1 && r.result.length < 1.2e6) return resolve(r.result)
+        const c = document.createElement('canvas')
+        c.width = Math.round(img.naturalWidth * scale)
+        c.height = Math.round(img.naturalHeight * scale)
+        const ctx = c.getContext('2d')
+        // fondo blanco por si el PNG tiene transparencia y vamos a JPEG
+        const hasAlpha = /image\/png|image\/webp/.test(file.type)
+        if (!hasAlpha) { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height) }
+        ctx.drawImage(img, 0, 0, c.width, c.height)
+        resolve(c.toDataURL(hasAlpha ? 'image/png' : 'image/jpeg', quality))
+      }
+      img.onerror = () => resolve(r.result)
+      img.src = r.result
+    }
+    r.readAsDataURL(file)
+  })
+}
+
+// quita el fondo de una foto (persona/objeto) 100% en el navegador.
+// El modelo (~5MB) se baja la primera vez y queda cacheado.
+export async function removeBackground(dataURL, onProgress) {
+  const { removeBackground: rb } = await import('@imgly/background-removal')
+  const blob = await (await fetch(dataURL)).blob()
+  const out = await rb(blob, {
+    output: { format: 'image/png' },
+    progress: (key, cur, total) => onProgress && onProgress(Math.round((cur / Math.max(total, 1)) * 100)),
+  })
+  return new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(out) })
+}
+
 // dims naturales de un data-URL de imagen (para cover con focal point)
 export function imageSize(dataURL) {
   return new Promise((resolve) => {

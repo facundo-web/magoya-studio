@@ -66,9 +66,16 @@ export const MAGOYA_OBJECTS = Object.entries(WORDMARKS).map(([k, w]) => ({
 // y adentro se les mete una foto/gráfico con "Recorte / pantalla" ----
 const deviceModules = import.meta.glob('./assets/devices/*.svg', { eager: true, query: '?url', import: 'default' })
 const DEVICE_NAMES = { phone: 'Celular', laptop: 'Notebook', tablet: 'Tablet' }
+// screen = rect de la PANTALLA en fracciones del marco (x, y, w, h, radio)
+// para meter la foto adentro automáticamente, sin que el usuario recorte nada
+const DEVICE_SCREENS = {
+  phone: { x: 12 / 232, y: 12 / 468, w: 208 / 232, h: 444 / 468, r: 0.16, ratio: 232 / 468 },
+  laptop: { x: 86 / 520, y: 18 / 322, w: 348 / 520, h: 224 / 322, r: 0.01, ratio: 520 / 322 },
+  tablet: { x: 18 / 344, y: 18 / 468, w: 308 / 344, h: 432 / 468, r: 0.03, ratio: 344 / 468 },
+}
 export const DEVICES = Object.entries(deviceModules).map(([path, url]) => {
   const slug = path.match(/([^/]+)\.svg$/)[1]
-  return { id: `devices:${slug}`, slug, category: 'devices', label: DEVICE_NAMES[slug] || slug, url, color: '#1B1B1B', isDevice: true }
+  return { id: `devices:${slug}`, slug, category: 'devices', label: DEVICE_NAMES[slug] || slug, url, color: '#1B1B1B', isDevice: true, screen: DEVICE_SCREENS[slug] }
 })
 
 export const ALL_OBJECTS = [...ICONS, ...MARKS, ...MAGOYA_OBJECTS, ...DEVICES]

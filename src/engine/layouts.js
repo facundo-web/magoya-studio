@@ -278,6 +278,29 @@ function drawObjects(b, { objects, W, H, ref, accent }) {
     const rotation = o.rotation || 0
     const shadow = o.shadow !== false
     const opacity = o.opacity ?? 1
+    // DISPOSITIVO: marco + foto adentro de la pantalla (automático)
+    if (o.kind === 'device') {
+      const dev = ICONS_BY_ID[o.deviceId]
+      if (!dev) continue
+      const sc = dev.screen || { x: 0.1, y: 0.1, w: 0.8, h: 0.8, r: 0.02, ratio: 0.5 }
+      const dw = ref * (o.scale || 0.5)
+      const dh = dw / (sc.ratio || 1)
+      const dx = cx - dw / 2, dy = cy - dh / 2
+      // 1) pantalla (foto) por debajo del marco
+      if (o.src) {
+        b.framedImage({
+          cx: dx + (sc.x + sc.w / 2) * dw, cy: dy + (sc.y + sc.h / 2) * dh,
+          w: sc.w * dw, h: sc.h * dh, rotation, href: o.src, natural: o.natural,
+          focal: o.focal || { x: 0.5, y: 0.5 }, radius: sc.r * sc.w * dw, zoom: o.zoom || 1, shadow: false, opacity,
+        })
+      } else {
+        b.framedImage({ cx: dx + (sc.x + sc.w / 2) * dw, cy: dy + (sc.y + sc.h / 2) * dh, w: sc.w * dw, h: sc.h * dh, rotation, href: null, radius: sc.r * sc.w * dw })
+      }
+      // 2) marco del dispositivo encima
+      const frameUrl = getAsset(dev.url) || dev.url
+      b.object({ cx, cy, size: dw, rotation, href: frameUrl, tile: false, shadow, opacity, aspect: 1 / (sc.ratio || 1) })
+      continue
+    }
     if (o.kind === 'image' && o.src) {
       if (o.frame) {
         // imagen enmascarada en un marco (pantalla/mockup)

@@ -108,11 +108,13 @@ export function createBuilder() {
       body.push(`<rect x="0" y="0" width="${n(w)}" height="${n(h)}" fill="url(#${gid})" opacity="${opacity}"/>`)
     },
     // objeto flotante: ícono en "tile" (app-icon) o imagen, con sombra + rotación
-    object({ cx, cy, size, rotation = 0, href, tile = false, tileColor = '#000', tileRadius = 0.22, shadow = true, iconInset = 0.22, opacity = 1 }) {
+    object({ cx, cy, size, rotation = 0, href, tile = false, tileColor = '#000', tileRadius = 0.22, shadow = true, iconInset = 0.22, opacity = 1, aspect = 1 }) {
       if (!href) return
+      const w = size
+      const h = size * aspect
+      const x = cx - w / 2
+      const y = cy - h / 2
       const half = size / 2
-      const x = cx - half
-      const y = cy - half
       let filterAttr = ''
       if (shadow) {
         const fId = id('sh')
