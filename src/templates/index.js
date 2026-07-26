@@ -54,7 +54,7 @@ export const PLACEHOLDERS = {
   subtitle: 'Cómo lo resolvimos con un retailer de insumos en Brasil.',
   body: 'Tres cosas que aprendimos integrando datos de suelo con el ERP del cliente.',
   metric: '−70%',
-  metricLabel: 'tickets de soporte en campo, en 4 meses',
+  metricLabel: 'tickets de soporte, en 4 meses',
   quote: 'Se integraron en dos semanas y desde ahí no los tratamos como proveedor.',
   author: 'VP Product · Apeel Sciences',
   cta: 'Agendá 30 minutos',

@@ -6,7 +6,11 @@
   "surface": "photo",
   "anchor": "center-left",
   "zocalo": false,
-  "roles": ["kicker", "metric", "metricLabel"],
+  "roles": [
+    "kicker",
+    "metric",
+    "metricLabel"
+  ],
   "defaults": {
     "scheme": "ink",
     "accent": "emerald",
@@ -18,6 +22,6 @@
     "vignette": 0.55,
     "kicker": "AI EN CAMPO",
     "metric": "−70%",
-    "metricLabel": "tiempo de scouting"
+    "metricLabel": "menos scouting, en 3 meses"
   }
 }

@@ -152,6 +152,8 @@ export default function Editor({
   const [mkDark, setMkDark] = useState(false)
   const [panel, setPanel] = useState('text')
   const [dragSlide, setDragSlide] = useState(null) // rail de inserción: un panel a la vez
+  // G2 · en celular los paneles son hojas que suben desde abajo
+  const [sheet, setSheet] = useState(false)
   const frameRef = useRef(null)
   const photoInputRef = useRef(null)
   const dragRef = useRef({ i: null })
@@ -364,7 +366,7 @@ export default function Editor({
   useEffect(() => { if (panel === 'style' && !variants.length) setPanel('text') }, [panel, variants.length])
 
   return (
-    <div className={'editor' + (selObj != null || selText ? ' has-sel' : '')}>
+    <div className={'editor' + (selObj != null || selText ? ' has-sel' : '') + (sheet ? ' sheet-open' : '')}>
       <nav className="insert-rail">
         {[
           ...(variants.length ? [['style', 'grid', 'Estilo']] : []),
@@ -375,13 +377,15 @@ export default function Editor({
           ['brand', 'brand', 'Marca'],
           ['settings', 'settings', 'Ajustes'],
         ].map(([k, ico, label]) => (
-          <button key={k} className={'rail-btn' + (panel === k ? ' on' : '')} onClick={() => setPanel(k)} title={label}>
+          <button key={k} className={'rail-btn' + (panel === k && sheet ? ' on' : '') + (panel === k ? ' cur' : '')}
+            onClick={() => { setSheet(panel === k ? !sheet : true); setPanel(k) }} title={label}>
             <span className="rail-ico"><Icon n={ico} size={21} /></span>
             <span className="rail-label">{label}</span>
           </button>
         ))}
       </nav>
       <div className="sidebar" style={{ width: panelW.left }}>
+        <button className="sheet-close" onClick={() => setSheet(false)} aria-label="Cerrar panel"><Icon n="down" size={18} /></button>
         {/* la tarjeta negra con nombre + propósito + formato era redundante:
             el formato ya está en la barra del lienzo y el nombre en el breadcrumb.
             Queda una línea silenciosa, y el espacio se lo lleva el panel. */}
@@ -644,6 +648,7 @@ export default function Editor({
       <div className="col-resize" onPointerDown={(e) => startResize('right', e)} title="Arrastrá para ajustar el panel" />
 
       <aside className="inspector" style={{ width: panelW.right }}>
+        <button className="sheet-close" onClick={() => { setSelObj(null); setSelText(null) }} aria-label="Cerrar propiedades"><Icon n="down" size={18} /></button>
         {selObj != null && objects[selObj] ? (
           <>
             <div className="insp-kicker">Propiedades del elemento</div>
