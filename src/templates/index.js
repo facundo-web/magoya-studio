@@ -70,7 +70,12 @@ export function placeholderContent(t) {
   const d = t.defaults || {}
   const c = { ...d }
   delete c.photo
-  ;(t.roles || []).forEach((r) => { c[r] = PLACEHOLDERS[r] ?? '' })
+  // si la plantilla trae su propio copy calibrado (ej: la volanta "AI EN
+  // CAMPO" de las piezas de impacto) ese gana: es más específico que el
+  // placeholder genérico. El genérico sólo llena los roles vacíos.
+  ;(t.roles || []).forEach((r) => {
+    if (c[r] === undefined || String(c[r]).trim() === '') c[r] = PLACEHOLDERS[r] ?? ''
+  })
   if (t.freeform) {
     c.textBlocks = (d.textBlocks || []).map((b) => ({ style: b.style, text: PLACEHOLDERS[b.style] || 'Tu texto acá' }))
   } else {

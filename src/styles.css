@@ -587,3 +587,13 @@ button.obj-row { width: 100%; cursor: pointer; text-align: left; font: inherit; 
 .rail-ico { display: flex; align-items: center; justify-content: center; }
 .btn .u-ico, .h3-filter .u-ico { margin-right: -1px; }
 .proj-act { display: inline-flex; align-items: center; justify-content: center; }
+
+/* ---- Bloque B · variantes de plantilla ("Estilo") ---- */
+.var-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.var-card { padding: 0; background: transparent; border: 0; cursor: pointer; text-align: center; display: flex; flex-direction: column; gap: 5px; }
+.var-thumb { border-radius: 10px; overflow: hidden; border: 2px solid var(--paper-200,#E6E1D8); background: var(--ui-thumb); transition: border-color .12s, transform .12s; }
+.var-thumb svg { width: 100%; height: auto; display: block; }
+.var-card:hover .var-thumb { transform: translateY(-2px); border-color: #C9C2B6; }
+.var-card.on .var-thumb { border-color: var(--emerald-500,#00DE68); box-shadow: 0 0 0 3px rgba(0,222,104,.18); }
+.var-label { font-size: 11px; color: #5C6B61; line-height: 1.2; }
+.var-card.on .var-label { color: #0D0C0C; font-weight: 700; }

@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import PiecePreview from './PiecePreview.jsx'
 import { TEMPLATES, MAXCHARS } from '../templates/index.js'
+import { variantsFor, activeVariantId } from '../templates/variants.js'
 import MockupPreview, { MOCKUPS } from './MockupPreview.jsx'
 import Icon from '../ui/Icon.jsx'
 import { FORMATS_BY_ID, formatsByNetwork, CAROUSEL_FORMATS } from '../formats/registry.js'
@@ -56,6 +57,30 @@ function Section({ title, help, summary, defaultOpen = false, children }) {
           {children}
         </div>
       )}
+    </div>
+  )
+}
+
+/* ---------------- Estilo: variantes de la plantilla (Bloque B) ----------------
+   Las miniaturas se renderizan CON TU CONTENIDO REAL (patrón Canva Layouts):
+   ves tu propio texto y tu propia foto en cada composición antes de elegir. */
+function VariantsBody({ template, content, format, variants, active, set }) {
+  // formato chico para las miniaturas: mismo ratio, menos píxeles
+  const thumbFmt = React.useMemo(() => {
+    const k = 380 / Math.max(format.w, format.h)
+    return { ...format, w: Math.round(format.w * k), h: Math.round(format.h * k) }
+  }, [format.w, format.h, format.id])
+  return (
+    <div className="var-grid">
+      {variants.map((v) => (
+        <button key={v.id} className={'var-card' + (active === v.id ? ' on' : '')}
+          onClick={() => set(v.set)} title={v.label}>
+          <div className="var-thumb">
+            <PiecePreview template={template} content={{ ...content, ...v.set }} format={thumbFmt} />
+          </div>
+          <span className="var-label">{v.label}</span>
+        </button>
+      ))}
     </div>
   )
 }
@@ -284,11 +309,17 @@ export default function Editor({
   }
 
   const needsPhoto = template.surface === 'photo' && !content.photo?.src
+  // Bloque B — variantes: misma plantilla, otra composición
+  const variants = React.useMemo(() => variantsFor(template), [template])
+  const activeVar = activeVariantId(template, content)
+  // si la plantilla no tiene variantes (chat), el panel no existe
+  useEffect(() => { if (panel === 'style' && !variants.length) setPanel('text') }, [panel, variants.length])
 
   return (
     <div className={'editor' + (selObj != null || selText ? ' has-sel' : '')}>
       <nav className="insert-rail">
         {[
+          ...(variants.length ? [['style', 'grid', 'Estilo']] : []),
           ['text', 'text', 'Texto'],
           ['bg', 'layers', 'Fondo'],
           ['photos', 'photo', 'Fotos'],
@@ -308,6 +339,14 @@ export default function Editor({
           {template.purpose && <div className="sh-purpose">{template.purpose}</div>}
           <div className="sh-dest">Para <b>{format.network} · {format.label}</b> · {format.w}×{format.h}</div>
         </div>
+
+        {panel === 'style' && (
+          <>
+            <div className="panel-title">Estilo de la pieza</div>
+            <p className="panel-help">La misma pieza, compuesta distinto. Cambia el diseño — nunca tus textos, tu foto ni los elementos que sumaste.</p>
+            <VariantsBody template={template} content={content} format={format} variants={variants} active={activeVar} set={set} />
+          </>
+        )}
 
         {panel === 'text' && (
           template.category === 'chat' ? (

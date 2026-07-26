@@ -44,18 +44,24 @@ pedir cambios por WhatsApp.
 
 ---
 
-## 🟠 BLOQUE B — Variantes de plantilla
-> El mayor multiplicador: con esto las 16 plantillas pasan a ~45 piezas
-> distintas sin escribir ninguna nueva.
+## ✅ BLOQUE B (HECHO) — Variantes de plantilla
+> El mayor multiplicador: **20 plantillas × 11 estilos = 220 composiciones**
+> sin escribir ninguna plantilla nueva. Panel "Estilo" en el editor.
 
 - **B1** Ejes overridables en el motor: `plate` (none/scrim/banda/tarjeta),
-  `anchor`, `surface`, `density` (cuánto texto), `scale`. **M**
-- **B2** Bloque `variants` curadas en el JSON de cada plantilla. **S**
-- **B3** Fila de miniaturas en vivo en el editor, renderizadas **con tu
-  contenido real** (patrón Canva Layouts). Cambiar de estilo nunca pisa los
-  textos. **M**
-- **B4** Lockups que suben el nivel: kicker con línea al costado, logo
-  **dentro** de la placa (hoy flota aparte), padding óptico de la banda. **S**
+  `anchor`, `density`, `scale`, `rule`. ✅
+- **B2** `variants` en el JSON de la plantilla; si no las declara, se derivan
+  de los ejes genéricos (`src/templates/variants.js`). ✅
+- **B3** Fila de miniaturas en vivo, renderizadas **con tu contenido real**
+  (patrón Canva Layouts). Cambiar de estilo nunca pisa los textos. ✅
+- **B4** Lockups: volanta con línea al costado, logo **dentro** de la banda
+  cuando hay lugar, padding óptico de la tarjeta. ✅
+
+**Bug de fondo que salió acá:** los ids de `<defs>` (filtros, clips,
+degradés) viven en el namespace del DOCUMENTO, no del `<svg>`. Con varias
+piezas inline en la misma página, `url(#f0)` resolvía al defs de otra pieza
+y la foto se recortaba con las coordenadas equivocadas. Cada pieza usa ahora
+su propio prefijo de id.
 
 ---
 

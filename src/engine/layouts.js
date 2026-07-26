@@ -25,6 +25,21 @@ function contrastOn(hex) {
 // roles de texto en orden de stack
 const STACK_ORDER = ['kicker', 'title', 'subtitle', 'body', 'metric', 'metricLabel', 'quote', 'author']
 
+// ---- Bloque B: ejes de composición ----
+// densidad = cuánto aire respira el stack (gap entre bloques y ancho de línea)
+const DENSITY = {
+  compact: { gap: 0.68, w: 1.02 },
+  normal: { gap: 1, w: 1 },
+  roomy: { gap: 1.7, w: 0.84 },
+}
+// placa = qué hay DETRÁS del texto. Es el eje que más cambia la pieza.
+const PLATES = ['none', 'scrim', 'band', 'card']
+function normalizePlate(v, template, onPhoto) {
+  if (PLATES.includes(v)) return v
+  if (template.zocalo) return 'band'
+  return onPhoto ? 'scrim' : 'none'
+}
+
 export function resolvePiece(template, content) {
   const d = template.defaults || {}
   const c = content || {}
@@ -33,11 +48,18 @@ export function resolvePiece(template, content) {
   const freeform = !!template.freeform
   // en freeform el fondo lo decide el usuario (color/foto)
   const bg = c.bg || d.bg || 'color'
+  const surface = freeform ? (bg === 'photo' ? 'photo' : 'solid') : (template.surface || (d.hasPhoto ? 'photo' : 'solid'))
+  const onPhoto = surface === 'photo'
   return {
     scheme,
     accent,
     freeform,
-    surface: freeform ? (bg === 'photo' ? 'photo' : 'solid') : (template.surface || (d.hasPhoto ? 'photo' : 'solid')),
+    surface,
+    // ejes de composición (Bloque B) — los pisa la variante elegida
+    plate: normalizePlate(c.plate ?? d.plate, template, onPhoto),
+    density: DENSITY[c.density ?? d.density] ? (c.density ?? d.density) : 'normal',
+    scale: Number(c.scale ?? d.scale) || 1,
+    rule: c.rule ?? d.rule ?? 'top',
     anchor: c.anchor || template.anchor || 'bottom-left',
     motif: freeform ? false : template.motif !== false,
     zocalo: template.zocalo || false,
@@ -80,8 +102,12 @@ export function drawPiece(b, { template, content, format }) {
   const safe = safeRect(format)
   const ref = Math.min(W, H)
   const onPhoto = p.surface === 'photo'
-  const textColor = onPhoto ? '#FFFFFF' : p.scheme.onSurface
-  const mutedColor = onPhoto ? 'rgba(255,255,255,.82)' : p.scheme.muted
+  const dens = DENSITY[p.density] || DENSITY.normal
+  // con placa opaca (banda/tarjeta) el texto vive sobre la superficie de
+  // marca, no sobre la foto: el color tiene que seguir a la placa.
+  const opaquePlate = (p.plate === 'band' || p.plate === 'card')
+  const textColor = onPhoto && !opaquePlate ? '#FFFFFF' : p.scheme.onSurface
+  const mutedColor = onPhoto && !opaquePlate ? 'rgba(255,255,255,.82)' : p.scheme.muted
 
   // ---- superficie ----
   if (onPhoto) {
@@ -116,12 +142,12 @@ export function drawPiece(b, { template, content, format }) {
 
   // ---- stack de texto ----
   const blocks = []
-  const maxTextW = safe.w * (onPhoto ? 0.92 : 0.8)
+  const maxTextW = safe.w * (onPhoto && !opaquePlate ? 0.92 : 0.8) * dens.w
   const pushBlock = (role, txt, opts = {}) => {
     if (txt === undefined || txt === null || String(txt).trim() === '') return
     const st = TEXT_STYLES[role] || TEXT_STYLES.body
     const hand = role === 'kicker' && p.handAccent
-    const startPx = ref * st.sizeRel * (hand ? 1.9 : 1)
+    const startPx = ref * st.sizeRel * (hand ? 1.9 : 1) * p.scale
     const value = (st.upper && !hand) ? String(txt).toUpperCase() : String(txt)
     const maxLines = role === 'title' || role === 'quote' ? 4 : role === 'kicker' || role === 'cta' ? 1 : 3
     const fit = fitText(value, {
@@ -144,12 +170,16 @@ export function drawPiece(b, { template, content, format }) {
     if (String(st || '').trim()) pushBlock('step', `${String(idx + 1).padStart(2, '0')}  ${st}`, { eid: `step:${idx}` })
   })
 
-  // altura total del stack (con gaps proporcionales)
-  const gap = ref * 0.022
+  // altura total del stack (con gaps proporcionales a la densidad)
+  const gap = ref * 0.022 * dens.gap
   let stackH = 0
+  let stackW = 0
   blocks.forEach((bl, i) => {
     stackH += bl.lines.length * bl.px * bl.lineHeight
     if (i < blocks.length - 1) stackH += gap
+    const wgt = bl.hand ? 700 : bl.st.weight
+    const trk = bl.hand ? 0 : (bl.st.tracking || 0)
+    bl.lines.forEach((ln) => { stackW = Math.max(stackW, measure(ln, { px: bl.px, weight: wgt, tracking: trk })) })
   })
 
   // posición del stack según ancla
@@ -161,21 +191,32 @@ export function drawPiece(b, { template, content, format }) {
   const textX = hAnchor === 'center' ? W / 2 : safe.x
   const textAnchor = hAnchor === 'center' ? 'middle' : 'start'
 
-  // zócalo (placa) detrás del stack si aplica
-  if (p.zocalo && onPhoto) {
+  // ---- PLACA: qué hay detrás del texto (eje `plate` del Bloque B) ----
+  const ruleH = Math.max(3, ref * 0.006)
+  let plateRect = null // si hay placa opaca, el logo entra ADENTRO (B4)
+  if (p.plate === 'band') {
+    // banda de ancho completo que baja hasta el borde (el clásico zócalo)
     const pad = ref * 0.045
-    b.rect({
-      x: 0, y: cursorY - pad, w: W, h: H - (cursorY - pad),
-      fill: p.scheme.surface, opacity: 0.9,
-    })
-    // regla de acento arriba de la placa
-    b.rect({ x: safe.x, y: cursorY - pad, w: ref * 0.12, h: Math.max(3, ref * 0.006), fill: p.accent })
-  } else if (onPhoto) {
-    // scrim de legibilidad
+    const by = cursorY - pad
+    plateRect = { x: 0, y: by, w: W, h: H - by, textW: stackW }
+    b.rect({ ...plateRect, fill: p.scheme.surface, opacity: onPhoto ? 0.94 : 1 })
+    if (p.rule !== 'none') b.rect({ x: safe.x, y: by, w: ref * 0.12, h: ruleH, fill: p.accent })
+  } else if (p.plate === 'card') {
+    // tarjeta ajustada al texto: la variante más "editorial"
+    const padX = ref * 0.05, padY = ref * 0.045
+    const cx0 = hAnchor === 'center' ? W / 2 - stackW / 2 : textX
+    plateRect = {
+      x: Math.max(ref * 0.02, cx0 - padX), y: cursorY - padY,
+      w: Math.min(W - ref * 0.04, stackW + padX * 2), h: stackH + padY * 2,
+    }
+    b.rect({ ...plateRect, rx: ref * 0.028, fill: p.scheme.surface, opacity: onPhoto ? 0.95 : 1 })
+    if (!onPhoto) b.rect({ x: plateRect.x, y: plateRect.y, w: plateRect.w, h: ruleH, rx: ruleH / 2, fill: p.accent })
+  } else if (p.plate === 'scrim' && onPhoto) {
     b.scrim({ x: 0, y: H * 0.4, w: W, h: H * 0.6, dir: 'bottom', to: 'rgba(0,0,0,0.68)' })
-  } else {
-    // acento sutil arriba del stack (rule) en solid
-    b.rect({ x: hAnchor === 'center' ? W / 2 - ref * 0.06 : safe.x, y: cursorY - gap, w: ref * 0.12, h: Math.max(3, ref * 0.006), fill: p.accent })
+  }
+  // regla de acento arriba del stack (sólo si no la puso ya la placa)
+  if (p.rule === 'top' && (p.plate === 'none' || (p.plate === 'scrim' && !onPhoto))) {
+    b.rect({ x: hAnchor === 'center' ? W / 2 - ref * 0.06 : safe.x, y: cursorY - gap, w: ref * 0.12, h: ruleH, fill: p.accent })
   }
 
   // ---- objetos DETRÁS del texto (profundidad) ----
@@ -220,11 +261,19 @@ export function drawPiece(b, { template, content, format }) {
       fontFamily: bl.hand ? FONT_HAND_STACK : undefined,
       eid: bl.eid,
     })
+    // B4 · lockup "volanta con línea": la regla sale AL LADO de la volanta,
+    // no arriba del stack. Sube mucho el nivel editorial y no mueve el texto.
+    if (isKicker && p.rule === 'side' && textAnchor !== 'middle') {
+      const kw = measure(bl.lines[0] || '', { px: bl.px, weight, tracking })
+      const lx = textX + kw + bl.px * 0.7
+      const lw = Math.min(ref * 0.16, Math.max(0, safe.x + safe.w - lx))
+      if (lw > ref * 0.02) b.rect({ x: lx, y: cursorY + bl.px * 0.5, w: lw, h: Math.max(2, ref * 0.004), fill: p.accent })
+    }
     cursorY += bl.lines.length * lineH + gap + (isCta ? bl.px * 0.5 : 0)
   }
 
   // ---- logo ----
-  if (p.showLogo) drawLogo(b, { p, W, H, safe, ref, textAnchor, hAnchor, vAnchor })
+  if (p.showLogo) drawLogo(b, { p, W, H, safe, ref, textAnchor, hAnchor, vAnchor, plateRect })
 
   // ---- objetos DELANTE del texto (profundidad) ----
   drawObjects(b, { objects: (p.objects || []).filter((o) => o.front), W, H, ref, accent: p.accent, scheme: p.scheme })
@@ -424,16 +473,23 @@ function roundRect(x, y, w, h, r) {
   return `M${x + r},${y} H${x + w - r} A${r},${r} 0 0 1 ${x + w},${y + r} V${y + h - r} A${r},${r} 0 0 1 ${x + w - r},${y + h} H${x + r} A${r},${r} 0 0 1 ${x},${y + h - r} V${y + r} A${r},${r} 0 0 1 ${x + r},${y} Z`
 }
 
-function drawLogo(b, { p, W, H, safe, ref, hAnchor, vAnchor }) {
+function drawLogo(b, { p, W, H, safe, ref, hAnchor, vAnchor, plateRect }) {
   const wm = WORDMARKS[p.logo] || WORDMARKS.cream
   const logoUrl = getAsset(wm.url)
   if (!logoUrl) return
   const lw = ref * 0.2 * (p.logoScale || 1)
   const lh = lw / WORDMARK_RATIO
-  // vertical: opuesto al stack de texto; horizontal: elegido por el usuario
   const onRight = p.logoPos === 'right'
+  // B4 · con banda, el logo va ADENTRO de la placa, del lado libre (hoy
+  // flotaba aparte y la pieza se leía como dos cosas pegadas). Sólo si el
+  // texto no llega hasta ahí: nunca se pisan.
+  if (plateRect && p.plate === 'band' && hAnchor !== 'center'
+      && safe.x + plateRect.textW + lw + ref * 0.06 <= W - safe.x) {
+    b.asset({ x: W - safe.x - lw, y: plateRect.y + (plateRect.h - lh) / 2, w: lw, h: lh, href: logoUrl })
+    return
+  }
+  // vertical: opuesto al stack de texto; horizontal: elegido por el usuario
   const lx = onRight ? W - safe.x - lw : safe.x
   const ly = vAnchor === 'top' ? safe.y + safe.h - lh : safe.y
   b.asset({ x: lx, y: ly, w: lw, h: lh, href: logoUrl })
-
 }

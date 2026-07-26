@@ -14,12 +14,20 @@ export function esc(s) {
     .replace(/"/g, '&quot;')
 }
 
+// Los ids de <defs> (filtros, clips, degradés) viven en el namespace del
+// DOCUMENTO, no del <svg>: con varias piezas inline en la misma página
+// (galería, tira de slides, fila de variantes) `url(#f0)` resolvía al defs
+// de OTRA pieza, con coordenadas de otro tamaño. Cada builder usa su propio
+// prefijo para que eso no pueda pasar.
+let builderSeq = 0
+
 // Builder acumula defs + body
 export function createBuilder() {
   const defs = []
   const body = []
   let uid = 0
-  const id = (p) => `${p}${uid++}`
+  const ns = (builderSeq++).toString(36) + '_'
+  const id = (p) => `${p}${ns}${uid++}`
   const filterCache = new Map()
   return {
     defs,
