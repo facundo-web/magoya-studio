@@ -31,6 +31,9 @@ export default function App() {
   const undoRef = useRef([])
   const redoRef = useRef([])
   const [histTick, setHistTick] = useState(0)
+  const [saveFail, setSaveFail] = useState(false)
+  const [undoDelete, setUndoDelete] = useState(null)
+  const [pvSlide, setPvSlide] = useState(0)
 
   useEffect(() => {
     if (preview?.shareId) listComments(preview.shareId).then(setComments).catch(() => {})
@@ -83,7 +86,14 @@ export default function App() {
   // autosave: guarda el proyecto en edición tras cada cambio (debounced)
   useEffect(() => {
     if (view !== 'editor' || !projectId || !pieces.length || !dirty) return
-    const t = setTimeout(() => setProjects(upsertProject(serialize())), 800)
+    const t = setTimeout(() => {
+      const next = upsertProject(serialize())
+      setProjects(next)
+      if (next.saveOk === false) {
+        setSaveFail(true)
+        showToast('⚠ Se llenó el guardado del navegador — descargá el proyecto para no perderlo')
+      } else setSaveFail(false)
+    }, 800)
     return () => clearTimeout(t)
   }, [dirty, pieces, formatId, carousel, view, projectId])
 
@@ -206,6 +216,10 @@ export default function App() {
     setDirty(true)
     showToast('Slide duplicada — seguí la historia')
   }
+  function reorderSlides(from, to) {
+    setPieces((ps) => { const a = [...ps]; const [it] = a.splice(from, 1); a.splice(to, 0, it); return a })
+    setActive(to); setDirty(true)
+  }
   function changeSlideTemplate(template) {
     // cambia el diseño de la slide activa, conservando el contenido (textos/foto/marca)
     setPieces((ps) => ps.map((p, i) => (i === active ? { template, content: p.content } : p)))
@@ -251,8 +265,10 @@ export default function App() {
     showToast('✓ Duplicado — el original queda intacto')
   }
   function removeProject(id) {
+    const backup = loadProjects().find((p) => p.id === id)
     setProjects(deleteProject(id))
-    showToast('Proyecto eliminado')
+    setUndoDelete({ kind: 'project', data: backup })
+    showToast('Se eliminó «' + (backup?.name || 'el proyecto') + '»')
   }
   function addCustomElement({ name, src }) {
     const { el, saved } = addElement({ name, src })
@@ -296,7 +312,7 @@ export default function App() {
   async function sendComment() {
     if (!pin || !cText.trim()) return
     try {
-      await addComment({ share_id: preview.shareId, author: cAuthor.trim() || 'Anónimo', text: cText.trim(), x: pin.x, y: pin.y })
+      await addComment({ share_id: preview.shareId, author: cAuthor.trim() || 'Anónimo', text: cText.trim(), x: pin.x, y: pin.y, slide: pin.slide ?? 0 })
       localStorage.setItem('magoya_author', cAuthor.trim())
       setCText(''); setPin(null)
       setComments(await listComments(preview.shareId))
@@ -322,8 +338,11 @@ export default function App() {
 
   // ---- pantalla de PREVIEW (link compartido con mockup) ----
   if (preview) {
-    const pc = preview.pieces?.[0]
+    const pvPieces = preview.pieces || []
+    const idx = Math.min(pvSlide, Math.max(pvPieces.length - 1, 0))
+    const pc = pvPieces[idx]
     const t = pc && allById[pc.templateId]
+    const multi = pvPieces.length > 1
     const pfmt = FORMATS_BY_ID[preview.formatId] || FORMATS_BY_ID[DEFAULT_FORMAT]
     const exitPreview = () => { setPreview(null); if (location.hash) location.hash = '' }
     const verdict = (ok) => {
@@ -348,10 +367,10 @@ export default function App() {
               if (!preview.shareId) return
               if (e.target.closest('.c-pin') || e.target.closest('.pin-form')) return
               const r = e.currentTarget.getBoundingClientRect()
-              setPin({ x: ((e.clientX - r.left) / r.width) * 100, y: ((e.clientY - r.top) / r.height) * 100 })
+              setPin({ x: ((e.clientX - r.left) / r.width) * 100, y: ((e.clientY - r.top) / r.height) * 100, slide: idx })
             }}>
             {t ? <MockupPreview template={t} content={pc.content} format={pfmt} mockup={preview.mockup || 'phone'} dark={!!preview.dark} /> : <div className="center-note">No se pudo cargar la pieza compartida.</div>}
-            {preview.shareId && comments.map((c, i) => (
+            {preview.shareId && comments.filter((c) => (c.slide ?? 0) === idx).map((c, i) => (
               <span key={c.id} className="c-pin" style={{ left: c.x + '%', top: c.y + '%' }} title={`${c.author}: ${c.text}`}>{i + 1}</span>
             ))}
             {pin && (
@@ -365,13 +384,20 @@ export default function App() {
               </div>
             )}
           </div>
+          {multi && (
+            <div className="pv-nav">
+              <button className="btn" onClick={() => setPvSlide((v) => Math.max(0, v - 1))} disabled={idx === 0}>‹</button>
+              <span className="pv-count">{idx + 1} / {pvPieces.length}</span>
+              <button className="btn" onClick={() => setPvSlide((v) => Math.min(pvPieces.length - 1, v + 1))} disabled={idx === pvPieces.length - 1}>›</button>
+            </div>
+          )}
           {preview.shareId && (
             <p className="preview-note"><b>Tocá un punto de la pieza para dejar un comentario ahí</b> — quedan anclados como en Figma.</p>
           )}
           {preview.shareId && comments.length > 0 && (
             <div className="c-list">
               {comments.map((c, i) => (
-                <div key={c.id} className="c-item"><span className="c-num">{i + 1}</span><div><b>{c.author}</b> {c.text}</div></div>
+                <div key={c.id} className="c-item"><span className="c-num">{i + 1}</span><div><b>{c.author}</b> {c.text}{multi && <span className="c-slide"> · slide {(c.slide ?? 0) + 1}</span>}</div></div>
               ))}
             </div>
           )}
@@ -406,7 +432,10 @@ export default function App() {
         <div className="spacer" />
         {view === 'editor' && (
           <>
-            <span className="save-status" title="Tu trabajo se guarda solo">{dirty ? '• Sin guardar' : '✓ Guardado'}</span>
+            <span className={'save-status' + (saveFail ? ' fail' : '')} title={saveFail ? 'No se pudo guardar: el navegador está lleno' : 'Tu trabajo se guarda solo'}>
+              {saveFail ? '⚠ No se pudo guardar' : dirty ? '• Guardando…' : '✓ Guardado'}
+            </span>
+            {saveFail && <button className="btn ghost-light" onClick={() => exportProjectFile(serialize())}>Descargar ahora</button>}
             <button className="btn ghost-light" onClick={() => setView('gallery')}>‹ Volver al inicio</button>
           </>
         )}
@@ -441,6 +470,7 @@ export default function App() {
           onSelectSlide={setActive}
           onAddSlide={addSlide}
           onDuplicateSlide={duplicateSlide}
+          onReorderSlides={reorderSlides}
           onUndo={undo} onRedo={redo}
           canUndo={undoRef.current.length > 0} canRedo={redoRef.current.length > 0}
           onConvertToCarousel={convertToCarousel}
@@ -461,7 +491,17 @@ export default function App() {
         <div className="center-note">Cargando…</div>
       )}
 
-      {toast && <div className="toast">{toast}</div>}
+      {toast && (
+        <div className="toast">
+          {toast}
+          {undoDelete && (
+            <button className="toast-act" onClick={() => {
+              if (undoDelete.kind === 'project' && undoDelete.data) setProjects(upsertProject(undoDelete.data))
+              setUndoDelete(null); showToast('Restaurado')
+            }}>Deshacer</button>
+          )}
+        </div>
+      )}
     </div>
   )
 }

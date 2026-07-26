@@ -29,7 +29,10 @@ export function upsertProject(project) {
   const i = list.findIndex((p) => p.id === project.id)
   if (i >= 0) list[i] = project
   else list.unshift(project)
-  return saveProjects(list) ? list : loadProjects()
+  const ok = saveProjects(list)
+  const out = ok ? list : loadProjects()
+  out.saveOk = ok // el caller mira esto: si es false, el guardado FALLÓ
+  return out
 }
 
 export function deleteProject(id) {

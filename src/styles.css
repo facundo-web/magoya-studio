@@ -575,3 +575,11 @@ button.obj-row { width: 100%; cursor: pointer; text-align: left; font: inherit; 
 .h3-mine { font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; background: var(--lime-300); color: var(--ui-fg); border-radius: 4px; padding: 1px 5px; }
 @media (max-width: 720px) { .h3-start { grid-template-columns: 1fr; } .home3 { padding: 16px; } }
 .icon-pick.shape { background: var(--ui-sunken); border: 1px solid var(--ui-line); }
+.save-status.fail { color: #FF8B88; font-weight: 700; }
+.toast-act { margin-left: 12px; background: var(--ui-accent); color: var(--ui-fg); border: 0; border-radius: 999px; padding: 3px 12px; font-size: 12px; font-weight: 700; cursor: pointer; }
+.slide-thumb { position: relative; cursor: grab; }
+.slide-thumb .sn { position: absolute; left: 3px; top: 3px; font-size: 10px; font-weight: 800; background: rgba(13,12,12,.75); color: #fff; border-radius: 4px; padding: 0 4px; }
+.slide-thumb.dragging { opacity: .4; }
+.pv-nav { display: flex; align-items: center; gap: 12px; }
+.pv-count { font-size: 12px; font-family: var(--font-mono); color: var(--ui-fg-2); }
+.c-slide { color: var(--ui-fg-3); font-size: 11px; }

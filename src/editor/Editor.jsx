@@ -61,7 +61,7 @@ function Section({ title, help, summary, defaultOpen = false, children }) {
 
 export default function Editor({
   template, format, content, slides, activeSlide,
-  onChangeContent, onChangeFormat, onSelectSlide, onAddSlide, onDuplicateSlide, onConvertToCarousel, onBackToSingle, onChangeSlideTemplate, onDeleteSlide, onToast,
+  onChangeContent, onChangeFormat, onSelectSlide, onAddSlide, onDuplicateSlide, onReorderSlides, onConvertToCarousel, onBackToSingle, onChangeSlideTemplate, onDeleteSlide, onToast,
   elements = [], onAddElement, onDeleteElement,
   templates = TEMPLATES, onSaveTemplate, onShare, onShareReview, onExportFile, onUndo, onRedo, canUndo, canRedo,
 }) {
@@ -93,7 +93,8 @@ export default function Editor({
   const [mockupOpen, setMockupOpen] = useState(false)
   const [mockup, setMockup] = useState('phone')
   const [mkDark, setMkDark] = useState(false)
-  const [panel, setPanel] = useState('text') // rail de inserción: un panel a la vez
+  const [panel, setPanel] = useState('text')
+  const [dragSlide, setDragSlide] = useState(null) // rail de inserción: un panel a la vez
   const frameRef = useRef(null)
   const photoInputRef = useRef(null)
   const dragRef = useRef({ i: null })
@@ -488,8 +489,13 @@ export default function Editor({
         {isCarousel && (
           <div className="strip">
             {slides.map((s, i) => (
-              <button key={i} className={'slide-thumb' + (i === activeSlide ? ' on' : '')} onClick={() => onSelectSlide(i)} title={`Slide ${i + 1}`}>
+              <button key={i} className={'slide-thumb' + (i === activeSlide ? ' on' : '') + (dragSlide === i ? ' dragging' : '')}
+                onClick={() => onSelectSlide(i)} title={`Slide ${i + 1} — arrastrá para reordenar`}
+                draggable onDragStart={() => setDragSlide(i)} onDragEnd={() => setDragSlide(null)}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => { e.preventDefault(); if (dragSlide != null && dragSlide !== i && onReorderSlides) onReorderSlides(dragSlide, i); setDragSlide(null) }}>
                 <PiecePreview template={s.template} content={s.content} format={format} />
+                <span className="sn">{i + 1}</span>
               </button>
             ))}
             <button className="add" onClick={() => onAddSlide()} title="Agregar slide en blanco (componer con bloques)">+</button>

@@ -29,7 +29,7 @@ export async function listComments(shareId) {
   return data
 }
 
-export async function addComment({ share_id, author, text, x, y }) {
-  const { error } = await supabase.from('comments').insert({ share_id, author, text, x, y })
+export async function addComment({ share_id, author, text, x, y, slide = 0 }) {
+  const { error } = await supabase.from('comments').insert({ share_id, author, text, x, y, slide })
   if (error) throw error
 }
