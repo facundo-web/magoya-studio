@@ -119,6 +119,7 @@ export default function Editor({
   }
   const [chooser, setChooser] = useState(null) // null | 'add' | 'change'
   const [mockupOpen, setMockupOpen] = useState(false)
+  const [shareOpen, setShareOpen] = useState(false)
   const [mockup, setMockup] = useState('phone')
   const [mkDark, setMkDark] = useState(false)
   const [panel, setPanel] = useState('text')
@@ -477,7 +478,8 @@ export default function Editor({
             </span>
           )}
           <button className="btn" onClick={() => setMockupOpen(true)}><Icon n="eye" size={16} /> Ver en mockup</button>
-          <MoreMenu onSaveTemplate={onSaveTemplate} onShare={onShare} onShareReview={onShareReview ? () => onShareReview(mockup) : undefined} onExportFile={onExportFile} />
+          <button className="btn" onClick={() => setShareOpen(true)}><Icon n="share" size={16} /> Compartir</button>
+          <MoreMenu onSaveTemplate={onSaveTemplate} onExportFile={onExportFile} />
           <DownloadMenu template={template} content={content} format={format} slides={slides} busy={busy} setBusy={setBusy} onToast={onToast} />
         </div>
 
@@ -580,6 +582,11 @@ export default function Editor({
         )}
       </div>
 
+      {shareOpen && (
+        <ShareModal onClose={() => setShareOpen(false)} onShare={onShare} onShareReview={onShareReview}
+          onExportFile={onExportFile} mockup={mockup} setMockup={setMockup} />
+      )}
+
       {mockupOpen && (
         <div className="mk-modal-ov" onClick={() => setMockupOpen(false)}>
           <div className="mk-modal" onClick={(e) => e.stopPropagation()}>
@@ -591,7 +598,7 @@ export default function Editor({
               </div>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 <label className="dk-toggle"><input type="checkbox" checked={mkDark} onChange={(e) => setMkDark(e.target.checked)} /> Modo oscuro</label>
-                {onShare && <button className="btn" onClick={() => onShare(mockup)} title="Copiá un link para que revisen cómo queda">Copiar link de preview</button>}
+                <button className="btn" onClick={() => { setMockupOpen(false); setShareOpen(true) }}><Icon n="share" size={15} /> Compartir</button>
                 <button className="btn" onClick={() => setMockupOpen(false)}>Cerrar</button>
               </div>
             </div>
@@ -1481,7 +1488,9 @@ function ChatBody({ content, template, set }) {
 }
 
 /* ---------------- More menu (acciones de proyecto) ---------------- */
-function MoreMenu({ onSaveTemplate, onShare, onShareReview, onExportFile }) {
+// Compartir vive en UN solo lugar (el modal). Acá queda lo que no es
+// compartir: reusar la pieza y bajar el archivo editable.
+function MoreMenu({ onSaveTemplate, onExportFile }) {
   const [open, setOpen] = useState(false)
   const act = (fn) => { setOpen(false); fn && fn() }
   return (
@@ -1489,14 +1498,75 @@ function MoreMenu({ onSaveTemplate, onShare, onShareReview, onExportFile }) {
       <button className="btn" onClick={() => setOpen((o) => !o)}>Más ▾</button>
       {open && (
         <div className="menu-pop" onMouseLeave={() => setOpen(false)}>
-          <div className="grp">Compartir</div>
-          {onShareReview && <button className="rec" onClick={() => act(onShareReview)}><span>Compartir para revisión (foto + comentarios)</span><span>☁</span></button>}
-          <button onClick={() => act(onShare)}><span>Copiar link liviano (sin foto)</span><span>↗</span></button>
-          <button onClick={() => act(onExportFile)}><span>Exportar proyecto (.json)</span><span>↓</span></button>
-          <div className="grp">Reusar</div>
-          <button onClick={() => act(onSaveTemplate)}><span>Guardar como plantilla</span><span>☆</span></button>
+          <button onClick={() => act(onSaveTemplate)}><span>Guardar como plantilla</span><Icon n="bookmark" size={15} /></button>
+          <button onClick={() => act(onExportFile)}><span>Bajar el archivo editable (.json)</span><Icon n="down" size={15} /></button>
         </div>
       )}
+    </div>
+  )
+}
+
+/* ---------------- D3 · Compartir: una sola puerta, por INTENCIÓN ----------------
+   Antes había 4 salidas repartidas (menú Más ×3 + el botón del mockup) y
+   ninguna decía para qué servía cada una. Acá se elige el objetivo y la app
+   resuelve el resto. */
+const SHARE_INTENTS = [
+  {
+    k: 'review', title: 'Para que lo revisen',
+    desc: 'Link con la foto incluida. Quien lo abra puede comentar tocando un punto de la pieza y aprobarla.',
+    cta: 'Crear link de revisión', best: true,
+  },
+  {
+    k: 'show', title: 'Para mostrar cómo queda',
+    desc: 'Link de sólo lectura dentro de un mockup, como se ve publicado. Sin foto: pesa poco y se abre al toque.',
+    cta: 'Copiar link de preview',
+  },
+  {
+    k: 'edit', title: 'Para que lo editen',
+    desc: 'Baja el archivo del proyecto con todo adentro. Se abre desde Inicio › Abrir un archivo.',
+    cta: 'Bajar el archivo',
+  },
+]
+
+function ShareModal({ onClose, onShare, onShareReview, onExportFile, mockup, setMockup }) {
+  const [pick, setPick] = useState('review')
+  const run = () => {
+    if (pick === 'review') onShareReview && onShareReview(mockup)
+    else if (pick === 'show') onShare && onShare(mockup)
+    else onExportFile && onExportFile()
+    onClose()
+  }
+  const cur = SHARE_INTENTS.find((i) => i.k === pick)
+  return (
+    <div className="mk-modal-ov" onClick={onClose}>
+      <div className="share-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="share-head">
+          <strong>Compartir</strong>
+          <button className="btn" onClick={onClose}>Cerrar</button>
+        </div>
+        <p className="panel-help" style={{ margin: '0 0 12px' }}>¿Para qué lo compartís? Según eso cambia el link.</p>
+        <div className="share-opts">
+          {SHARE_INTENTS.map((it) => (
+            <button key={it.k} className={'share-opt' + (pick === it.k ? ' on' : '')} onClick={() => setPick(it.k)}>
+              <span className="so-t">{it.title}{it.best && <span className="so-tag">recomendado</span>}</span>
+              <span className="so-d">{it.desc}</span>
+            </button>
+          ))}
+        </div>
+        {pick !== 'edit' && (
+          <div className="share-mk">
+            <label>Mockup</label>
+            <div className="chips">
+              {MOCKUPS.map((m) => (
+                <button key={m.k} className={'chip' + (mockup === m.k ? ' on' : '')} onClick={() => setMockup(m.k)}>{m.label}</button>
+              ))}
+            </div>
+          </div>
+        )}
+        <div className="share-foot">
+          <button className="btn primary" onClick={run}>{cur.cta}</button>
+        </div>
+      </div>
     </div>
   )
 }

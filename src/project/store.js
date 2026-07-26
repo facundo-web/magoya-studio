@@ -193,3 +193,62 @@ function stripPhotos(content) {
   if (c.photo) c.photo = { note: 'foto no incluida en el link — usar archivo .magoya.json' }
   return c
 }
+
+// ============================================================
+// PIEZAS COMPARTIDAS (D4) — si perdés el link, perdés el feedback.
+// Guardamos cada link de revisión que generás, con cuántos comentarios
+// habías visto la última vez para poder avisar cuando hay nuevos.
+// ============================================================
+const SHARES_KEY = 'magoya_studio_shares_v1'
+
+export function loadShares() {
+  try {
+    return JSON.parse(localStorage.getItem(SHARES_KEY) || '[]')
+  } catch {
+    return []
+  }
+}
+
+function writeShares(list) {
+  try { localStorage.setItem(SHARES_KEY, JSON.stringify(list)); return true } catch { return false }
+}
+
+export function rememberShare({ id, name, formatId }) {
+  const list = loadShares().filter((s) => s.id !== id)
+  list.unshift({ id, name: name || 'Sin título', formatId, at: new Date().toISOString(), seen: 0 })
+  writeShares(list.slice(0, 30))
+  return list
+}
+
+export function markShareSeen(id, count) {
+  const list = loadShares().map((s) => (s.id === id ? { ...s, seen: count } : s))
+  writeShares(list)
+  return list
+}
+
+export function forgetShare(id) {
+  const list = loadShares().filter((s) => s.id !== id)
+  writeShares(list)
+  return list
+}
+
+// Copiar al portapapeles sin mentir: si el navegador lo bloquea (pestaña sin
+// foco, permiso denegado) se intenta el fallback y, si tampoco, se avisa.
+export async function copyToClipboard(text) {
+  try {
+    await navigator.clipboard.writeText(text)
+    return true
+  } catch {}
+  try {
+    const ta = document.createElement('textarea')
+    ta.value = text
+    ta.style.cssText = 'position:fixed;opacity:0'
+    document.body.appendChild(ta)
+    ta.select()
+    const ok = document.execCommand('copy')
+    ta.remove()
+    return ok
+  } catch {
+    return false
+  }
+}

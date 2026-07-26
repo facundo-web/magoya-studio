@@ -606,3 +606,29 @@ button.obj-row { width: 100%; cursor: pointer; text-align: left; font: inherit; 
 /* cabecera del panel: una línea, no una tarjeta */
 .side-head { padding: 0 0 10px; border-bottom: 1px solid var(--paper-200,#E6E1D8); margin-bottom: 12px; background: none; }
 .side-head .sh-name { font-size: 12px; font-weight: 700; color: #5C6B61; letter-spacing: .02em; }
+
+/* ---- D3 · modal de compartir (una sola puerta) ---- */
+.share-modal { background: #fff; border-radius: 18px; padding: 20px; width: min(560px, 92vw); box-shadow: 0 30px 80px rgba(0,0,0,.28); }
+.share-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.share-head strong { font-size: 17px; }
+.share-opts { display: grid; gap: 8px; }
+.share-opt { text-align: left; padding: 12px 14px; border-radius: 12px; border: 1.5px solid var(--paper-200,#E6E1D8); background: #fff; cursor: pointer; display: grid; gap: 3px; }
+.share-opt:hover { border-color: #C9C2B6; }
+.share-opt.on { border-color: var(--emerald-500,#00DE68); background: #F3FBF6; }
+.so-t { font-weight: 700; font-size: 14px; display: flex; align-items: center; gap: 8px; }
+.so-tag { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; background: var(--emerald-500,#00DE68); color: #06301B; padding: 2px 7px; border-radius: 999px; }
+.so-d { font-size: 12.5px; color: #5C6B61; line-height: 1.4; }
+.share-mk { margin-top: 14px; }
+.share-mk label { font-size: 12px; color: #5C6B61; display: block; margin-bottom: 6px; }
+.share-foot { margin-top: 16px; display: flex; justify-content: flex-end; }
+
+/* ---- D4 · piezas compartidas ---- */
+.share-list { display: grid; gap: 6px; }
+.share-row { display: flex; align-items: center; gap: 6px; }
+.share-open { flex: 1; display: flex; align-items: center; gap: 10px; text-align: left; padding: 9px 12px; border-radius: 10px; border: 1px solid var(--paper-200,#E6E1D8); background: #fff; cursor: pointer; }
+.share-open:hover { border-color: #C9C2B6; }
+.sr-name { font-weight: 600; font-size: 13px; }
+.sr-meta { font-size: 12px; color: #8A9389; }
+.sr-badge { margin-left: auto; font-size: 11px; font-weight: 700; background: var(--emerald-500,#00DE68); color: #06301B; padding: 2px 8px; border-radius: 999px; }
+.link-box { width: 100%; padding: 10px 12px; border-radius: 10px; border: 1.5px solid var(--paper-200,#E6E1D8); font: inherit; font-size: 13px; background: #FAF8F5; }
+.link-box:focus { outline: none; border-color: var(--emerald-500,#00DE68); }

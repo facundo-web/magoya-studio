@@ -3,7 +3,7 @@ import Gallery from './editor/Gallery.jsx'
 import Editor from './editor/Editor.jsx'
 import BrandKit from './editor/BrandKit.jsx'
 import MockupPreview from './editor/MockupPreview.jsx'
-import { createShare, loadShare, listComments, addComment } from './lib/supabase.js'
+import { createShare, loadShare, listComments, addComment, countComments } from './lib/supabase.js'
 import { TEMPLATES, TEMPLATES_BY_ID, BLANK_TEMPLATE, placeholderContent } from './templates/index.js'
 import { FORMATS_BY_ID, CAROUSEL_FORMATS } from './formats/registry.js'
 import {
@@ -11,6 +11,7 @@ import {
   exportProjectFile, importProjectFile, toShareLink, fromShareLink,
   loadElements, addElement, deleteElement,
   loadCustomTemplates, buildTemplateFromPiece, saveCustomTemplate, deleteCustomTemplate,
+  loadShares, rememberShare, markShareSeen, forgetShare, copyToClipboard,
 } from './project/store.js'
 
 const DEFAULT_FORMAT = 'ig-post'
@@ -33,6 +34,9 @@ export default function App() {
   const [histTick, setHistTick] = useState(0)
   const [saveFail, setSaveFail] = useState(false)
   const [undoDelete, setUndoDelete] = useState(null)
+  const [shares, setShares] = useState([])       // D4 · links de revisión propios
+  const [shareCounts, setShareCounts] = useState({})
+  const [linkToCopy, setLinkToCopy] = useState(null) // fallback si el portapapeles falla
   const [pvSlide, setPvSlide] = useState(0)
 
   useEffect(() => {
@@ -60,6 +64,7 @@ export default function App() {
     setProjects(loadProjects())
     setElements(loadElements())
     setCustomTemplates(loadCustomTemplates())
+    setShares(loadShares())
     // ¿link de revisión en la nube? (#r=<id>, con foto y comentarios)
     const rm = location.hash.match(/[#&]r=([\w-]+)/)
     if (rm) {
@@ -73,6 +78,12 @@ export default function App() {
     if (shared?.preview) setPreview(shared)
     else if (shared) openFromSerialized(shared)
   }, [])
+
+  // cuántos comentarios tiene cada pieza compartida (para el badge)
+  useEffect(() => {
+    if (view !== 'gallery' || !shares.length) return
+    countComments(shares.map((s) => s.id)).then(setShareCounts).catch(() => {})
+  }, [view, shares.length])
 
   const showToast = (msg) => {
     setToast(msg)
@@ -259,10 +270,11 @@ export default function App() {
     setDirty(false)
     showToast('✓ Proyecto guardado')
   }
-  function share(mockup) {
+  async function share(mockup) {
     const link = toShareLink(serialize(), typeof mockup === 'string' ? mockup : undefined)
-    navigator.clipboard?.writeText(link)
-    showToast('✓ Link copiado' + (typeof mockup === 'string' ? ' (preview en mockup)' : '') + ' — sin foto; para foto usá Exportar proyecto')
+    const ok = await copyToClipboard(link)
+    if (ok) showToast('✓ Link de preview copiado — sin foto (para la foto, compartí para revisión)')
+    else setLinkToCopy(link)
   }
   async function importFile(file) {
     try {
@@ -305,6 +317,19 @@ export default function App() {
       showToast('⚠ No se pudo guardar (almacenamiento lleno)')
     }
   }
+  function openShare(sh) {
+    const n = shareCounts[sh.id] ?? 0
+    setShares(markShareSeen(sh.id, n))
+    loadShare(sh.id)
+      .then((p) => { location.hash = 'r=' + sh.id; setPreview({ ...p, shareId: sh.id, preview: true }) })
+      .catch(() => showToast('⚠ Ya no está disponible esa pieza compartida'))
+  }
+  function copyShareLink(sh) {
+    navigator.clipboard?.writeText(location.origin + location.pathname + '#r=' + sh.id)
+    showToast('✓ Link copiado')
+  }
+  function removeShare(id) { setShares(forgetShare(id)); showToast('Sacado de tu lista (el link sigue vivo)') }
+
   function removeCustomTemplate(id) {
     setCustomTemplates(deleteCustomTemplate(id))
     showToast('Plantilla eliminada')
@@ -317,8 +342,13 @@ export default function App() {
       const payload = { ...serialize(), mockup: typeof mockup === 'string' ? mockup : 'phone' }
       const id = await createShare(payload)
       const link = location.origin + location.pathname + '#r=' + id
-      await navigator.clipboard?.writeText(link)
-      showToast('✓ Link de revisión copiado — con foto y comentarios')
+      // D4 · lo guardamos: si perdés el link, no perdés el feedback
+      setShares(rememberShare({ id, name: projectName || 'Sin título', formatId }))
+      // el portapapeles puede fallar (pestaña sin foco): la pieza YA se subió,
+      // así que en ese caso mostramos el link en vez de mentir con un error.
+      const ok = await copyToClipboard(link)
+      if (ok) showToast('✓ Link de revisión copiado — lo tenés en Inicio › Compartidas')
+      else setLinkToCopy(link)
     } catch (e) {
       console.error(e)
       showToast('⚠ No se pudo subir la pieza')
@@ -477,6 +507,11 @@ export default function App() {
           onDeleteProject={removeProject}
           onDuplicateProject={duplicateProject}
           onImport={importFile}
+          shares={shares}
+          shareCounts={shareCounts}
+          onOpenShare={openShare}
+          onCopyShare={copyShareLink}
+          onForgetShare={removeShare}
         />
       ) : current ? (
         <Editor
@@ -509,6 +544,16 @@ export default function App() {
         />
       ) : (
         <div className="center-note">Cargando…</div>
+      )}
+
+      {linkToCopy && (
+        <div className="mk-modal-ov" onClick={() => setLinkToCopy(null)}>
+          <div className="share-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="share-head"><strong>Tu link está listo</strong><button className="btn" onClick={() => setLinkToCopy(null)}>Cerrar</button></div>
+            <p className="panel-help" style={{ margin: '0 0 10px' }}>El navegador no dejó copiarlo solo. Copialo de acá:</p>
+            <input className="link-box" readOnly value={linkToCopy} onFocus={(e) => e.target.select()} autoFocus />
+          </div>
+        </div>
       )}
 
       {toast && (

@@ -33,3 +33,16 @@ export async function addComment({ share_id, author, text, x, y, slide = 0 }) {
   const { error } = await supabase.from('comments').insert({ share_id, author, text, x, y, slide })
   if (error) throw error
 }
+
+// cuántos comentarios tiene cada share (para el badge de "hay novedades")
+export async function countComments(shareIds) {
+  if (!shareIds?.length) return {}
+  const { data, error } = await supabase.from('comments').select('share_id').in('share_id', shareIds)
+  if (error) throw error
+  // arranca en 0 para TODOS los pedidos: si no, "sin comentarios" y
+  // "todavía no cargó" se ven igual y la fila queda buscando para siempre.
+  const out = {}
+  for (const id of shareIds) out[id] = 0
+  for (const r of data) out[r.share_id] = (out[r.share_id] || 0) + 1
+  return out
+}

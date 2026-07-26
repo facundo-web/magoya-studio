@@ -17,6 +17,7 @@ const FILTERS = [
 export default function Gallery({
   galleryFormat, setGalleryFormat, templates = TEMPLATES, onDeleteTemplate,
   onPick, onStartCarousel, onStartBlank, projects, onOpenProject, onImport, onDeleteProject, onDuplicateProject,
+  shares = [], shareCounts = {}, onOpenShare, onCopyShare, onForgetShare,
 }) {
   const fileRef = useRef(null)
   const [filter, setFilter] = React.useState('all')
@@ -93,6 +94,35 @@ export default function Gallery({
                       <button className="proj-act del" onClick={() => onDeleteProject(p.id)} title="Eliminar"><Icon n="close" size={12} /></button>
                     </span>
                   </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* 2b · COMPARTIDAS — D4: si perdés el link, perdés el feedback */}
+      {shares.length > 0 && (
+        <div className="h3-recent">
+          <span className="h3-label">Compartidas para revisión</span>
+          <div className="share-list">
+            {shares.slice(0, 6).map((sh) => {
+              const total = shareCounts[sh.id]
+              const nuevos = total === undefined ? 0 : Math.max(0, total - (sh.seen || 0))
+              return (
+                <div key={sh.id} className="share-row">
+                  <button className="share-open" onClick={() => onOpenShare && onOpenShare(sh)}
+                    title="Abrir la vista de revisión y leer los comentarios">
+                    <span className="sr-name">{sh.name}</span>
+                    <span className="sr-meta">
+                      {total === undefined ? 'buscando comentarios…'
+                        : total === 0 ? 'sin comentarios todavía'
+                        : `${total} comentario${total === 1 ? '' : 's'}`}
+                    </span>
+                    {nuevos > 0 && <span className="sr-badge" title="Comentarios que todavía no leíste">{nuevos} nuevo{nuevos === 1 ? '' : 's'}</span>}
+                  </button>
+                  <button className="proj-act" title="Copiar el link" onClick={() => onCopyShare && onCopyShare(sh)}><Icon n="copy" size={13} /></button>
+                  <button className="proj-act del" title="Sacar de la lista (el link sigue funcionando)" onClick={() => onForgetShare && onForgetShare(sh.id)}><Icon n="close" size={13} /></button>
                 </div>
               )
             })}
