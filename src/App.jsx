@@ -28,6 +28,9 @@ export default function App() {
   const [cAuthor, setCAuthor] = useState(() => localStorage.getItem('magoya_author') || '')
   const [cText, setCText] = useState('')
   const importRef = useRef(null)
+  const undoRef = useRef([])
+  const redoRef = useRef([])
+  const [histTick, setHistTick] = useState(0)
 
   useEffect(() => {
     if (preview?.shareId) listComments(preview.shareId).then(setComments).catch(() => {})
@@ -128,9 +131,31 @@ export default function App() {
 
   // ---- editar ----
   function changeContent(next) {
-    setPieces((ps) => ps.map((p, i) => (i === active ? { ...p, content: next } : p)))
+    setPieces((ps) => {
+      pushHistory(ps)
+      return ps.map((p, i) => (i === active ? { ...p, content: next } : p))
+    })
     if (active === 0 && next.title) setProjectName(next.title)
     setDirty(true)
+  }
+  // ---- undo / redo (últimos 40 estados de pieces) ----
+  function pushHistory(prev) {
+    undoRef.current.push(prev)
+    if (undoRef.current.length > 40) undoRef.current.shift()
+    redoRef.current = []
+    setHistTick((t) => t + 1)
+  }
+  function undo() {
+    const prev = undoRef.current.pop()
+    if (!prev) return
+    redoRef.current.push(pieces)
+    setPieces(prev); setDirty(true); setHistTick((t) => t + 1)
+  }
+  function redo() {
+    const next = redoRef.current.pop()
+    if (!next) return
+    undoRef.current.push(pieces)
+    setPieces(next); setDirty(true); setHistTick((t) => t + 1)
   }
   function addSlide(template) {
     // sin plantilla → slide EN BLANCO para componer con bloques
@@ -274,6 +299,19 @@ export default function App() {
     }
   }
 
+  // atajos globales de deshacer/rehacer
+  useEffect(() => {
+    const onKey = (e) => {
+      const tag = document.activeElement?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return
+      if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== 'z') return
+      e.preventDefault()
+      e.shiftKey ? redo() : undo()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  })
+
   // ---- pantalla de PREVIEW (link compartido con mockup) ----
   if (preview) {
     const pc = preview.pieces?.[0]
@@ -394,6 +432,8 @@ export default function App() {
           onSelectSlide={setActive}
           onAddSlide={addSlide}
           onDuplicateSlide={duplicateSlide}
+          onUndo={undo} onRedo={redo}
+          canUndo={undoRef.current.length > 0} canRedo={redoRef.current.length > 0}
           onConvertToCarousel={convertToCarousel}
           onBackToSingle={backToSingle}
           onChangeSlideTemplate={changeSlideTemplate}

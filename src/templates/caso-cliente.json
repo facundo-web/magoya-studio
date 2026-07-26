@@ -1,0 +1,21 @@
+{
+  "id": "caso-cliente",
+  "name": "Caso de cliente",
+  "purpose": "El resultado que conseguiste, con el logo del cliente. Prueba social — la pieza que más convierte.",
+  "category": "metric",
+  "surface": "solid",
+  "anchor": "center-left",
+  "motif": false,
+  "roles": ["kicker", "metric", "metricLabel", "subtitle"],
+  "defaults": {
+    "scheme": "ink",
+    "accent": "emerald",
+    "logo": "cream",
+    "clientLogo": "johndeere",
+    "hasPhoto": false,
+    "kicker": "CASO",
+    "metric": "−70%",
+    "metricLabel": "tickets de soporte en campo, en 4 meses",
+    "subtitle": "Integramos su capa de datos agronómicos con el ERP. Equipo embebido."
+  }
+}

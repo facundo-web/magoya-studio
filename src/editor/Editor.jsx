@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react'
 import PiecePreview from './PiecePreview.jsx'
-import { TEMPLATES } from '../templates/index.js'
+import { TEMPLATES, MAXCHARS } from '../templates/index.js'
 import MockupPreview, { MOCKUPS } from './MockupPreview.jsx'
 import { FORMATS_BY_ID, formatsByNetwork, CAROUSEL_FORMATS } from '../formats/registry.js'
 import { COLOR_SCHEMES, ACCENTS, WORDMARKS, CLIENT_LOGOS, TEXT_STYLES, GRADIENTS, HIGHLIGHTS } from '../brand/brandKit.js'
@@ -61,7 +61,7 @@ export default function Editor({
   template, format, content, slides, activeSlide,
   onChangeContent, onChangeFormat, onSelectSlide, onAddSlide, onDuplicateSlide, onConvertToCarousel, onBackToSingle, onChangeSlideTemplate, onDeleteSlide, onToast,
   elements = [], onAddElement, onDeleteElement,
-  templates = TEMPLATES, onSaveTemplate, onShare, onShareReview, onExportFile,
+  templates = TEMPLATES, onSaveTemplate, onShare, onShareReview, onExportFile, onUndo, onRedo, canUndo, canRedo,
 }) {
   const [busy, setBusy] = useState(false)
   const [selObj, setSelObj] = useState(null)
@@ -322,6 +322,12 @@ export default function Editor({
               <div className="panel-title">Textos</div>
               <p className="panel-help">Tocá un texto (acá o en la pieza) para editarlo a la derecha.</p>
               <ContentBody template={template} content={content} onSelectText={onSelectText} selText={selText} />
+              {(content.steps || template.defaults?.steps) && (
+                <>
+                  <div className="panel-title" style={{ marginTop: 16 }}>Pasos</div>
+                  <StepsBody content={content} template={template} set={set} />
+                </>
+              )}
             </>
           )
         )}
@@ -390,6 +396,12 @@ export default function Editor({
       <div className="stage">
         <div className="stage-tools">
           <span style={{ fontSize: 13, color: '#5C6B61' }}>{format.network} · {format.label} · {format.w}×{format.h}</span>
+          {onUndo && (
+            <span className="undo-group">
+              <button className="btn icon-btn" onClick={onUndo} disabled={!canUndo} title="Deshacer (⌘Z)">↶</button>
+              <button className="btn icon-btn" onClick={onRedo} disabled={!canRedo} title="Rehacer (⇧⌘Z)">↷</button>
+            </span>
+          )}
           <label className="safe-toggle"><input type="checkbox" checked={showSafe} onChange={(e) => setShowSafe(e.target.checked)} /> Ver zona segura</label>
           <div style={{ flex: 1 }} />
           {canCarousel && !isCarousel && <button className="btn" onClick={onConvertToCarousel}>+ Convertir en carrusel</button>}
@@ -816,6 +828,24 @@ function Pad2D({ x = 0.5, y = 0.5, onChange }) {
   )
 }
 
+/* ---------------- Pasos numerados (plantilla método) ---------------- */
+function StepsBody({ content, template, set }) {
+  const steps = content.steps || template.defaults?.steps || []
+  const upd = (i, v) => set({ steps: steps.map((s, idx) => (idx === i ? v : s)) })
+  return (
+    <div className="steps-list">
+      {steps.map((s, i) => (
+        <div key={i} className="step-row">
+          <span className="step-num">{String(i + 1).padStart(2, '0')}</span>
+          <input type="text" value={s} onChange={(e) => upd(i, e.target.value)} maxLength={60} />
+          <button className="obj-row-del" onClick={() => set({ steps: steps.filter((_, idx) => idx !== i) })} title="Quitar">✕</button>
+        </div>
+      ))}
+      {steps.length < 6 && <button className="btn" onClick={() => set({ steps: [...steps, 'Nuevo paso'] })}>+ Agregar paso</button>}
+    </div>
+  )
+}
+
 /* ---------------- Fotos: insertar sobre la pieza (con recorte) ---------------- */
 function PhotosBody({ objects, setObjects, setSelObj, elements = [], onAddElement, onDeleteElement, onToast }) {
   const fileRef = useRef(null)
@@ -1231,6 +1261,13 @@ function TextProps({ eid, content, set, getText, setText }) {
       <div className="insp-head"><span className="insp-name">Texto</span></div>
       <label>Contenido</label>
       <textarea value={val} onChange={(e) => setText(eid, e.target.value)} rows={2} />
+      {(() => {
+        const role = isTb ? (block?.style || 'title') : eid.slice(5)
+        const max = MAXCHARS[role]
+        if (!max) return null
+        const n = String(val || '').length
+        return <div className={'charcount' + (n > max ? ' over' : '')}>{n}/{max} {n > max ? '· se va a achicar' : ''}</div>
+      })()}
       {isTb && block ? (
         <>
           <label>Estilo</label>

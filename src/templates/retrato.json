@@ -1,0 +1,20 @@
+{
+  "id": "retrato",
+  "name": "Persona del equipo",
+  "purpose": "Retrato con una frase. Para employer brand y para mostrar quién se embebe en el equipo del cliente.",
+  "category": "quote",
+  "surface": "photo",
+  "anchor": "bottom-left",
+  "zocalo": true,
+  "roles": ["quote", "author"],
+  "defaults": {
+    "scheme": "deep",
+    "accent": "emerald",
+    "logo": "cream",
+    "clientLogo": "none",
+    "hasPhoto": true,
+    "treatment": "bw",
+    "quote": "Mi trabajo es que el equipo del cliente deje de necesitarme.",
+    "author": "Solutions Architect · Magoya"
+  }
+}

@@ -51,6 +51,7 @@ export function resolvePiece(template, content) {
     photo: c.photo || null,
     gradient: c.gradient !== undefined ? c.gradient : d.gradient || null,
     objects: c.objects || d.objects || [],
+    steps: c.steps || d.steps || [],
     handAccent: template.handAccent || false,
     text: {
       kicker: pick(c.kicker, d.kicker),
@@ -130,6 +131,10 @@ export function drawPiece(b, { template, content, format }) {
   // bloques de texto sumados por el usuario (freeform / componentes)
   p.textBlocks.forEach((tb, idx) => {
     pushBlock(tb.style || 'title', tb.text, { hl: (HIGHLIGHTS[tb.highlight] || {}).value, eid: `tb:${idx}` })
+  })
+  // pasos numerados (plantilla "método")
+  ;(p.steps || []).forEach((st, idx) => {
+    if (String(st || '').trim()) pushBlock('step', `${String(idx + 1).padStart(2, '0')}  ${st}`, { eid: `step:${idx}` })
   })
 
   // altura total del stack (con gaps proporcionales)

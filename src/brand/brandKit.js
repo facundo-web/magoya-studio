@@ -150,6 +150,7 @@ export const TEXT_STYLES = {
   metric: { weight: 800, tracking: -0.03, upper: false, sizeRel: 0.2, lineHeight: 0.98 },
   metricLabel: { weight: 600, tracking: 0.02, upper: false, sizeRel: 0.032, lineHeight: 1.2 },
   cta: { weight: 800, tracking: 0, upper: false, sizeRel: 0.04, lineHeight: 1.1 },
+  step: { weight: 600, tracking: 0, upper: false, sizeRel: 0.036, lineHeight: 1.35 },
 }
 
 // colores de resaltado (marcador detrás del texto, estilo "YouTube")

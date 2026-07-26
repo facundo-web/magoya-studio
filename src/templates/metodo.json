@@ -1,0 +1,25 @@
+{
+  "id": "metodo",
+  "name": "Método / pasos",
+  "purpose": "Cómo trabajamos, en pasos numerados. Educación y autoridad — el corazón de Clarity.",
+  "category": "post",
+  "surface": "solid",
+  "anchor": "center-left",
+  "motif": false,
+  "roles": ["kicker", "title"],
+  "defaults": {
+    "scheme": "cream",
+    "accent": "deep",
+    "logo": "deep",
+    "clientLogo": "none",
+    "hasPhoto": false,
+    "kicker": "CÓMO TRABAJAMOS",
+    "title": "Antes de escribir código, dos semanas en tu operación.",
+    "steps": [
+      "Entendemos el ciclo agronómico",
+      "Mapeamos los datos que ya tenés",
+      "Prototipamos con usuarios reales",
+      "Nos quedamos hasta que corre en producción"
+    ]
+  }
+}

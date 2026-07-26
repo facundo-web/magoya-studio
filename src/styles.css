@@ -523,3 +523,13 @@ button.obj-row { width: 100%; cursor: pointer; text-align: left; font: inherit; 
   .how { gap: 6px; }
   .how-sep { display: none; }
 }
+
+/* contador de caracteres (guía de copy por rol) */
+.charcount { font-size: 10.5px; font-family: var(--font-mono); color: var(--ui-fg-3); text-align: right; margin-top: 3px; }
+.charcount.over { color: var(--ui-danger); font-weight: 700; }
+/* editor de pasos */
+.steps-list { display: flex; flex-direction: column; gap: 6px; }
+.step-row { display: flex; align-items: center; gap: 6px; }
+.step-num { flex: none; width: 22px; height: 22px; border-radius: 999px; background: var(--ui-selected-ink); color: #fff; font-size: 10px; font-weight: 800; display: flex; align-items: center; justify-content: center; }
+.undo-group { display: inline-flex; gap: 4px; }
+.btn.icon-btn { padding: 7px 11px; font-size: 15px; line-height: 1; }
