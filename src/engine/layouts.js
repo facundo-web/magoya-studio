@@ -360,9 +360,18 @@ function drawObjects(b, { objects, W, H, ref, accent, scheme }) {
       } else {
         b.framedImage({ cx: dx + (sc.x + sc.w / 2) * dw, cy: dy + (sc.y + sc.h / 2) * dh, w: sc.w * dw, h: sc.h * dh, rotation, href: null, radius: sc.r * sc.w * dw })
       }
-      // 2) marco del dispositivo encima
+      // 2) marco del dispositivo encima, con sombra de objeto físico
       const frameUrl = getAsset(dev.url) || dev.url
-      b.object({ cx, cy, size: dw, rotation, flipX, href: frameUrl, tile: false, shadow, opacity, aspect: 1 / (sc.ratio || 1) })
+      const devShadow = shadow ? b.filter({ kind: 'device', k: (dw / ref) * 1.6 }) : null
+      b.object({ cx, cy, size: dw, rotation, flipX, href: frameUrl, tile: false, shadow: false, opacity, aspect: 1 / (sc.ratio || 1), extraFilter: devShadow })
+      // 3) reflejo de la pantalla: lo que lo termina de sacar de "ícono"
+      if (o.glare !== false) {
+        b.screenGlare({
+          cx: dx + (sc.x + sc.w / 2) * dw, cy: dy + (sc.y + sc.h / 2) * dh,
+          w: sc.w * dw, h: sc.h * dh, radius: sc.r * sc.w * dw,
+          rotation, strength: o.glare ?? 1,
+        })
+      }
       continue
     }
     if (o.kind === 'image' && o.src) {

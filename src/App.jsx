@@ -147,6 +147,7 @@ export default function App() {
     namedByHand.current = false
     setProjectName(template.defaults?.title || template.name)
     setFormatId(chosenFormat?.id || galleryFormatId || DEFAULT_FORMAT)
+    piecesRef.current = [{ template, content: freshContent(template) }]
     setPieces([{ template, content: freshContent(template) }])
     setActive(0)
     setCarousel(false)
@@ -170,6 +171,7 @@ export default function App() {
     namedByHand.current = true // el proyecto ya tiene su nombre elegido
     setProjectName(p.name || '')
     setFormatId(FORMATS_BY_ID[p.formatId] ? p.formatId : DEFAULT_FORMAT)
+    piecesRef.current = ps
     setPieces(ps)
     setActive(0)
     setCarousel(!!p.carousel)
@@ -187,36 +189,74 @@ export default function App() {
     }
   }
 
-  // ---- editar ----
-  // `tag` agrupa una MISMA interacción (arrastrar, mover un slider) en un
-  // solo paso de deshacer. Sin esto, arrastrar un objeto dejaba un estado
-  // por cada píxel y Deshacer tenía que recorrerlos todos uno por uno.
-  const lastTagRef = useRef(null)
-  // El gesto termina cuando soltás el mouse o la tecla; ahí se abre un paso
-  // de deshacer nuevo. (No se usa reloj: algunos navegadores redondean
-  // Date.now() a 1s por privacidad y una ventana temporal no cierra nunca.)
+  // ============================================================
+  // HISTORIAL — el modelo que usan Figma, Canva y Keynote:
+  // el paso de deshacer se cierra cuando TERMINA el gesto, no en cada
+  // cambio. Mientras arrastrás, movés un slider o escribís, la pieza se
+  // actualiza pero el historial no anota nada; al soltar (o al frenar de
+  // escribir) se anota UNA vez el estado de antes de empezar.
+  //
+  // El modelo anterior (comparar "etiquetas" de gesto en cada cambio)
+  // dependía de que las etiquetas coincidieran entre renders: si fallaba,
+  // Deshacer volvía píxel por píxel.
+  // ============================================================
+  const piecesRef = useRef(pieces)          // siempre el estado actual
+  const gestureRef = useRef(null)           // { tag, antes } del gesto abierto
+  const idleRef = useRef(null)
+  useEffect(() => { piecesRef.current = pieces }, [pieces])
+
+  function endGesture() {
+    clearTimeout(idleRef.current)
+    const g = gestureRef.current
+    gestureRef.current = null
+    // sólo anota si el gesto cambió algo de verdad
+    if (g && g.antes !== piecesRef.current) pushHistory(g.antes)
+  }
+
+  function beginGesture(tag) {
+    const g = gestureRef.current
+    if (g && g.tag === tag) return           // el mismo gesto sigue abierto
+    endGesture()                             // cambió de gesto: cerrá el anterior
+    gestureRef.current = { tag, antes: piecesRef.current }
+  }
+
+  // Escribir no tiene "soltar el mouse": el gesto se cierra tras una pausa.
+  // Así una palabra entera es un solo Deshacer, como en cualquier editor.
+  function touchIdle() {
+    clearTimeout(idleRef.current)
+    idleRef.current = setTimeout(endGesture, 700)
+  }
+
   useEffect(() => {
-    const end = () => { lastTagRef.current = null }
+    const end = () => endGesture()
     window.addEventListener('pointerup', end)
-    window.addEventListener('keyup', end)
-    return () => { window.removeEventListener('pointerup', end); window.removeEventListener('keyup', end) }
+    window.addEventListener('pointercancel', end)
+    return () => {
+      window.removeEventListener('pointerup', end)
+      window.removeEventListener('pointercancel', end)
+    }
   }, [])
+
+  // `tag` = nombre del gesto en curso (arrastrar, un slider, escribir un
+  // texto). Sin tag el cambio es discreto y va derecho al historial.
   function changeContent(next, tag) {
-    const sameGesture = !!tag && lastTagRef.current === tag
-    lastTagRef.current = tag || null
-    setPieces((ps) => {
-      if (!sameGesture) pushHistory(ps)
-      return ps.map((p, i) => (i === active ? { ...p, content: next } : p))
-    })
+    if (tag) { beginGesture(tag); touchIdle() }
+    else { endGesture(); pushHistory(piecesRef.current) }
+    const nextPieces = piecesRef.current.map((p, i) => (i === active ? { ...p, content: next } : p))
+    piecesRef.current = nextPieces
+    setPieces(nextPieces)
     if (active === 0 && next.title && !namedByHand.current) setProjectName(next.title)
     setDirty(true)
   }
+
   // Toda operación de SLIDE (agregar, duplicar, reordenar, cambiar diseño,
-  // borrar) tiene que entrar al historial. Antes tocaban setPieces directo:
-  // ⌘Z no deshacía nada y una slide borrada se perdía para siempre.
+  // borrar) es discreta: entra al historial de una.
   function mutatePieces(fn) {
-    lastTagRef.current = null
-    setPieces((ps) => { pushHistory(ps); return fn(ps) })
+    endGesture()
+    pushHistory(piecesRef.current)
+    const nextPieces = fn(piecesRef.current)
+    piecesRef.current = nextPieces
+    setPieces(nextPieces)
     setDirty(true)
   }
 
@@ -228,15 +268,18 @@ export default function App() {
     setHistTick((t) => t + 1)
   }
   function undo() {
+    endGesture() // si estabas a mitad de un gesto, se cierra antes de volver
     const prev = undoRef.current.pop()
     if (!prev) return
-    redoRef.current.push(pieces)
+    redoRef.current.push(piecesRef.current)
+    piecesRef.current = prev
     setPieces(prev); setDirty(true); setHistTick((t) => t + 1)
   }
   function redo() {
     const next = redoRef.current.pop()
     if (!next) return
-    undoRef.current.push(pieces)
+    undoRef.current.push(piecesRef.current)
+    piecesRef.current = next
     setPieces(next); setDirty(true); setHistTick((t) => t + 1)
   }
   function addSlide(template) {
@@ -253,6 +296,7 @@ export default function App() {
     namedByHand.current = false
     setProjectName('Pieza nueva')
     setFormatId(f.id)
+    piecesRef.current = [{ template: BLANK_TEMPLATE, content: freshContent(BLANK_TEMPLATE) }]
     setPieces([{ template: BLANK_TEMPLATE, content: freshContent(BLANK_TEMPLATE) }])
     setActive(0); setCarousel(false); setDirty(false); setView('editor')
   }
@@ -263,6 +307,7 @@ export default function App() {
     namedByHand.current = false
     setProjectName('Carrusel')
     setFormatId(format.id)
+    piecesRef.current = [blank(), blank(), blank()]
     setPieces([blank(), blank(), blank()])
     setActive(0)
     setCarousel(true)
@@ -387,7 +432,7 @@ export default function App() {
   async function shareForReview(mockup) {
     showToast('Subiendo pieza…')
     try {
-      const payload = { ...serialize(), mockup: typeof mockup === 'string' ? mockup : 'phone' }
+      const payload = { ...serialize(), mockup: typeof mockup === 'string' ? mockup : 'ig' }
       const id = await createShare(payload)
       const link = location.origin + location.pathname + '#r=' + id
       // D4 · lo guardamos: si perdés el link, no perdés el feedback
@@ -462,7 +507,7 @@ export default function App() {
               const r = e.currentTarget.getBoundingClientRect()
               setPin({ x: ((e.clientX - r.left) / r.width) * 100, y: ((e.clientY - r.top) / r.height) * 100, slide: idx })
             }}>
-            {t ? <MockupPreview template={t} content={pc.content} format={pfmt} mockup={preview.mockup || 'phone'} dark={!!preview.dark} /> : <div className="center-note">No se pudo cargar la pieza compartida.</div>}
+            {t ? <MockupPreview template={t} content={pc.content} format={pfmt} mockup={preview.mockup || 'ig'} dark={!!preview.dark} /> : <div className="center-note">No se pudo cargar la pieza compartida.</div>}
             {preview.shareId && comments.filter((c) => (c.slide ?? 0) === idx).map((c, i) => (
               <span key={c.id} className="c-pin" style={{ left: c.x + '%', top: c.y + '%' }} title={`${c.author}: ${c.text}`}>{i + 1}</span>
             ))}

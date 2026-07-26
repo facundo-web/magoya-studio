@@ -51,6 +51,16 @@ export function createBuilder() {
         inner = `<feMorphology in="SourceAlpha" operator="dilate" radius="${n(spec.r ?? 8)}" result="d"/>` +
                 `<feFlood flood-color="${spec.color || '#FFFFFF'}"/><feComposite in2="d" operator="in" result="ring"/>` +
                 `<feMerge><feMergeNode in="ring"/><feMergeNode in="SourceGraphic"/></feMerge>`
+      } else if (spec.kind === 'device') {
+        // Sombra de objeto físico: NO es una sombra, son varias.
+        // Una sola siempre se lee como ícono; lo que da la sensación de
+        // volumen es el apilado (contacto duro cerca + halo amplio lejos).
+        const k = spec.k || 1
+        const capas = [[2, .15], [4, .12], [8, .10], [16, .07], [32, .05], [64, .04]]
+        inner = capas.map(([blur, op], i) =>
+          `<feDropShadow in="SourceAlpha" dx="0" dy="${n(blur * 0.5 * k)}" stdDeviation="${n(blur * 0.5 * k)}" flood-color="#000000" flood-opacity="${op}" result="s${i}"/>`
+        ).join('') +
+        `<feMerge>${capas.map((_, i) => `<feMergeNode in="s${i}"/>`).join('')}<feMergeNode in="SourceGraphic"/></feMerge>`
       } else if (spec.kind === 'soft') {
         inner = `<feDropShadow dx="0" dy="${n(spec.dy ?? 20)}" stdDeviation="${n(spec.r ?? 24)}" flood-color="#000" flood-opacity="${spec.opacity ?? .45}"/>`
       } else if (spec.kind === 'blur') {
@@ -211,6 +221,38 @@ export function createBuilder() {
         inner = `<image href="${href}" x="${n(x)}" y="${n(y)}" width="${n(w)}" height="${n(h)}" preserveAspectRatio="xMidYMid meet"/>`
       }
       body.push(`<g${transform}${filterAttr}${op}>${inner}</g>`)
+    },
+    // ---- REFLEJO DE PANTALLA ----
+    // Dos capas: un "glint" con CORTE DURO (el borde neto es lo que el ojo
+    // lee como vidrio; un degradé suave se lee como plástico) y un lavado
+    // tenue en la diagonal opuesta. Va recortado a la pantalla.
+    screenGlare({ cx, cy, w, h, radius = 0, rotation = 0, strength = 1 }) {
+      if (w <= 0 || h <= 0) return
+      const x = cx - w / 2, y = cy - h / 2
+      const clipId = id('gclip')
+      defs.push(`<clipPath id="${clipId}"><rect x="${n(x)}" y="${n(y)}" width="${n(w)}" height="${n(h)}" rx="${n(radius)}"/></clipPath>`)
+      const gid = id('glint')
+      defs.push(
+        `<linearGradient id="${gid}" x1="0" y1="0" x2="1" y2="1" gradientTransform="rotate(-18 0.5 0.5)">` +
+        `<stop offset="0" stop-color="#FFFFFF" stop-opacity="${n(0.16 * strength)}"/>` +
+        `<stop offset="0.35" stop-color="#FFFFFF" stop-opacity="${n(0.10 * strength)}"/>` +
+        `<stop offset="0.3501" stop-color="#FFFFFF" stop-opacity="0"/>` +
+        `</linearGradient>`
+      )
+      const wid = id('wash')
+      defs.push(
+        `<linearGradient id="${wid}" x1="0" y1="0" x2="1" y2="1">` +
+        `<stop offset="0" stop-color="#FFFFFF" stop-opacity="${n(0.07 * strength)}"/>` +
+        `<stop offset="0.55" stop-color="#FFFFFF" stop-opacity="0"/>` +
+        `</linearGradient>`
+      )
+      const t = rotation ? ` transform="rotate(${n(rotation)} ${n(cx)} ${n(cy)})"` : ''
+      body.push(
+        `<g${t} clip-path="url(#${clipId})">` +
+        `<rect x="${n(x)}" y="${n(y)}" width="${n(w)}" height="${n(h)}" fill="url(#${wid})"/>` +
+        `<rect x="${n(x)}" y="${n(y)}" width="${n(w)}" height="${n(h)}" fill="url(#${gid})"/>` +
+        `</g>`
+      )
     },
     // imagen enmascarada en un marco rectangular (pantalla/mockup)
     framedImage({ cx, cy, w, h, rotation = 0, flipX = false, href, natural, focal = { x: 0.5, y: 0.5 }, radius = 0, zoom = 1, shadow = false, opacity = 1 }) {

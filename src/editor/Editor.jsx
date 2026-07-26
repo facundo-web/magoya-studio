@@ -158,7 +158,8 @@ export default function Editor({
   const [chooser, setChooser] = useState(null) // null | 'add' | 'change'
   const [mockupOpen, setMockupOpen] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
-  const [mockup, setMockup] = useState('phone')
+  const [mockup, setMockup] = useState('ig')
+  const [mkSafe, setMkSafe] = useState(false)
   const [mkDark, setMkDark] = useState(false)
   const [panel, setPanel] = useState('text')
   const [dragSlide, setDragSlide] = useState(null) // rail de inserción: un panel a la vez
@@ -281,7 +282,7 @@ export default function Editor({
         updateObject(selObj, {
           x: Math.min(1, Math.max(0, (o.x ?? 0.5) + (mv.x || 0))),
           y: Math.min(1, Math.max(0, (o.y ?? 0.5) + (mv.y || 0))),
-        })
+        }, 'nudge')
       }
     }
     window.addEventListener('keydown', onKey)
@@ -347,8 +348,9 @@ export default function Editor({
     return ''
   }
   const setText = (eid, val) => {
-    if (eid.startsWith('role:')) set({ [eid.slice(5)]: val })
-    else if (eid.startsWith('tb:')) { const i = +eid.slice(3); set({ textBlocks: (content.textBlocks || []).map((b, idx) => (idx === i ? { ...b, text: val } : b)) }) }
+    // escribir es un gesto: una palabra entera es un solo Deshacer
+    if (eid.startsWith('role:')) set({ [eid.slice(5)]: val }, 'txt:' + eid)
+    else if (eid.startsWith('tb:')) { const i = +eid.slice(3); set({ textBlocks: (content.textBlocks || []).map((b, idx) => (idx === i ? { ...b, text: val } : b)) }, 'txt:' + eid) }
   }
   const openTextEditor = (t) => {
     const eid = t.getAttribute('data-eid')
@@ -650,12 +652,17 @@ export default function Editor({
                 ))}
               </div>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                {mockup === 'phone' && (
+                  <label className="dk-toggle" title="Marca lo que tapan el header y la barra de respuesta de la app">
+                    <input type="checkbox" checked={mkSafe} onChange={(e) => setMkSafe(e.target.checked)} /> Ver qué tapa la app
+                  </label>
+                )}
                 <label className="dk-toggle"><input type="checkbox" checked={mkDark} onChange={(e) => setMkDark(e.target.checked)} /> Modo oscuro</label>
                 <button className="btn" onClick={() => { setMockupOpen(false); setShareOpen(true) }}><Icon n="share" size={15} /> Compartir</button>
                 <button className="btn" onClick={() => setMockupOpen(false)}>Cerrar</button>
               </div>
             </div>
-            <div className="mk-stage"><MockupPreview template={template} content={content} format={format} mockup={mockup} dark={mkDark} /></div>
+            <div className="mk-stage"><MockupPreview template={template} content={content} format={format} mockup={mockup} dark={mkDark} safeZones={mkSafe} /></div>
           </div>
         </div>
       )}

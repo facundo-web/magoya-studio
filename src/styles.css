@@ -451,62 +451,130 @@ button.obj-row { width: 100%; cursor: pointer; text-align: left; font: inherit; 
 
 /* ---------- Mockups de preview ---------- */
 .mk-modal-ov { position: fixed; inset: 0; background: rgba(13,12,12,.62); z-index: 200; display: flex; align-items: center; justify-content: center; padding: 20px; }
-.mk-modal { background: var(--paper-100,#F1EDE7); border-radius: 16px; width: min(760px, 96vw); max-height: 92vh; display: flex; flex-direction: column; box-shadow: 0 30px 80px rgba(0,0,0,.4); }
+.mk-modal { background: var(--paper-100,#F1EDE7); border-radius: 16px; width: min(860px, 96vw); overflow: hidden; max-height: 92vh; display: flex; flex-direction: column; box-shadow: 0 30px 80px rgba(0,0,0,.4); }
 .mk-modal-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--paper-200,#E6E1D8); flex-wrap: wrap; }
 .mk-tabs { display: inline-flex; gap: 6px; }
 .mk-tabs button { border: 1px solid var(--paper-200,#E6E1D8); background: #fff; border-radius: 999px; padding: 6px 12px; font-size: 12px; font-weight: 600; }
 .mk-tabs button.on { background: var(--ink-900); color: #fff; border-color: var(--ink-900); }
-.mk-stage { flex: 1; overflow: auto; display: flex; align-items: center; justify-content: center; padding: 24px; background: #E9E4DC; border-radius: 0 0 16px 16px; }
+/* ============================================================
+   PREVIEW REAL — medidas tomadas del chrome propio de Instagram y
+   LinkedIn (sus renderers de embed), a escala 1,25×.
+   A tamaño físico un teléfono son ~320 px de ancho en un monitor
+   normal: eso es el "teléfono enano" que no sirve para revisar nada.
+   ============================================================ */
+.mk-stage { flex: 1; overflow: auto; display: flex; align-items: flex-start; justify-content: center;
+  padding: 0; border-radius: 0 0 16px 16px; }
 .mk-piece > div { display: contents; }
 .mk-piece svg { width: 100%; height: 100%; display: block; }
-/* celular */
-.mk-phone { width: 300px; background: #0D0C0C; border-radius: 38px; padding: 10px; box-shadow: 0 20px 50px rgba(0,0,0,.35); position: relative; }
-.mk-phone-screen { position: relative; border-radius: 30px; overflow: hidden; background: #000; }
-.mk-notch { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); width: 90px; height: 22px; background: #0D0C0C; border-radius: 999px; }
-.mk-story-top { position: absolute; top: 10px; left: 10px; right: 10px; display: flex; gap: 4px; z-index: 2; }
-.mk-story-top span { flex: 1; height: 3px; background: rgba(255,255,255,.55); border-radius: 2px; }
-.mk-story-top span:first-child { background: #fff; }
-.mk-story-user { position: absolute; top: 22px; left: 12px; display: flex; align-items: center; gap: 8px; color: #fff; font-size: 12px; font-weight: 600; z-index: 2; text-shadow: 0 1px 3px rgba(0,0,0,.5); }
-.mk-av { width: 26px; height: 26px; border-radius: 999px; background: linear-gradient(135deg,#00DE68,#133825); display: inline-block; border: 2px solid #fff; }
-.mk-av.lg { width: 40px; height: 40px; }
-/* feed IG */
-.mk-feed { background: #fff; }
-.mk-ig-head { display: flex; align-items: center; gap: 8px; padding: 10px; }
-.mk-ig-name { font-size: 13px; font-weight: 700; color: #111; flex: 1; }
-.mk-dots { color: #111; }
-.mk-ig-actions { display: flex; gap: 14px; padding: 10px; font-size: 18px; color: #111; }
-.mk-ig-actions .mk-save { margin-left: auto; }
-.mk-ig-cap { padding: 0 10px 12px; font-size: 12px; color: #111; }
-/* LinkedIn */
-.mk-licard { width: 400px; background: #fff; border-radius: 10px; overflow: hidden; box-shadow: 0 20px 50px rgba(0,0,0,.2); font-family: -apple-system, system-ui, sans-serif; }
-.mk-li-head { display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; }
-.mk-li-name { font-size: 14px; font-weight: 700; color: rgba(0,0,0,.9); }
-.mk-li-sub { font-size: 11.5px; color: rgba(0,0,0,.6); display: flex; align-items: center; gap: 3px; }
-.mk-li-follow { margin-left: auto; color: #0A66C2; font-weight: 700; font-size: 14px; }
-.mk-li-text { padding: 0 14px 10px; font-size: 13.5px; color: rgba(0,0,0,.9); }
-.mk-li-more { color: rgba(0,0,0,.6); }
-.mk-li-social { padding: 8px 14px; font-size: 11.5px; color: rgba(0,0,0,.6); border-bottom: 1px solid #ebebeb; }
-.mk-li-actions { display: flex; justify-content: space-around; padding: 6px 4px; font-size: 12.5px; font-weight: 600; color: rgba(0,0,0,.6); }
-.mk-li-actions span { display: inline-flex; align-items: center; gap: 5px; padding: 8px 6px; }
-.mk-av.sq { border-radius: 6px; border: 0; }
-/* story extras */
-.mk-time { font-weight: 400; opacity: .85; margin-left: 2px; }
-.mk-av.ring { box-shadow: 0 0 0 2px #fff, 0 0 0 4px #E4405F; border: 0; width: 30px; height: 30px; }
-.mk-story-reply { position: absolute; bottom: 12px; left: 12px; right: 12px; display: flex; align-items: center; gap: 12px; z-index: 2; color: #fff; }
-.mk-reply-input { flex: 1; border: 1px solid rgba(255,255,255,.7); border-radius: 999px; padding: 8px 14px; font-size: 12.5px; color: rgba(255,255,255,.9); }
-.mk-story-ic { display: inline-flex; }
-.mk-ig-likes { padding: 0 10px 4px; font-size: 12.5px; font-weight: 700; color: #111; }
-.mk-ig-actions span { display: inline-flex; color: #111; }
+.mk-av { width: 26px; height: 26px; border-radius: 999px; background: linear-gradient(135deg,#00DE68,#133825); display: inline-block; border: 2px solid #fff; flex: none; }
+.mk-ph { display: block; height: 10px; border-radius: 5px; background: rgba(0,0,0,.10); }
+.mk-ph.n { width: 82px; }
 
-/* dark mode del chrome de los mockups */
-.mk-feed.dark { background: #000; }
-.mk-feed.dark .mk-ig-name, .mk-feed.dark .mk-dots, .mk-feed.dark .mk-ig-likes, .mk-feed.dark .mk-ig-cap { color: #fafafa; }
-.mk-feed.dark .mk-ig-actions span { color: #fafafa; }
-.mk-licard.dark { background: #1B1F23; }
-.mk-licard.dark .mk-li-name, .mk-licard.dark .mk-li-text { color: rgba(255,255,255,.9); }
-.mk-licard.dark .mk-li-sub, .mk-licard.dark .mk-li-more, .mk-licard.dark .mk-li-social, .mk-licard.dark .mk-li-actions { color: rgba(255,255,255,.6); }
-.mk-licard.dark .mk-li-social { border-color: rgba(255,255,255,.12); }
-.mk-licard.dark .mk-li-follow { color: #70B5F9; }
+/* ---------- FEED INSTAGRAM ----------
+   Sin teléfono: la tarjeta sobre el fondo real de la app, con las piezas
+   vecinas cortadas arriba y abajo. El contexto del scroll es lo que hace
+   que se lea "así se va a ver" (es lo que hacen Later, Planoly y Buffer). */
+.mk-feed-stage { width: 100%; min-height: 100%; background: #FFFFFF; display: flex;
+  flex-direction: column; align-items: center; padding: 0 0 40px; }
+.mk-igcard { width: 500px; max-width: 100%; background: #fff; }
+.mk-ig-head { display: flex; align-items: center; gap: 12px; height: 67px; padding: 0 12px; }
+.mk-ig-head .mk-av.ring { width: 38px; height: 38px; box-shadow: 0 0 0 2px #fff, 0 0 0 4px #E4405F; border: 0; }
+.mk-ig-name { font-size: 17px; line-height: 22px; font-weight: 600; color: #1C1E21; flex: 1;
+  font-family: -apple-system, system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+.mk-dots { color: #1C1E21; letter-spacing: 1px; }
+.mk-ig-actions { display: flex; align-items: center; gap: 15px; height: 51px; padding: 0 12px; color: #1C1E21; }
+.mk-ig-actions span { display: inline-flex; }
+.mk-ig-actions svg { width: 30px; height: 30px; }
+.mk-ig-actions .mk-save { margin-left: auto; }
+.mk-ig-likes { padding: 0 12px 7px; font-size: 17px; line-height: 22px; font-weight: 600; color: #1C1E21;
+  font-family: -apple-system, system-ui, sans-serif; }
+.mk-ig-cap { padding: 0 12px 12px; font-size: 17px; line-height: 22px; color: #1C1E21;
+  font-family: -apple-system, system-ui, sans-serif; }
+.mk-ig-cap b { font-weight: 600; }
+/* vecinos: contexto, no contenido — grises neutros y cortados por el borde */
+.mk-vecino { width: 500px; max-width: 100%; overflow: hidden; }
+.mk-vecino-img { background: repeating-linear-gradient(135deg, #F0F0F0 0 14px, #EAEAEA 14px 28px); }
+.mk-vecino.corte-arriba { margin-top: 0; }
+.mk-vecino .mk-ig-actions { opacity: .35; }
+.mk-vecino .mk-ig-head { opacity: .35; }
+.mk-feed-stage.dark { background: #000; }
+.mk-feed-stage.dark .mk-igcard { background: #000; }
+.mk-feed-stage.dark .mk-ig-name, .mk-feed-stage.dark .mk-dots,
+.mk-feed-stage.dark .mk-ig-likes, .mk-feed-stage.dark .mk-ig-cap { color: #FAFAFA; }
+.mk-feed-stage.dark .mk-ig-actions { color: #FAFAFA; }
+.mk-feed-stage.dark .mk-vecino-img { background: repeating-linear-gradient(135deg, #1a1a1a 0 14px, #141414 14px 28px); }
+
+/* ---------- STORY / REEL ----------
+   Acá el marco SÍ suma: es pantalla completa. 405×720 mínimo. */
+.mk-stage-phone { width: 100%; min-height: 100%; background: #E9E4DC;
+  display: flex; align-items: center; justify-content: center; padding: 28px 20px 36px; }
+.mk-phone { width: min(405px, 100%, calc((92vh - 210px) * 0.5625)); min-width: 260px; background: #181818; border-radius: 52px; padding: 11px; position: relative;
+  /* la pila de sombras: una sola siempre se ve a ícono */
+  box-shadow: 0 1px 2px rgba(0,0,0,.15), 0 2px 4px rgba(0,0,0,.12), 0 4px 8px rgba(0,0,0,.10),
+              0 6px 12px rgba(0,0,0,.08), 0 8px 16px rgba(0,0,0,.06), 0 12px 24px rgba(0,0,0,.05),
+              0 16px 32px rgba(0,0,0,.04), 0 24px 48px rgba(0,0,0,.03), 0 32px 64px rgba(0,0,0,.03),
+              inset 0 0 3px 1px rgba(0,0,0,.4); }
+.mk-phone::before { /* canto metálico */
+  content: ''; position: absolute; inset: 0; border-radius: 52px; padding: 1px;
+  background: linear-gradient(135deg, #555, #000);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none; }
+.mk-phone::after { /* reflejo de vidrio: el CORTE DURO al 35% es lo que se lee como vidrio */
+  content: ''; position: absolute; inset: 11px; border-radius: 42px; pointer-events: none; z-index: 3;
+  background: linear-gradient(155deg, rgba(255,255,255,.08) 0%, rgba(255,255,255,.08) 35%, rgba(255,255,255,0) 35%); }
+/* La story SIEMPRE es 9:16. Si la pieza es cuadrada se ve centrada sobre
+   negro — que es exactamente lo que pasa al subir un 1:1 a una story. */
+.mk-phone-screen { position: relative; border-radius: 42px; overflow: hidden; background: #000;
+  aspect-ratio: 9 / 16; display: flex; align-items: center; }
+.mk-phone-screen .mk-piece { width: 100%; }
+.mk-notch { position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
+  width: 134px; height: 36px; background: #050505; border-radius: 999px; z-index: 4; }
+.mk-safe { position: absolute; left: 0; right: 0; background: repeating-linear-gradient(45deg, rgba(255,0,0,.12) 0 8px, transparent 8px 16px); z-index: 1; pointer-events: none; }
+.mk-safe.top { top: 0; height: 13%; }
+.mk-safe.bottom { bottom: 0; height: 17.7%; }
+.mk-story-top { position: absolute; top: 52px; left: 14px; right: 14px; display: flex; gap: 4px; z-index: 2; }
+.mk-story-top span { flex: 1; height: 3px; background: rgba(255,255,255,.45); border-radius: 2px; }
+.mk-story-top span:first-child { background: #fff; }
+.mk-story-user { position: absolute; top: 64px; left: 16px; display: flex; align-items: center; gap: 9px; color: #fff; font-size: 14px; font-weight: 600; z-index: 2; text-shadow: 0 1px 3px rgba(0,0,0,.5); }
+.mk-time { font-weight: 400; opacity: .85; margin-left: 2px; }
+.mk-story-reply { position: absolute; bottom: 18px; left: 16px; right: 16px; display: flex; align-items: center; gap: 14px; z-index: 2; color: #fff; }
+.mk-reply-input { flex: 1; border: 1px solid rgba(255,255,255,.7); border-radius: 999px; padding: 10px 16px; font-size: 14px; color: rgba(255,255,255,.9); }
+.mk-story-ic { display: inline-flex; }
+.mk-story-ic svg { width: 26px; height: 26px; }
+
+/* ---------- POST LINKEDIN ----------
+   504 px es el ancho de embed oficial. Media a sangre (margen negativo). */
+.mk-li-stage { width: 100%; min-height: 100%; background: #F4F2EE; display: flex;
+  justify-content: center; padding: 24px 16px 40px; }
+.mk-licard { width: 504px; max-width: 100%; align-self: flex-start; background: #fff;
+  border: 1px solid #E6E6E6; border-radius: 8px; padding: 12px 16px 0; height: max-content;
+  font-family: -apple-system, system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+.mk-li-head { display: flex; align-items: flex-start; gap: 8px; height: 64px; }
+.mk-av.lg.sq { width: 48px; height: 48px; border-radius: 999px; border: 0; }
+.mk-li-who { flex: 1; min-width: 0; }
+.mk-li-name { font-size: 14px; line-height: 21px; font-weight: 600; color: rgba(0,0,0,.9); }
+.mk-li-sub { font-size: 12px; line-height: 16px; color: rgba(0,0,0,.6); display: flex; align-items: center; gap: 4px; }
+.mk-li-globe svg { width: 12px; height: 12px; }
+.mk-li-follow { color: #0A66C2; font-weight: 600; font-size: 14px; flex: none; }
+.mk-li-text { font-size: 14px; line-height: 21px; color: rgba(0,0,0,.9); margin: 8px 0 12px; }
+.mk-li-more { color: rgba(0,0,0,.6); }
+.mk-li-media { margin: 0 -16px; }
+.mk-li-social { height: 46px; display: flex; align-items: center; gap: 6px;
+  border-top: 1px solid rgba(0,0,0,.08); margin: 8px 0 0; font-size: 12px; color: rgba(0,0,0,.6); }
+.mk-li-reacts { width: 40px; height: 16px; border-radius: 999px;
+  background: linear-gradient(90deg,#0A66C2 0 33%,#DF704D 33% 66%,#F5BB5C 66% 100%); display: inline-block; }
+.mk-li-actions { display: flex; justify-content: space-between; min-height: 44px; align-items: center;
+  border-top: 1px solid rgba(0,0,0,.08); }
+.mk-li-actions span { display: inline-flex; align-items: center; gap: 6px; padding: 10px 6px;
+  font-size: 14px; line-height: 21px; font-weight: 600; color: rgba(0,0,0,.6); }
+.mk-li-actions svg { width: 24px; height: 24px; }
+.mk-li-stage.dark { background: #1B1F23; }
+.mk-li-stage.dark .mk-licard { background: #1D2226; border-color: rgba(255,255,255,.12); }
+.mk-li-stage.dark .mk-li-name, .mk-li-stage.dark .mk-li-text { color: rgba(255,255,255,.9); }
+.mk-li-stage.dark .mk-li-sub, .mk-li-stage.dark .mk-li-more,
+.mk-li-stage.dark .mk-li-social, .mk-li-stage.dark .mk-li-actions span { color: rgba(255,255,255,.6); }
+.mk-li-stage.dark .mk-li-social, .mk-li-stage.dark .mk-li-actions { border-color: rgba(255,255,255,.12); }
+.mk-li-stage.dark .mk-li-follow { color: #70B5F9; }
 /* aprobación en preview */
 .verdict-row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
 .dk-toggle { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: #5C6B61; }
