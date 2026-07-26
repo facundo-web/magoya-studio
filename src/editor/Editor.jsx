@@ -90,6 +90,7 @@ export default function Editor({
   const [chooser, setChooser] = useState(null) // null | 'add' | 'change'
   const [mockupOpen, setMockupOpen] = useState(false)
   const [mockup, setMockup] = useState('phone')
+  const [mkDark, setMkDark] = useState(false)
   const [panel, setPanel] = useState('text') // rail de inserción: un panel a la vez
   const frameRef = useRef(null)
   const photoInputRef = useRef(null)
@@ -214,12 +215,28 @@ export default function Editor({
   }
 
   const onSelectText = (eid) => { setSelText(eid); setSelObj(null) }
+  const [guides, setGuides] = useState({ v: false, h: false })
   const startDrag = (e, i) => { e.stopPropagation(); setSelObj(i); setSelText(null); dragRef.current.i = i }
-  const onFrameMove = (e) => { if (dragRef.current.i != null) updateObject(dragRef.current.i, posFromEvent(e)) }
-  const endDrag = () => { dragRef.current.i = null }
+  const onFrameMove = (e) => {
+    if (dragRef.current.i == null) return
+    let pos = posFromEvent(e)
+    // snapping al centro (guías)
+    const snapV = Math.abs(pos.x - 0.5) < 0.02
+    const snapH = Math.abs(pos.y - 0.5) < 0.02
+    if (snapV) pos.x = 0.5
+    if (snapH) pos.y = 0.5
+    setGuides({ v: snapV, h: snapH })
+    updateObject(dragRef.current.i, pos)
+  }
+  const endDrag = () => { dragRef.current.i = null; setGuides({ v: false, h: false }) }
   const onFrameDown = (e) => {
     const t = e.target.closest && e.target.closest('text[data-eid]')
-    if (t) { setSelText(t.getAttribute('data-eid')); setSelObj(null); return }
+    if (t) {
+      const eid = t.getAttribute('data-eid')
+      // segundo tap/click sobre el texto ya seleccionado → editar (touch-friendly)
+      if (selText === eid) { openTextEditor(t) } else { setSelText(eid); setSelObj(null) }
+      return
+    }
     if (e.target === frameRef.current || e.target.tagName === 'svg' || e.target.tagName === 'IMAGE') { setSelObj(null); setSelText(null) }
   }
 
@@ -233,9 +250,7 @@ export default function Editor({
     if (eid.startsWith('role:')) set({ [eid.slice(5)]: val })
     else if (eid.startsWith('tb:')) { const i = +eid.slice(3); set({ textBlocks: (content.textBlocks || []).map((b, idx) => (idx === i ? { ...b, text: val } : b)) }) }
   }
-  const onFrameDblClick = (e) => {
-    const t = e.target.closest && e.target.closest('text[data-eid]')
-    if (!t) return
+  const openTextEditor = (t) => {
     const eid = t.getAttribute('data-eid')
     const fr = frameRef.current.getBoundingClientRect()
     const r = t.getBoundingClientRect()
@@ -247,6 +262,10 @@ export default function Editor({
       width: Math.max(r.width + fontPx, 90), fontPx,
       align: (t.getAttribute('text-anchor') === 'middle') ? 'center' : 'left',
     })
+  }
+  const onFrameDblClick = (e) => {
+    const t = e.target.closest && e.target.closest('text[data-eid]')
+    if (t) openTextEditor(t)
   }
 
   const needsPhoto = template.surface === 'photo' && !content.photo?.src
@@ -402,6 +421,8 @@ export default function Editor({
                 </div>
               )
             })}
+            {guides.v && <div className="guide-v" />}
+            {guides.h && <div className="guide-h" />}
             {showSafe && (
               <div className="safe-ov" style={{
                 top: `${format.safe.top * 100}%`, bottom: `${format.safe.bottom * 100}%`,
@@ -464,12 +485,13 @@ export default function Editor({
                   <button key={m.k} className={mockup === m.k ? 'on' : ''} onClick={() => setMockup(m.k)}>{m.label}</button>
                 ))}
               </div>
-              <div style={{ display: 'flex', gap: 8 }}>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <label className="dk-toggle"><input type="checkbox" checked={mkDark} onChange={(e) => setMkDark(e.target.checked)} /> Modo oscuro</label>
                 {onShare && <button className="btn" onClick={() => onShare(mockup)} title="Copiá un link para que revisen cómo queda">Copiar link de preview</button>}
                 <button className="btn" onClick={() => setMockupOpen(false)}>Cerrar</button>
               </div>
             </div>
-            <div className="mk-stage"><MockupPreview template={template} content={content} format={format} mockup={mockup} /></div>
+            <div className="mk-stage"><MockupPreview template={template} content={content} format={format} mockup={mockup} dark={mkDark} /></div>
           </div>
         </div>
       )}

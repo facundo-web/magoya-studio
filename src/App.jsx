@@ -223,18 +223,29 @@ export default function App() {
     const t = pc && allById[pc.templateId]
     const pfmt = FORMATS_BY_ID[preview.formatId] || FORMATS_BY_ID[DEFAULT_FORMAT]
     const exitPreview = () => { setPreview(null); if (location.hash) location.hash = '' }
+    const verdict = (ok) => {
+      const name = preview.name || 'pieza'
+      const msg = (ok ? `✅ Aprobada: "${name}"` : `✏️ Pedido de cambios en "${name}" — mis comentarios: `) + `\n${location.href}`
+      window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank')
+    }
     return (
       <div className="app">
         <div className="topbar">
           <button className="brand" onClick={exitPreview}>Magoya <b>Studio</b></button>
-          <span className="save-status">Preview compartido</span>
+          <span className="save-status">Pieza para revisar</span>
           <div className="spacer" />
+          <label className="dk-toggle" style={{ color: 'var(--cream-300)' }}>
+            <input type="checkbox" checked={!!preview.dark} onChange={(e) => setPreview({ ...preview, dark: e.target.checked })} /> Modo oscuro
+          </label>
           <button className="btn ghost-light" onClick={() => { const p = preview; setPreview(null); if (location.hash) location.hash = ''; openFromSerialized(p) }}>Editar esta pieza</button>
-          <button className="btn primary" onClick={exitPreview}>Crear la mía</button>
         </div>
         <div className="preview-stage">
-          {t ? <MockupPreview template={t} content={pc.content} format={pfmt} mockup={preview.mockup || 'phone'} /> : <div className="center-note">No se pudo cargar la pieza compartida.</div>}
-          <p className="preview-note">Así queda la pieza. La foto no viaja en el link — pedila por archivo (.magoya.json) para verla completa.</p>
+          {t ? <MockupPreview template={t} content={pc.content} format={pfmt} mockup={preview.mockup || 'phone'} dark={!!preview.dark} /> : <div className="center-note">No se pudo cargar la pieza compartida.</div>}
+          <div className="verdict-row">
+            <button className="btn primary" onClick={() => verdict(true)}>✓ Aprobar (responde por WhatsApp)</button>
+            <button className="btn" onClick={() => verdict(false)}>✏️ Pedir cambios</button>
+          </div>
+          <p className="preview-note">Así se ve publicada. La foto no viaja en el link — pedila por archivo (.magoya.json) para verla completa.</p>
         </div>
         {toast && <div className="toast">{toast}</div>}
       </div>
@@ -263,13 +274,6 @@ export default function App() {
           <>
             <span className="save-status" title="Tu trabajo se guarda solo">{dirty ? '• Sin guardar' : '✓ Guardado'}</span>
             <button className="btn ghost-light" onClick={() => setView('gallery')}>‹ Volver al inicio</button>
-          </>
-        )}
-        {view !== 'editor' && (
-          <>
-            <button className="btn ghost-light" onClick={() => importRef.current?.click()}>Abrir proyecto</button>
-            <input ref={importRef} type="file" accept=".json,application/json" style={{ display: 'none' }}
-              onChange={(e) => e.target.files[0] && importFile(e.target.files[0])} />
           </>
         )}
       </div>

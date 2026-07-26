@@ -1,0 +1,25 @@
+{
+  "id": "carrusel-cierre",
+  "name": "Carrusel · cierre con CTA",
+  "purpose": "Última slide del carrusel: mensaje corto + botón de acción. Cierra la historia.",
+  "category": "post",
+  "surface": "solid",
+  "anchor": "center-center",
+  "motif": false,
+  "freeform": true,
+  "roles": [],
+  "defaults": {
+    "scheme": "deep",
+    "accent": "emerald",
+    "logo": "cream",
+    "clientLogo": "none",
+    "hasPhoto": false,
+    "bg": "color",
+    "showLogo": true,
+    "textBlocks": [
+      { "style": "title", "text": "¿Te sirvió?" },
+      { "style": "subtitle", "text": "Guardalo y compartilo con tu equipo" },
+      { "style": "cta", "text": "Seguinos para más" }
+    ]
+  }
+}

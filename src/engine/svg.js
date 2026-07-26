@@ -47,8 +47,14 @@ export function createBuilder() {
     // imagen con cover + focal point + B&N opcional
     imageCover({ x, y, w, h, href, natural, focal = { x: 0.5, y: 0.5 }, grayscale = false }) {
       if (!href) {
-        // placeholder si no hay foto
-        this.rect({ x, y, w, h, fill: '#20302A' })
+        // esqueleto estático (acá va una foto): fondo neutro + pictograma
+        this.rect({ x, y, w, h, fill: '#DAD5CC' })
+        const s = Math.min(w, h)
+        const cx = x + w / 2, cy = y + h / 2
+        // sol + montañas (glifo universal de imagen)
+        body.push(`<circle cx="${n(cx - s * 0.1)}" cy="${n(cy - s * 0.12)}" r="${n(s * 0.055)}" fill="#B9B3A6"/>`)
+        body.push(`<path d="M ${n(cx - s * 0.22)} ${n(cy + s * 0.14)} L ${n(cx - s * 0.06)} ${n(cy - s * 0.03)} L ${n(cx + s * 0.05)} ${n(cy + 0.07 * s)} L ${n(cx + s * 0.13)} ${n(cy - s * 0.01)} L ${n(cx + s * 0.22)} ${n(cy + s * 0.14)} Z" fill="#B9B3A6"/>`)
+        body.push(`<rect x="${n(cx - s * 0.26)}" y="${n(cy - s * 0.2)}" width="${n(s * 0.52)}" height="${n(s * 0.38)}" rx="${n(s * 0.03)}" fill="none" stroke="#B9B3A6" stroke-width="${n(Math.max(2, s * 0.012))}"/>`)
         return
       }
       const clipId = id('clip')

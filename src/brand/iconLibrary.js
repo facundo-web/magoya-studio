@@ -46,7 +46,7 @@ export const ICONS = Object.entries(modules).map(([path, url]) => {
 })
 
 // ---- trazos y misceláneas (currentColor → se tiñen con el acento/negro) ----
-const MARK_NAMES = { 'flourish-arrow': 'Flecha', 'flourish-circle': 'Círculo', 'flourish-underline': 'Subrayado', 'doodle-blob': 'Mancha', 'doodle-loop': 'Bucle', 'doodle-sparkle': 'Destello' }
+const MARK_NAMES = { 'flourish-arrow': 'Flecha', 'flourish-circle': 'Círculo', 'flourish-underline': 'Subrayado', 'flourish-navarrow': 'Flecha siguiente', 'doodle-blob': 'Mancha', 'doodle-loop': 'Bucle', 'doodle-sparkle': 'Destello', 'doodle-dots': 'Dots de carrusel' }
 export const MARKS = Object.entries(markModules)
   .map(([path, url]) => {
     const m = path.match(/\/((?:flourish|doodle)-[^/]+)\.svg$/)

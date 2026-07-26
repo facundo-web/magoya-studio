@@ -13,8 +13,9 @@ import carruselPortada from './carrusel-portada.json'
 import techTitular from './tech-titular.json'
 import blank from './blank.json'
 import whatsapp from './whatsapp.json'
+import carruselCierre from './carrusel-cierre.json'
 
-export const TEMPLATES = [blank, zocaloPlaca, fotoTitular, fotoCentrada, carruselPortada, techTitular, bloqueColor, cita, dato, whatsapp]
+export const TEMPLATES = [blank, zocaloPlaca, fotoTitular, fotoCentrada, carruselPortada, techTitular, bloqueColor, cita, dato, whatsapp, carruselCierre]
 
 export const TEMPLATES_BY_ID = Object.fromEntries(TEMPLATES.map((t) => [t.id, t]))
 export const BLANK_TEMPLATE = blank

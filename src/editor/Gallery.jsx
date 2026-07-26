@@ -77,24 +77,56 @@ export default function Gallery({ galleryFormat, setGalleryFormat, templates = T
     <div className="gallery compact home2">
       <div className="g-head">
         <h1>¿Qué vas a crear?</h1>
-        <div className="dest-bar">
-          <span className="dest-label-sm">Publicás en</span>
-          <div className="nettabs">
-            {Object.keys(groups).map((net) => (
-              <button key={net} className={'nettab' + (network === net ? ' on' : '')} onClick={() => pickNet(net)}>{net}</button>
-            ))}
+        <div className="dest-stack">
+          <div className="dest-row">
+            <span className="dest-label-sm">1 · Red</span>
+            <div className="nettabs">
+              {Object.keys(groups).map((net) => (
+                <button key={net} className={'nettab' + (network === net ? ' on' : '')} onClick={() => pickNet(net)}>{net}</button>
+              ))}
+            </div>
           </div>
-          <div className="fmttabs slim">
-            {groups[network].map((f) => (
-              <button key={f.id} className={'fmttab' + (f.id === fmt.id ? ' on' : '')} onClick={() => setGalleryFormat(f)}
-                title={`${f.w}×${f.h} · ${GROUP_USE[f.group] || ''}`}>
-                <RatioBox w={f.w} h={f.h} on={f.id === fmt.id} />
-                <span className="fl">{f.label}</span>
-              </button>
-            ))}
+          <div className="dest-row">
+            <span className="dest-label-sm">2 · Formato</span>
+            <div className="fmttabs slim">
+              {groups[network].map((f) => (
+                <button key={f.id} className={'fmttab' + (f.id === fmt.id ? ' on' : '')} onClick={() => setGalleryFormat(f)}
+                  title={`${f.w}×${f.h} · ${GROUP_USE[f.group] || ''}`}>
+                  <RatioBox w={f.w} h={f.h} on={f.id === fmt.id} />
+                  <span className="fl">{f.label}</span>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </div>
+
+      {projects && projects.length > 0 && (
+        <div className="g-retomar">
+          <span className="ret-label">Retomar</span>
+          <div className="proj-row">
+            {projects.slice(0, 10).map((p) => {
+              const pc = p.pieces?.[0]
+              const t = pc && byId[pc.templateId]
+              const pf = FORMATS_BY_ID[p.formatId] || fmt
+              return (
+                <div key={p.id} className="proj-card">
+                  <button className="proj-thumb" onClick={() => onOpenProject(p)} title="Seguir editando">
+                    {t && <PiecePreview template={t} content={pc.content} format={pf} />}
+                  </button>
+                  <div className="proj-meta">
+                    <span className="proj-name" title={p.name}>{p.name || 'Sin título'}</span>
+                    <button className="proj-del" onClick={() => onDeleteProject(p.id)} title="Eliminar proyecto">✕</button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+          <button className="linklike ret-import" onClick={() => fileRef.current?.click()} title="Si alguien te pasó un archivo .magoya.json, abrilo acá">¿Te compartieron un proyecto?</button>
+          <input ref={fileRef} type="file" accept=".json,application/json" style={{ display: 'none' }}
+            onChange={(e) => e.target.files[0] && onImport(e.target.files[0])} />
+        </div>
+      )}
 
       <nav className="g-rail">
         {railItems.map((r) => (
@@ -107,38 +139,9 @@ export default function Gallery({ galleryFormat, setGalleryFormat, templates = T
         {[['all', 'Todo'], ['photo', 'Con foto'], ['solid', 'Solo color']].map(([k, l]) => (
           <button key={k} className={'rail-item sm' + (surface === k ? ' on' : '')} onClick={() => setSurface(k)}>{l}</button>
         ))}
-        <hr className="rail-hr" />
-        <button className="rail-item sm" onClick={() => fileRef.current?.click()}>Abrir proyecto…</button>
-        <input ref={fileRef} type="file" accept=".json,application/json" style={{ display: 'none' }}
-          onChange={(e) => e.target.files[0] && onImport(e.target.files[0])} />
       </nav>
 
       <div className="g-content">
-        {projects && projects.length > 0 && cat === 'all' && (
-          <>
-            <div className="sec-title2">Retomar <span className="sec-hint">se guardan solos</span></div>
-            <div className="proj-row">
-              {projects.slice(0, 10).map((p) => {
-                const pc = p.pieces?.[0]
-                const t = pc && byId[pc.templateId]
-                const pf = FORMATS_BY_ID[p.formatId] || fmt
-                return (
-                  <div key={p.id} className="proj-card">
-                    <button className="proj-thumb" onClick={() => onOpenProject(p)} title="Seguir editando">
-                      {t && <PiecePreview template={t} content={pc.content} format={pf} />}
-                    </button>
-                    <div className="proj-meta">
-                      <span className="proj-name" title={p.name}>{p.name || 'Sin título'}</span>
-                      <button className="proj-del" onClick={() => onDeleteProject(p.id)} title="Eliminar proyecto">✕</button>
-                    </div>
-                    <div className="proj-fmt">{pf.network} · {pf.label}</div>
-                  </div>
-                )
-              })}
-            </div>
-          </>
-        )}
-
         {sections.map((sec) => (
           <div key={sec.key}>
             <div className="sec-title2">{sec.title}</div>
