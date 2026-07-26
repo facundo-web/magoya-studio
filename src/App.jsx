@@ -13,6 +13,7 @@ import {
   loadCustomTemplates, buildTemplateFromPiece, saveCustomTemplate, deleteCustomTemplate,
   loadShares, rememberShare, markShareSeen, forgetShare, copyToClipboard,
 } from './project/store.js'
+import { dehydrate, hydrate, collectGarbage, usage } from './project/photoStore.js'
 
 const DEFAULT_FORMAT = 'ig-post'
 
@@ -33,6 +34,7 @@ export default function App() {
   const redoRef = useRef([])
   const [histTick, setHistTick] = useState(0)
   const [saveFail, setSaveFail] = useState(false)
+  const [espacio, setEspacio] = useState(null) // {usado, disponible}
   const [undoDelete, setUndoDelete] = useState(null)
   const [shares, setShares] = useState([])       // D4 · links de revisión propios
   const [shareCounts, setShareCounts] = useState({})
@@ -122,13 +124,19 @@ export default function App() {
   // autosave: guarda el proyecto en edición tras cada cambio (debounced)
   useEffect(() => {
     if (view !== 'editor' || !projectId || !pieces.length || !dirty) return
-    const t = setTimeout(() => {
-      const next = upsertProject(serialize())
+    const t = setTimeout(async () => {
+      // las fotos van a IndexedDB; en localStorage queda sólo texto chico
+      const liviano = await dehydrate(serialize()).catch(() => serialize())
+      const next = upsertProject(liviano)
       setProjects(next)
       if (next.saveOk === false) {
         setSaveFail(true)
-        showToast('⚠ Se llenó el guardado del navegador — descargá el proyecto para no perderlo')
-      } else setSaveFail(false)
+        showToast('⚠ No se pudo guardar — mirá el aviso de abajo')
+      } else {
+        setSaveFail(false)
+        collectGarbage(next).catch(() => {})
+      }
+      usage().then(setEspacio).catch(() => {})
     }, 800)
     return () => clearTimeout(t)
   }, [dirty, pieces, formatId, carousel, view, projectId])
@@ -147,7 +155,9 @@ export default function App() {
   }
 
   // ---- abrir proyecto guardado / serializado ----
-  function openFromSerialized(p) {
+  async function openFromSerialized(raw) {
+    // las fotos guardadas son referencias a IndexedDB: hay que traerlas
+    const p = await hydrate(raw).catch(() => raw)
     const ps = (p.pieces || []).map((pp) => ({
       template: allById[pp.templateId],
       content: pp.content || {},
@@ -434,7 +444,7 @@ export default function App() {
       window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank')
     }
     return (
-      <div className="app">
+      <div className="app app--fixed">
         <div className="topbar">
           <button className="brand" onClick={exitPreview}>Magoya <b>Studio</b></button>
           <span className="save-status">Pieza para revisar</span>
@@ -496,7 +506,7 @@ export default function App() {
   }
 
   return (
-    <div className="app">
+    <div className={'app ' + (view === 'editor' ? 'app--fixed' : 'app--scroll')}>
       <div className="topbar">
         <button className="brand" onClick={() => setView('gallery')} title="Ir al inicio">Magoya <b>Studio</b></button>
         {view !== 'editor' && (
@@ -607,6 +617,18 @@ export default function App() {
             <p className="panel-help" style={{ margin: '0 0 10px' }}>El navegador no dejó copiarlo solo. Copialo de acá:</p>
             <input className="link-box" readOnly value={linkToCopy} onFocus={(e) => e.target.select()} autoFocus />
           </div>
+        </div>
+      )}
+
+      {saveFail && view === 'editor' && (
+        <div className="stale-bar quota">
+          <div>
+            <b>No se pudo guardar esta pieza.</b> El navegador reserva un espacio
+            chico por sitio y ya está lleno{espacio ? ` (${Math.round(espacio.usado / 1e6)} MB usados)` : ''}.
+            Bajá la pieza para no perderla, o hacé lugar borrando proyectos viejos desde Inicio.
+          </div>
+          <button className="btn primary" onClick={() => exportProjectFile(serialize())}>Bajar la pieza</button>
+          <button className="btn ghost-light" onClick={() => setView('gallery')}>Hacer lugar</button>
         </div>
       )}
 

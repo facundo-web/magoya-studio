@@ -86,7 +86,11 @@ export async function preloadBrandAssets() {
   ])
 }
 
-// comprime una foto subida (máx 2048px, JPEG .85) → dataURL liviano
+// Comprime una foto (File o Blob) → dataURL liviano.
+// TODA foto que entre al proyecto tiene que pasar por acá: guardar el
+// archivo crudo era lo que llenaba el guardado del navegador de una.
+// `maxSide` según para qué es: 2048 para el fondo (ocupa toda la pieza),
+// 1400 para objetos y pantallas de dispositivo (se ven a un cuarto de eso).
 export function compressImage(file, maxSide = 2048, quality = 0.85) {
   return new Promise((resolve) => {
     const r = new FileReader()
@@ -100,7 +104,7 @@ export function compressImage(file, maxSide = 2048, quality = 0.85) {
         c.height = Math.round(img.naturalHeight * scale)
         const ctx = c.getContext('2d')
         // fondo blanco por si el PNG tiene transparencia y vamos a JPEG
-        const hasAlpha = /image\/png|image\/webp/.test(file.type)
+        const hasAlpha = /image\/png|image\/webp/.test(file.type || '')
         if (!hasAlpha) { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height) }
         ctx.drawImage(img, 0, 0, c.width, c.height)
         resolve(c.toDataURL(hasAlpha ? 'image/png' : 'image/jpeg', quality))

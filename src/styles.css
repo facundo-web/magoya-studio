@@ -44,7 +44,7 @@
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
-html, body, #root { height: 100%; }
+html, body, #root { min-height: 100%; }
 body {
   font-family: var(--font-body);
   background: var(--paper-100, #F1EDE7);
@@ -55,7 +55,16 @@ button { font: inherit; cursor: pointer; }
 /* focus accesible: el emerald-500 sobre blanco da 1.6:1 (invisible) → emerald-700 */
 :focus-visible { outline: 2px solid var(--ui-focus); outline-offset: 2px; }
 
-.app { display: flex; flex-direction: column; height: 100vh; }
+/* Dos layouts distintos, a propósito:
+   · scroll  → la página scrollea con el VIEWPORT (home, kit de marca).
+     Antes el contenido vivía dentro de una caja con overflow propio: la
+     rueda del mouse y la barra del navegador no lo movían.
+   · fixed   → alto de pantalla y paneles con scroll propio (editor,
+     revisión). Ahí sí lo querés: el lienzo no se tiene que ir de cuadro. */
+.app { display: flex; flex-direction: column; }
+.app--scroll { min-height: 100vh; }
+.app--fixed { height: 100vh; overflow: hidden; }
+.app--scroll .topbar { position: sticky; top: 0; z-index: 50; }
 
 /* ---------- Topbar ---------- */
 .topbar {
@@ -101,7 +110,7 @@ button { font: inherit; cursor: pointer; }
 
 
 /* ---------- Gallery ---------- */
-.gallery { flex: 1; overflow: auto; padding: 32px; max-width: 1200px; margin: 0 auto; width: 100%; }
+.gallery { flex: 1; padding: 32px; max-width: 1200px; margin: 0 auto; width: 100%; }
 .gallery h1 { font-size: 30px; font-weight: 800; letter-spacing: -.03em; margin-bottom: 4px; }
 .gallery .lead { color: #5C6B61; margin-bottom: 8px; max-width: 60ch; }
 .gallery .lead .mark { background: var(--lime-300); padding: 0 4px; border-radius: 3px; }
@@ -566,7 +575,7 @@ button.obj-row { width: 100%; cursor: pointer; text-align: left; font: inherit; 
    HOME v3 — resuelve UNA cosa: cómo arrancás.
    El formato salió de acá (se cambia en el editor) → home corta.
    ============================================================ */
-.home3 { flex: 1; overflow: auto; width: 100%; max-width: 1120px; margin: 0 auto; padding: 24px 28px 40px; }
+.home3 { width: 100%; max-width: 1120px; margin: 0 auto; padding: 24px 28px 40px; }
 .h3-head { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
 .h3-head h1 { font-size: 26px; font-weight: 800; letter-spacing: -.03em; margin: 0; }
 .h3-fmt { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--ui-fg-3); }
@@ -702,6 +711,11 @@ button.obj-row { width: 100%; cursor: pointer; text-align: left; font: inherit; 
   .h3-head { flex-direction: column; align-items: flex-start; gap: 8px; }
 
   /* ---- editor en una columna + hojas ---- */
+  /* En el teléfono no hay 3 paneles que mantener a la vista: el rail y las
+     hojas son fijos, así que la página scrollea normal. Sin esto el alto
+     fijo recortaba la tira del carrusel y no había forma de llegar. */
+  .app--fixed { height: auto; min-height: 100vh; overflow: visible; }
+  .app--fixed .topbar { position: sticky; top: 0; z-index: 50; }
   .editor { display: block; padding-bottom: 76px; }
   .col-resize { display: none; }
   .stage { width: 100%; }
@@ -773,3 +787,5 @@ button.obj-row { width: 100%; cursor: pointer; text-align: left; font: inherit; 
   padding: 12px 14px 12px 18px; border-radius: var(--r-card); box-shadow: var(--e-3);
   font-size: var(--fs-3); line-height: 1.4; }
 .stale-bar .btn { flex: none; }
+.stale-bar.quota { background: #6E2A28; align-items: flex-start; }
+.stale-bar.quota b { display: block; }

@@ -23,6 +23,16 @@ import { imageSize, getAsset, compressImage, removeBackground } from '../engine/
 import { measure, wrapText } from '../engine/textLayout.js'
 import { exportPiece, exportCarousel } from '../engine/export.js'
 
+// Todo lo que entra como foto se comprime primero. OBJ_MAX es más chico que
+// el fondo a propósito: una foto dentro de un celular se ve a ~1/4 de la
+// pieza, guardarla en 2048px es 4× de peso que nadie va a ver.
+const OBJ_MAX = 1400
+const blobToCompressed = (blob, maxSide = OBJ_MAX) => compressImage(blob, maxSide)
+async function fetchCompressed(url, maxSide = OBJ_MAX) {
+  const blob = await (await fetch(url)).blob()
+  return compressImage(blob, maxSide)
+}
+
 const ROLE_LABELS = {
   kicker: 'Etiqueta',
   title: 'Título',
@@ -735,9 +745,7 @@ function PhotoBody({ content, set, inputRef, onPhotoFile, onToast }) {
   const treatment = content.treatment || 'bw'
   // foto de la biblioteca → dataURL (para que exporte bien) + dims naturales
   const useLibraryPhoto = async (url) => {
-    const res = await fetch(url)
-    const blob = await res.blob()
-    const src = await new Promise((r) => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(blob) })
+    const src = await fetchCompressed(url, 2048)
     const natural = await imageSize(src)
     set({ photo: { src, natural, focal: content.photo?.focal || { x: 0.5, y: 0.5 } } })
   }
@@ -870,7 +878,7 @@ function ObjectsBody({ objects, setObjects, selObj, setSelObj, objRemove, onToas
   }
   const addImage = async (file) => {
     if (!file || !file.type.startsWith('image/')) return onToast('No es una imagen')
-    const src = await new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(file) })
+    const src = await compressImage(file, OBJ_MAX)
     let elementId
     const nice = file.name.replace(/\.[^.]+$/, '')
     if (onAddElement) { const el = onAddElement({ name: nice, src }); elementId = el?.id }
@@ -1026,16 +1034,14 @@ function PhotosBody({ objects, setObjects, setSelObj, elements = [], onAddElemen
   }
   const upload = async (file) => {
     if (!file || !file.type.startsWith('image/')) return onToast('Ese archivo no es una imagen')
-    const src = await compressImage(file)
+    const src = await compressImage(file, OBJ_MAX)
     const nice = file.name.replace(/\.[^.]+$/, '')
     let elementId
     if (onAddElement) elementId = onAddElement({ name: nice, src, kind: 'photo' })?.id
     place(src, elementId, nice)
   }
   const useLib = async (url, label) => {
-    const blob = await (await fetch(url)).blob()
-    const src = await new Promise((r) => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(blob) })
-    place(src, undefined, label)
+    place(await fetchCompressed(url), undefined, label)
   }
 
   return (
@@ -1087,13 +1093,11 @@ function ObjectProps({ o, i, updateObject, objRemove, objBringFront, objSendBack
   }
   const onDevFile = async (file) => {
     if (!file || !file.type.startsWith('image/')) return
-    const src = await new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(file) })
+    const src = await blobToCompressed(file)
     setDevPhoto(src)
   }
   const useLibPhoto = async (url) => {
-    const res = await fetch(url); const blob = await res.blob()
-    const src = await new Promise((r) => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(blob) })
-    setDevPhoto(src)
+    setDevPhoto(await fetchCompressed(url))
   }
   return (
     <>

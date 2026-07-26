@@ -207,10 +207,13 @@ revisión con comentarios anclados, export PNG @3x / ZIP / PDF, y mobile.
 
 - **Sólo probado en Chrome** (desktop y viewport de 375px). No se probó en
   Safari, Firefox ni en un teléfono real.
-- **El guardado local se llena.** Las fotos viajan como data-URL dentro del
-  proyecto; con varias piezas con foto se agota la cuota del navegador. La
-  app **avisa y no miente** (chip rojo + "descargar ahora"), pero la
-  solución de fondo es subir las fotos a la nube — Fase 3.
+- ~~El guardado local se llena.~~ **RESUELTO.** Eran dos cosas: 5 de las 7
+  formas de poner una foto guardaban el archivo **crudo** (una foto de
+  celular de 4 MB se volvía 5,4 MB de texto y llenaba sola la cuota), y todo
+  eso vivía en localStorage (~5 MB para todo el sitio). Ahora toda foto se
+  comprime al entrar y los bytes van a **IndexedDB** (10 GB disponibles acá);
+  en localStorage queda una referencia de 24 caracteres. Medido: una pieza
+  con foto dentro de un celular pasó de llenar la cuota a **1 KB**.
 - La validación de copy es heurística: puede no detectar una mezcla de
   idiomas sutil. Avisa, nunca bloquea.
 - Sin control de concurrencia: si dos personas comentan la misma pieza a la
