@@ -437,6 +437,7 @@ export default function Editor({
   // Un texto seleccionado no se veía seleccionado EN LA PIEZA: cambiaba el
   // panel de la derecha y en el lienzo no pasaba nada, así que no sabías si
   // le habías pegado al título o al subtítulo.
+  const [ctxMenu, setCtxMenu] = useState(null)   // menú de click derecho
   const [textBox, setTextBox] = useState(null)
   useEffect(() => {
     if (!selText || !frameRef.current) { setTextBox(null); return }
@@ -452,7 +453,21 @@ export default function Editor({
   }, [selText, content, format.id, panelW.left, panelW.right])
   const startDrag = (e, i) => {
     e.stopPropagation()
-    setSelObj(i); setSelText(null); dragRef.current.i = i
+    // Alt+click cicla hacia lo que está DEBAJO: si dos objetos se pisan,
+    // sin esto sólo se puede agarrar el de arriba.
+    let idx = i
+    if (e.altKey) {
+      const r = frameRef.current.getBoundingClientRect()
+      const px = (e.clientX - r.left) / r.width, py = (e.clientY - r.top) / r.height
+      const bajo = objects.map((o, k) => [k, objBox(o)])
+        .filter(([, b]) => px * 100 >= b.left && px * 100 <= b.left + b.w && py * 100 >= b.top && py * 100 <= b.top + b.h)
+        .map(([k]) => k)
+      if (bajo.length > 1) {
+        const pos = bajo.indexOf(selObj)
+        idx = bajo[(pos + bajo.length - 1) % bajo.length]   // el siguiente hacia abajo
+      }
+    }
+    setSelObj(idx); setSelText(null); dragRef.current.i = idx
     // sin capturar el puntero, arrastrar rápido hacia el borde soltaba el
     // objeto a mitad de camino (en cualquier editor podés salir y volver)
     try { e.currentTarget.setPointerCapture(e.pointerId) } catch {}
@@ -490,6 +505,7 @@ export default function Editor({
     }
     // cualquier click que no caiga sobre un objeto o un texto DESELECCIONA:
     // sin esto nunca se ve la pieza limpia, siempre queda un marco encima.
+    setCtxMenu(null)
     if (!e.target.closest('.obj-hit') && !e.target.closest('.rs-handle')) { setSelObj(null); setSelText(null) }
   }
   const onStageDown = (e) => {
@@ -703,6 +719,13 @@ export default function Editor({
             onDoubleClick={onFrameDblClick}
             onDragOver={(e) => e.preventDefault()}
             onDrop={onFrameDrop}
+            onContextMenu={(e) => {
+              const hit = e.target.closest && e.target.closest('.obj-hit')
+              if (!hit) return
+              e.preventDefault()
+              const fr = frameRef.current.getBoundingClientRect()
+              setCtxMenu({ x: e.clientX - fr.left, y: e.clientY - fr.top })
+            }}
           >
             <PiecePreview template={template} content={content} format={format} />
             {editing && (
@@ -742,6 +765,15 @@ export default function Editor({
                 </div>
               )
             })}
+            {ctxMenu && selObj != null && (
+              <div className="ctx-menu" style={{ left: ctxMenu.x, top: ctxMenu.y }}
+                onPointerDown={(e) => e.stopPropagation()} onMouseLeave={() => setCtxMenu(null)}>
+                <button onClick={() => { objDuplicate(selObj); setCtxMenu(null) }}><Icon n="copy" size={14} /> Duplicar</button>
+                <button onClick={() => { objBringFront(selObj); setCtxMenu(null) }}><Icon n="up" size={14} /> Subir</button>
+                <button onClick={() => { objSendBack(selObj); setCtxMenu(null) }}><Icon n="down" size={14} /> Bajar</button>
+                <button className="del" onClick={() => { objRemove(selObj); setCtxMenu(null) }}><Icon n="close" size={14} /> Quitar</button>
+              </div>
+            )}
             {textBox && <div className="text-sel" style={{ left: textBox.left, top: textBox.top, width: textBox.width, height: textBox.height }} />}
             {guides.v && <div className="guide-v" />}
             {guides.h && <div className="guide-h" />}
@@ -833,7 +865,7 @@ export default function Editor({
                 <button className="btn" onClick={() => setMockupOpen(false)}>Cerrar</button>
               </div>
             </div>
-            <div className="mk-stage"><MockupPreview template={template} content={content} format={format} mockup={mockup} dark={mkDark} safeZones={mkSafe} /></div>
+            <div className="mk-stage"><MockupPreview template={template} content={content} format={format} mockup={mockup} dark={mkDark} safeZones={mkSafe} slides={slides} /></div>
           </div>
         </div>
       )}

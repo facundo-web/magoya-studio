@@ -49,10 +49,26 @@ function Vecino({ alto, cortadoArriba = false }) {
   )
 }
 
-export default function MockupPreview({ template, content, format, mockup = 'ig', dark = false, safeZones = false }) {
-  const piece = <PiecePreview template={template} content={content} format={format} />
+export default function MockupPreview({ template, content, format, mockup = 'ig', dark = false, safeZones = false, slides = null }) {
+  // Un carrusel se veía como UNA pieza suelta: no se podía revisar cómo
+  // encadena. Acá se pasa slide por slide, con los puntos de Instagram.
+  const carrusel = slides && slides.length > 1
+  const [i, setI] = React.useState(0)
+  const idx = Math.min(i, carrusel ? slides.length - 1 : 0)
+  const act = carrusel ? slides[idx] : { template, content }
+  const piece = <PiecePreview template={act.template} content={act.content} format={format} />
   const ar = `${format.w} / ${format.h}`
   const dk = dark ? ' dark' : ''
+  const nav = carrusel && (
+    <div className="mk-carrusel">
+      <button className="mkc-arrow" disabled={idx === 0} onClick={() => setI(idx - 1)} aria-label="Anterior">‹</button>
+      <span className="mkc-dots">
+        {slides.map((_, k) => <span key={k} className={'mkc-dot' + (k === idx ? ' on' : '')} onClick={() => setI(k)} />)}
+      </span>
+      <button className="mkc-arrow" disabled={idx === slides.length - 1} onClick={() => setI(idx + 1)} aria-label="Siguiente">›</button>
+      <span className="mkc-num">{idx + 1} de {slides.length}</span>
+    </div>
+  )
 
   // ---- STORY / REEL: pantalla completa, acá el marco SÍ suma ----
   if (mockup === 'phone') {
@@ -61,6 +77,11 @@ export default function MockupPreview({ template, content, format, mockup = 'ig'
         <div className="mk-phone">
           <div className="mk-phone-screen">
             <div className="mk-piece" style={{ aspectRatio: ar }}>{piece}</div>
+            {carrusel && (
+              <div className="mk-story-top" style={{ top: 52 }}>
+                {slides.map((_, k) => <span key={k} style={{ background: k === idx ? '#fff' : 'rgba(255,255,255,.45)' }} onClick={() => setI(k)} />)}
+              </div>
+            )}
             {/* zonas que tapa la app, a escala real sobre 1080×1920:
                 arriba 250 px (13%), abajo 340 px (17,7%) */}
             {safeZones && (<><div className="mk-safe top" /><div className="mk-safe bottom" /></>)}
@@ -89,7 +110,11 @@ export default function MockupPreview({ template, content, format, mockup = 'ig'
             <span className="mk-ig-name">magoya</span>
             <span className="mk-dots">···</span>
           </div>
-          <div className="mk-piece" style={{ aspectRatio: ar, width: '100%' }}>{piece}</div>
+          <div className="mk-piece pos" style={{ aspectRatio: ar, width: '100%' }}>
+            {piece}
+            {carrusel && <span className="mk-ig-count">{idx + 1}/{slides.length}</span>}
+          </div>
+          {nav}
           <div className="mk-ig-actions">
             <span>{I.heart}</span><span>{I.comment}</span><span>{I.send}</span><span className="mk-save">{I.save}</span>
           </div>
@@ -119,6 +144,7 @@ export default function MockupPreview({ template, content, format, mockup = 'ig'
           <span className="mk-li-more"> …ver más</span>
         </div>
         <div className="mk-li-media"><div className="mk-piece" style={{ aspectRatio: ar, width: '100%' }}>{piece}</div></div>
+        {nav}
         <div className="mk-li-social"><span className="mk-li-reacts" /> 87 · 12 comentarios</div>
         <div className="mk-li-actions">
           <span>{I.like} Recomendar</span><span>{I.comment} Comentar</span><span>{I.repost} Compartir</span><span>{I.send} Enviar</span>

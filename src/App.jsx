@@ -211,10 +211,26 @@ export default function App() {
   // dependía de que las etiquetas coincidieran entre renders: si fallaba,
   // Deshacer volvía píxel por píxel.
   // ============================================================
+  // El historial guardaba SÓLO las slides. Al meter el cambio de formato
+  // adentro, ⌘Z deshacía el cambio ANTERIOR de contenido y dejaba el
+  // formato cambiado: peor que no cubrirlo. Ahora el paso es el estado
+  // completo de la pieza (slides + formato + si es carrusel).
   const piecesRef = useRef(pieces)          // siempre el estado actual
+  const fmtRef = useRef(formatId)
+  const carRef = useRef(carousel)
+  const snapshot = () => ({ pieces: piecesRef.current, formatId: fmtRef.current, carousel: carRef.current })
+  const restore = (snap) => {
+    if (!snap) return
+    piecesRef.current = snap.pieces; setPieces(snap.pieces)
+    fmtRef.current = snap.formatId; setFormatId(snap.formatId)
+    carRef.current = snap.carousel; setCarousel(snap.carousel)
+    setActive((a) => Math.min(a, snap.pieces.length - 1))
+  }
   const gestureRef = useRef(null)           // { tag, antes } del gesto abierto
   const idleRef = useRef(null)
   useEffect(() => { piecesRef.current = pieces }, [pieces])
+  useEffect(() => { fmtRef.current = formatId }, [formatId])
+  useEffect(() => { carRef.current = carousel }, [carousel])
 
   // Abrir otra pieza tiene que empezar con el historial en cero: si no,
   // ⌘Z te inyecta las slides del proyecto anterior en el que estás.
@@ -230,14 +246,14 @@ export default function App() {
     const g = gestureRef.current
     gestureRef.current = null
     // sólo anota si el gesto cambió algo de verdad
-    if (g && g.antes !== piecesRef.current) pushHistory(g.antes)
+    if (g && g.antes.pieces !== piecesRef.current) pushHistory(g.antes)
   }
 
   function beginGesture(tag) {
     const g = gestureRef.current
     if (g && g.tag === tag) return           // el mismo gesto sigue abierto
     endGesture()                             // cambió de gesto: cerrá el anterior
-    gestureRef.current = { tag, antes: piecesRef.current }
+    gestureRef.current = { tag, antes: snapshot() }
   }
 
   // Escribir no tiene "soltar el mouse": el gesto se cierra tras una pausa.
@@ -261,7 +277,7 @@ export default function App() {
   // texto). Sin tag el cambio es discreto y va derecho al historial.
   function changeContent(next, tag) {
     if (tag) { beginGesture(tag); touchIdle() }
-    else { endGesture(); pushHistory(piecesRef.current) }
+    else { endGesture(); pushHistory(snapshot()) }
     const nextPieces = piecesRef.current.map((p, i) => (i === active ? { ...p, content: next } : p))
     piecesRef.current = nextPieces
     setPieces(nextPieces)
@@ -273,7 +289,7 @@ export default function App() {
   // borrar) es discreta: entra al historial de una.
   function mutatePieces(fn) {
     endGesture()
-    pushHistory(piecesRef.current)
+    pushHistory(snapshot())
     const nextPieces = fn(piecesRef.current)
     piecesRef.current = nextPieces
     setPieces(nextPieces)
@@ -291,22 +307,20 @@ export default function App() {
     endGesture() // si estabas a mitad de un gesto, se cierra antes de volver
     const prev = undoRef.current.pop()
     if (!prev) return
-    redoRef.current.push(piecesRef.current)
-    piecesRef.current = prev
-    setPieces(prev); setDirty(true); setHistTick((t) => t + 1)
+    redoRef.current.push(snapshot())
+    restore(prev); setDirty(true); setHistTick((t) => t + 1)
   }
   function redo() {
     const next = redoRef.current.pop()
     if (!next) return
-    undoRef.current.push(piecesRef.current)
-    piecesRef.current = next
-    setPieces(next); setDirty(true); setHistTick((t) => t + 1)
+    undoRef.current.push(snapshot())
+    restore(next); setDirty(true); setHistTick((t) => t + 1)
   }
   function addSlide(template) {
     // sin plantilla → slide EN BLANCO para componer con bloques
     const tpl = template || BLANK_TEMPLATE
     mutatePieces((ps) => [...ps, { template: tpl, content: freshContent(tpl) }])
-    setCarousel(true)
+    carRef.current = true; setCarousel(true)
     setActive(pieces.length)
     showToast('Slide agregada')
   }
@@ -337,10 +351,16 @@ export default function App() {
     setView('editor')
   }
   function convertToCarousel() {
+    endGesture(); pushHistory(snapshot())
+    carRef.current = true
     setCarousel(true); setDirty(true)
     showToast('Listo: ya es un carrusel. Sumá la slide 2 con el +')
   }
-  function backToSingle() { setCarousel(false); setActive(0); setDirty(true) }
+  function backToSingle() {
+    endGesture(); pushHistory(snapshot())
+    carRef.current = false
+    setCarousel(false); setActive(0); setDirty(true)
+  }
   // C2 · lo que se borra de las bibliotecas también se puede recuperar
   function duplicateSlide() {
     // clona la slide activa (deep) para continuar la historia (ej: chat que sigue)
@@ -352,7 +372,7 @@ export default function App() {
       next.splice(active + 1, 0, { template: src.template, content })
       return next
     })
-    setCarousel(true)
+    carRef.current = true; setCarousel(true)
     setActive((a) => a + 1)
     showToast('Slide duplicada — seguí la historia')
   }
@@ -660,7 +680,7 @@ export default function App() {
           slides={carousel ? pieces : null}
           activeSlide={active}
           onChangeContent={changeContent}
-          onChangeFormat={(f) => { endGesture(); pushHistory(piecesRef.current); setFormatId(f.id); setDirty(true) }}
+          onChangeFormat={(f) => { endGesture(); pushHistory(snapshot()); fmtRef.current = f.id; setFormatId(f.id); setDirty(true) }}
           onSelectSlide={setActive}
           onAddSlide={addSlide}
           onDuplicateSlide={duplicateSlide}

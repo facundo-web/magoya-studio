@@ -297,6 +297,19 @@ Todo el feedback está implementado y verificado en el navegador. Lo medido:
 - El botón de descarga dice **"Slide 3 de 4…"** durante la exportación.
 - La galería muestra 19 plantillas, las de foto con foto de verdad.
 
+### Cierre: los 25 hallazgos de la auditoría, uno por uno
+
+Repaso final contra el código. Quedaban cuatro y ya están:
+
+- **#4** El historial guardaba SÓLO las slides. Al meter el cambio de
+  formato adentro quedó peor: ⌘Z deshacía el cambio anterior de contenido y
+  dejaba el formato cambiado. Ahora el paso es el estado completo (slides +
+  formato + si es carrusel), y convertir/volver de carrusel también entra.
+- **#13b** Alt+click cicla hacia el objeto de abajo cuando dos se pisan.
+- **#14b** Menú de click derecho: Duplicar / Subir / Bajar / Quitar.
+- **Carrusel en el preview**: se veía como una pieza suelta. Ahora se pasa
+  slide por slide con los puntos de Instagram y el contador "3/3".
+
 ### Nueva tabla en Supabase
 
 `verdicts` (share_id, author, verdict ok|changes, created_at) con RLS de

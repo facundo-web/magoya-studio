@@ -916,3 +916,26 @@ button.obj-row { width: 100%; cursor: pointer; text-align: left; font: inherit; 
 .sr-badge + .sr-verdict, .sr-verdict + .sr-badge { margin-left: 6px; }
 .verdict-done { font-size: var(--fs-3); font-weight: 600; color: #6B5320; }
 .verdict-done.ok { color: #06301B; }
+
+/* menú de click derecho sobre un elemento */
+.ctx-menu { position: absolute; z-index: 20; min-width: 168px; background: var(--ui-surface);
+  border: 1px solid var(--ui-line); border-radius: var(--r-box); box-shadow: var(--e-3); padding: 4px; }
+.ctx-menu button { display: flex; align-items: center; gap: 9px; width: 100%; text-align: left;
+  border: 0; background: transparent; padding: 8px 10px; border-radius: var(--r-sm);
+  font-size: var(--fs-3); font-weight: 600; color: var(--ui-fg); }
+.ctx-menu button:hover { background: var(--ui-sunken); }
+.ctx-menu button.del:hover { background: #FDECEC; color: var(--ui-danger); }
+
+/* carrusel dentro del preview: se pasa slide por slide, como en la app */
+.mk-piece.pos { position: relative; }
+.mk-ig-count { position: absolute; top: 12px; right: 12px; background: rgba(0,0,0,.6); color: #fff;
+  font-size: 13px; font-weight: 600; padding: 3px 10px; border-radius: 999px; }
+.mk-carrusel { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 10px 12px 0; }
+.mkc-arrow { border: 0; background: transparent; font-size: 20px; line-height: 1; color: #1C1E21; padding: 0 6px; }
+.mkc-arrow:disabled { opacity: .25; }
+.mkc-dots { display: inline-flex; gap: 5px; }
+.mkc-dot { width: 6px; height: 6px; border-radius: 999px; background: rgba(0,0,0,.18); cursor: pointer; }
+.mkc-dot.on { background: #0095F6; }
+.mkc-num { font-size: 12px; color: var(--ui-fg-3); margin-left: 4px; }
+.mk-feed-stage.dark .mkc-arrow { color: #FAFAFA; }
+.mk-feed-stage.dark .mkc-dot { background: rgba(255,255,255,.25); }
