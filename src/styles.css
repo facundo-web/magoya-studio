@@ -765,3 +765,11 @@ button.obj-row { width: 100%; cursor: pointer; text-align: left; font: inherit; 
 .photo-cta.mini .pc-ic { width: auto; height: auto; }
 /* "Seguir con lo tuyo": expandido pasa a grilla en varias filas */
 .proj-row.wrap { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); overflow: visible; }
+
+/* aviso de versión nueva: los chunks viejos ya no existen en el servidor */
+.stale-bar { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 200;
+  display: flex; align-items: center; gap: 12px; max-width: min(720px, 92vw);
+  background: var(--ink-900,#0D0C0C); color: var(--cream-50,#F6F1EB);
+  padding: 12px 14px 12px 18px; border-radius: var(--r-card); box-shadow: var(--e-3);
+  font-size: var(--fs-3); line-height: 1.4; }
+.stale-bar .btn { flex: none; }

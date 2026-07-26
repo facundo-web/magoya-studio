@@ -39,6 +39,26 @@ export default function App() {
   const [linkToCopy, setLinkToCopy] = useState(null) // fallback si el portapapeles falla
   const [tplName, setTplName] = useState(null)       // C4 · nombre al guardar plantilla
   const [pvSlide, setPvSlide] = useState(0)
+  const [staleBuild, setStaleBuild] = useState(false) // salió una versión nueva
+
+  // Cuando se despliega una versión, los archivos con hash viejo dejan de
+  // existir. Si tenías la pestaña abierta, todo lo que carga bajo demanda
+  // (quitar fondo, ZIP, PDF) falla con un error críptico. Lo detectamos y
+  // decimos lo único útil: recargá.
+  useEffect(() => {
+    const stale = (msg) => /Failed to fetch dynamically imported module|Importing a module script failed|error loading dynamically imported module/i.test(String(msg || ''))
+    const onPreload = () => setStaleBuild(true)
+    const onRej = (e) => { if (stale(e.reason?.message || e.reason)) setStaleBuild(true) }
+    const onErr = (e) => { if (stale(e.message)) setStaleBuild(true) }
+    window.addEventListener('vite:preloadError', onPreload)
+    window.addEventListener('unhandledrejection', onRej)
+    window.addEventListener('error', onErr)
+    return () => {
+      window.removeEventListener('vite:preloadError', onPreload)
+      window.removeEventListener('unhandledrejection', onRej)
+      window.removeEventListener('error', onErr)
+    }
+  }, [])
 
   useEffect(() => {
     if (preview?.shareId) listComments(preview.shareId).then(setComments).catch(() => {})
@@ -587,6 +607,14 @@ export default function App() {
             <p className="panel-help" style={{ margin: '0 0 10px' }}>El navegador no dejó copiarlo solo. Copialo de acá:</p>
             <input className="link-box" readOnly value={linkToCopy} onFocus={(e) => e.target.select()} autoFocus />
           </div>
+        </div>
+      )}
+
+      {staleBuild && (
+        <div className="stale-bar">
+          Salió una versión nueva de Magoya Studio. Recargá para que vuelvan a andar las
+          funciones que cargan al vuelo (quitar fondo, ZIP, PDF). Tu trabajo está guardado.
+          <button className="btn primary" onClick={() => location.reload()}>Recargar</button>
         </div>
       )}
 

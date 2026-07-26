@@ -115,6 +115,8 @@ export function compressImage(file, maxSide = 2048, quality = 0.85) {
 // quita el fondo de una foto (persona/objeto) 100% en el navegador.
 // El modelo (~5MB) se baja la primera vez y queda cacheado.
 export async function removeBackground(dataURL, onProgress) {
+  // si la app se actualizó con la pestaña abierta este import falla; el
+  // aviso global lo detecta y ofrece recargar (ver App.jsx)
   const { removeBackground: rb } = await import('@imgly/background-removal')
   const blob = await (await fetch(dataURL)).blob()
   const out = await rb(blob, {

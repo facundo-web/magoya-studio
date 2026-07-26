@@ -170,7 +170,53 @@ en el plan y afectaban a toda la app):
 - Compartir decía "no se pudo subir" cuando la pieza **sí** se había subido
   y lo único que había fallado era el portapapeles.
 
-## Lo que sigue (ronda de feedback)
+## Auditoría de consistencia (después de cerrar A–G)
+
+Revisión flujo por flujo de la app entera. Encontró **13 inconsistencias
+reales**, todas arregladas y verificadas:
+
+1. Ninguna operación de slide entraba al historial → **borrar una slide no
+   se podía deshacer**. (Pérdida de trabajo.)
+2. Sólo el borrado de proyecto ofrecía "Deshacer"; faltaban plantilla propia
+   y elemento de la biblioteca.
+3. El nombre editable de la pieza se pisaba solo al editar el título.
+4. "Guardar como plantilla" guardaba sin preguntar el nombre (C4 no estaba).
+5. Quedaban ~20 glifos sin migrar a íconos, y el chevron de menú apuntaba
+   hacia el costado.
+6. El rail marcaba mal el panel activo al tocar dos veces el mismo botón.
+7. "Grosor del trazo" aparecía en el isotipo, donde no hace nada.
+8. Toda foto se llamaba "Imagen" en el inspector.
+9. El cartel "Subí una foto" tapaba lo que acababas de colocar.
+10. **11 de 19 proyectos guardados eran inalcanzables**: la home mostraba
+    sólo 8 y no había forma de ver el resto.
+11. El badge de comentarios nuevos quedaba con el número viejo al volver.
+12. El detector de mezcla de idiomas saltaba con textos normales
+    ("el equipo de data", "nuestro insight del mes").
+13. Al desplegar una versión con la pestaña abierta, todo lo que carga bajo
+    demanda (quitar fondo, ZIP, PDF) fallaba con un error críptico. Ahora
+    aparece un aviso claro con botón de recargar.
+
+**Cobertura de la verificación:** 465 combinaciones plantilla × formato ×
+variante renderizadas sin un fallo (21 plantillas, 13 formatos, 11
+variantes). Flujos probados de punta a punta en el navegador: plantilla, en
+blanco, chat, carrusel (agregar / reordenar / borrar / deshacer), variantes,
+cambio de formato, fotos, quitar fondo, compartir (las 3 intenciones),
+revisión con comentarios anclados, export PNG @3x / ZIP / PDF, y mobile.
+
+## Límites conocidos (honestos)
+
+- **Sólo probado en Chrome** (desktop y viewport de 375px). No se probó en
+  Safari, Firefox ni en un teléfono real.
+- **El guardado local se llena.** Las fotos viajan como data-URL dentro del
+  proyecto; con varias piezas con foto se agota la cuota del navegador. La
+  app **avisa y no miente** (chip rojo + "descargar ahora"), pero la
+  solución de fondo es subir las fotos a la nube — Fase 3.
+- La validación de copy es heurística: puede no detectar una mezcla de
+  idiomas sutil. Avisa, nunca bloquea.
+- Sin control de concurrencia: si dos personas comentan la misma pieza a la
+  vez, los comentarios conviven pero no hay aviso en vivo.
+
+## Lo que sigue
 
 Nada del plan original queda pendiente. Los próximos cambios salen de usar
 la herramienta: ahí decidimos qué merece Fase 3.
