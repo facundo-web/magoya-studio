@@ -67,6 +67,20 @@ export const MAXCHARS = {
   metric: 6, metricLabel: 44, quote: 120, author: 32, cta: 28, step: 52,
 }
 
+// K3 · en la galería, TODAS las plantillas con foto se veían como la misma
+// tarjeta gris (el esqueleto de "acá va una foto"). Cada una lleva una foto
+// de demo distinta para que la grilla se pueda mirar en vez de leer.
+// Es sólo para la miniatura: al abrir la pieza la foto la ponés vos.
+import { PHOTOS } from '../brand/photoLibrary.js'
+export function demoContent(t) {
+  const c = placeholderContent(t)
+  if (t.surface !== 'photo' || !PHOTOS.length) return c
+  let h = 0
+  for (const ch of t.id) h = (h * 31 + ch.charCodeAt(0)) >>> 0
+  const p = PHOTOS[h % PHOTOS.length]
+  return { ...c, photo: { src: p.url, natural: null, focal: { x: 0.5, y: 0.5 } } }
+}
+
 // contenido inicial de una plantilla: mantiene el DISEÑO (colores, logo,
 // motivo, objetos) pero reemplaza el copy por placeholders y limpia la foto.
 export function placeholderContent(t) {

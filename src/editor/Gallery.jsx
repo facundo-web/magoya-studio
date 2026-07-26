@@ -1,5 +1,5 @@
 import React, { useRef } from 'react'
-import { TEMPLATES, placeholderContent } from '../templates/index.js'
+import { TEMPLATES, placeholderContent, demoContent } from '../templates/index.js'
 import { FORMATS_BY_ID, FORMATS, formatsByNetwork } from '../formats/registry.js'
 import PiecePreview from './PiecePreview.jsx'
 import Icon from '../ui/Icon.jsx'
@@ -17,7 +17,7 @@ const FILTERS = [
 export default function Gallery({
   galleryFormat, setGalleryFormat, templates = TEMPLATES, onDeleteTemplate,
   onPick, onStartCarousel, onStartBlank, projects, onOpenProject, onImport, onDeleteProject, onDuplicateProject,
-  shares = [], shareCounts = {}, onOpenShare, onCopyShare, onForgetShare,
+  shares = [], shareCounts = {}, shareVerdicts = {}, onOpenShare, onCopyShare, onForgetShare,
 }) {
   const fileRef = useRef(null)
   const [filter, setFilter] = React.useState('all')
@@ -128,6 +128,7 @@ export default function Gallery({
             {(verTodasShares ? shares : shares.slice(0, 6)).map((sh) => {
               const total = shareCounts[sh.id]
               const nuevos = total === undefined ? 0 : Math.max(0, total - (sh.seen || 0))
+              const v = shareVerdicts[sh.id]
               return (
                 <div key={sh.id} className="share-row">
                   <button className="share-open" onClick={() => onOpenShare && onOpenShare(sh)}
@@ -138,6 +139,12 @@ export default function Gallery({
                         : total === 0 ? 'sin comentarios todavía'
                         : `${total} comentario${total === 1 ? '' : 's'}`}
                     </span>
+                    {v && (
+                      <span className={'sr-verdict' + (v.verdict === 'ok' ? ' ok' : '')}
+                        title={`${v.author || 'Alguien'} · ${new Date(v.created_at).toLocaleDateString('es-AR')}`}>
+                        {v.verdict === 'ok' ? 'Aprobada' : 'Pide cambios'}
+                      </span>
+                    )}
                     {nuevos > 0 && <span className="sr-badge" title="Comentarios que todavía no leíste">{nuevos} nuevo{nuevos === 1 ? '' : 's'}</span>}
                   </button>
                   <button className="proj-act" title="Copiar el link" onClick={() => onCopyShare && onCopyShare(sh)}><Icon n="copy" size={13} /></button>
@@ -164,7 +171,7 @@ export default function Gallery({
             <div key={t.id} className="h3-card" role="button" tabIndex={0} onClick={() => onPick(t, fmt)}
               onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onPick(t, fmt)} title={t.purpose}>
               <div className="h3-thumb">
-                <PiecePreview template={t} content={placeholderContent(t)} format={fmt} />
+                <PiecePreview template={t} content={demoContent(t)} format={fmt} />
                 {t.custom && onDeleteTemplate && (
                   <button className="tpl-del" title="Eliminar plantilla" onClick={(e) => { e.stopPropagation(); onDeleteTemplate(t.id) }}><Icon n="close" size={11} /></button>
                 )}

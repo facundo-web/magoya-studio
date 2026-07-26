@@ -1,7 +1,7 @@
 {
   "id": "zocalo-placa",
-  "name": "Zócalo sobre foto (placa)",
-  "purpose": "Ahora es la variante \"Banda\" de Foto + texto.",
+  "name": "Foto con barra de texto abajo",
+  "purpose": "Ahora es la variante \"Texto en barra\" de Foto + texto.",
   "category": "zocalo",
   "surface": "photo",
   "anchor": "bottom-left",

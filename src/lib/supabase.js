@@ -46,3 +46,22 @@ export async function countComments(shareIds) {
   for (const r of data) out[r.share_id] = (out[r.share_id] || 0) + 1
   return out
 }
+
+// ---- veredicto de la revisión (K2) ----
+// "Aprobar" abría WhatsApp y no guardaba nada: el que revisa creía que
+// había terminado y el que espera no se enteraba nunca.
+export async function setVerdict({ share_id, author, verdict }) {
+  const { error } = await supabase.from('verdicts').insert({ share_id, author, verdict })
+  if (error) throw error
+}
+
+export async function getVerdicts(shareIds) {
+  if (!shareIds?.length) return {}
+  const { data, error } = await supabase
+    .from('verdicts').select('share_id, verdict, author, created_at')
+    .in('share_id', shareIds).order('created_at')
+  if (error) throw error
+  const out = {}
+  for (const r of data) out[r.share_id] = r   // el último gana
+  return out
+}

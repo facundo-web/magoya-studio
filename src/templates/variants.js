@@ -20,20 +20,20 @@ function V(id, label, patch) {
 // ---- catálogo genérico: sirve para cualquier plantilla clásica ----
 const COMMON = [
   V('base', 'Original', {}),
-  V('card', 'Tarjeta', { plate: 'card' }),
-  V('band', 'Banda', { plate: 'band' }),
+  V('card', 'Texto en tarjeta', { plate: 'card' }),
+  V('band', 'Texto en barra', { plate: 'band' }),
   V('center', 'Centrado', { anchor: 'center-center', rule: 'none' }),
   V('top', 'Arriba', { anchor: 'top-left' }),
   V('bottom', 'Abajo', { anchor: 'bottom-left' }),
   V('airy', 'Con aire', { density: 'roomy' }),
   V('big', 'Titular grande', { scale: 1.16, density: 'compact' }),
-  V('kickerline', 'Volanta con línea', { rule: 'side' }),
+  V('kickerline', 'Etiqueta con línea', { rule: 'side' }),
 ]
 
 // sobre foto se suman las placas que sólo tienen sentido con imagen
 const PHOTO_EXTRA = [
-  V('scrim', 'Degradé', { plate: 'scrim' }),
-  V('clean', 'Sin placa', { plate: 'none' }),
+  V('scrim', 'Sombreado abajo', { plate: 'scrim' }),
+  V('clean', 'Texto sobre la foto', { plate: 'none' }),
 ]
 
 // Devuelve las variantes de una plantilla. Si el JSON declara `variants`

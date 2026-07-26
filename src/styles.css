@@ -890,3 +890,29 @@ button.obj-row { width: 100%; cursor: pointer; text-align: left; font: inherit; 
 .rot-handle:active { cursor: grabbing; }
 .mk-av.neutro { width: 38px; height: 38px; background: rgba(0,0,0,.10); }
 .mk-feed-stage.dark .mk-av.neutro { background: rgba(255,255,255,.12); }
+.warn-pill { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-2); font-weight: 600;
+  background: #FDF6E7; border: 1px solid #EFE0BE; color: #6B5320; padding: 6px 11px; border-radius: var(--r-pill); }
+
+/* ---- J2 · elegir el logo viéndolo ---- */
+.logo-sw { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
+.lsw { border: 1.5px solid var(--ui-line); border-radius: var(--r-box); padding: 10px 8px; min-height: 46px;
+  display: flex; align-items: center; justify-content: center; background: #fff; cursor: pointer; }
+.lsw img { width: 78%; height: auto; }
+.lsw.auto { background: var(--ui-sunken); font-size: var(--fs-2); font-weight: 600; color: var(--ui-fg-2); }
+.lsw.on { border-color: var(--ui-accent,#00DE68); box-shadow: 0 0 0 2px rgba(0,222,104,.2); }
+.lsw.auto.on { color: var(--ui-fg); }
+
+/* ---- J3 · el color dice cómo se llama (en celular no hay hover) ---- */
+.sw.named { width: auto; height: auto; display: inline-flex; align-items: center; gap: 7px;
+  padding: 5px 11px 5px 6px; border-radius: var(--r-pill); border: 1.5px solid var(--ui-line);
+  background: var(--ui-surface); box-shadow: none; }
+.sw.named .sw-dot { width: 18px; height: 18px; border-radius: 999px; box-shadow: inset 0 0 0 1px rgba(0,0,0,.14); }
+.sw.named .sw-name { font-size: var(--fs-2); font-weight: 600; color: var(--ui-fg); }
+.sw.named.on { border-color: var(--ui-accent,#00DE68); box-shadow: 0 0 0 2px rgba(0,222,104,.18); }
+/* K2 · el veredicto se ve en la lista, no sólo en WhatsApp */
+.sr-verdict { margin-left: auto; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px;
+  background: #FDF6E7; color: #6B5320; border: 1px solid #EFE0BE; }
+.sr-verdict.ok { background: #EEFBF3; color: #06301B; border-color: #B9E9CD; }
+.sr-badge + .sr-verdict, .sr-verdict + .sr-badge { margin-left: 6px; }
+.verdict-done { font-size: var(--fs-3); font-weight: 600; color: #6B5320; }
+.verdict-done.ok { color: #06301B; }

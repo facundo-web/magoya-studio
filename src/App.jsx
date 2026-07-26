@@ -3,7 +3,7 @@ import Gallery from './editor/Gallery.jsx'
 import Editor from './editor/Editor.jsx'
 import BrandKit from './editor/BrandKit.jsx'
 import MockupPreview from './editor/MockupPreview.jsx'
-import { createShare, loadShare, listComments, addComment, countComments } from './lib/supabase.js'
+import { createShare, loadShare, listComments, addComment, countComments, setVerdict, getVerdicts } from './lib/supabase.js'
 import { TEMPLATES, TEMPLATES_BY_ID, BLANK_TEMPLATE, placeholderContent } from './templates/index.js'
 import { FORMATS_BY_ID, CAROUSEL_FORMATS } from './formats/registry.js'
 import {
@@ -38,9 +38,11 @@ export default function App() {
   const [undoDelete, setUndoDelete] = useState(null)
   const [shares, setShares] = useState([])       // D4 · links de revisión propios
   const [shareCounts, setShareCounts] = useState({})
+  const [shareVerdicts, setShareVerdicts] = useState({})   // K2 · aprobada / pide cambios
   const [linkToCopy, setLinkToCopy] = useState(null) // fallback si el portapapeles falla
   const [tplName, setTplName] = useState(null)       // C4 · nombre al guardar plantilla
   const [pvSlide, setPvSlide] = useState(0)
+  const [miVoto, setMiVoto] = useState(null)
   const [staleBuild, setStaleBuild] = useState(false) // salió una versión nueva
 
   // Cuando se despliega una versión, los archivos con hash viejo dejan de
@@ -109,16 +111,20 @@ export default function App() {
   // con el número viejo hasta recargar la página.
   useEffect(() => {
     if (preview || view !== 'gallery' || !shares.length) return
-    countComments(shares.map((s) => s.id)).then(setShareCounts).catch(() => {})
+    const ids = shares.map((s) => s.id)
+    countComments(ids).then(setShareCounts).catch(() => {})
+    getVerdicts(ids).then(setShareVerdicts).catch(() => {})
   }, [view, shares.length, preview])
 
   // Un aviso con botón "Deshacer" necesita tiempo para leerlo Y llegar al
   // botón: 2,2 s no alcanzaba. Y al vencer se limpia la acción, si no el
   // aviso siguiente heredaba un "Deshacer" de algo borrado hace rato.
+  const [toastUndo, setToastUndo] = useState(false)
   const showToast = (msg, conAccion = false) => {
     setToast(msg)
+    setToastUndo(conAccion)
     clearTimeout(window.__mt)
-    window.__mt = setTimeout(() => { setToast(null); setUndoDelete(null) }, conAccion ? 9000 : 2400)
+    window.__mt = setTimeout(() => { setToast(null); setToastUndo(false); setUndoDelete(null) }, conAccion ? 9000 : 2400)
   }
 
   const format = FORMATS_BY_ID[formatId] || FORMATS_BY_ID[DEFAULT_FORMAT]
@@ -363,7 +369,7 @@ export default function App() {
     if (pieces.length <= 1) { showToast('Es la única slide: no se puede borrar'); return }
     mutatePieces((ps) => ps.filter((_, idx) => idx !== i))
     setActive((a) => Math.max(0, a - (i <= a ? 1 : 0)))
-    showToast('Slide borrada — ⌘Z para recuperarla')
+    showToast('Slide borrada', true)
   }
 
   // ---- acciones ----
@@ -499,9 +505,20 @@ export default function App() {
     const multi = pvPieces.length > 1
     const pfmt = FORMATS_BY_ID[preview.formatId] || FORMATS_BY_ID[DEFAULT_FORMAT]
     const exitPreview = () => { setPreview(null); if (location.hash) location.hash = '' }
-    const verdict = (ok) => {
+    // K2 · antes esto sólo abría WhatsApp: el que revisaba creía que había
+    // terminado y el que esperaba no se enteraba nunca. Ahora queda guardado
+    // y se ve en Inicio › Compartidas. Avisar por WhatsApp es opcional.
+    const votar = async (ok) => {
+      if (!preview.shareId) return showToast('Este link es sólo de vista: pedí el link de revisión')
+      try {
+        await setVerdict({ share_id: preview.shareId, author: cAuthor.trim() || 'Anónimo', verdict: ok ? 'ok' : 'changes' })
+        setMiVoto(ok ? 'ok' : 'changes')
+        showToast(ok ? '✓ Aprobada — ya lo ve el equipo' : '✓ Pedido de cambios registrado')
+      } catch (e) { console.error(e); showToast('⚠ No se pudo registrar') }
+    }
+    const avisarWhatsApp = () => {
       const name = preview.name || 'pieza'
-      const msg = (ok ? `✅ Aprobada: "${name}"` : `✏️ Pedido de cambios en "${name}" — mis comentarios: `) + `\n${location.href}`
+      const msg = (miVoto === 'ok' ? `Aprobada: "${name}"` : `Pedido de cambios en "${name}"`) + `\n${location.href}`
       window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank')
     }
     return (
@@ -556,8 +573,20 @@ export default function App() {
             </div>
           )}
           <div className="verdict-row">
-            <button className="btn primary" onClick={() => verdict(true)}>✓ Aprobar (responde por WhatsApp)</button>
-            <button className="btn" onClick={() => verdict(false)}>✏️ Pedir cambios</button>
+            {miVoto ? (
+              <>
+                <span className={'verdict-done' + (miVoto === 'ok' ? ' ok' : '')}>
+                  {miVoto === 'ok' ? '✓ La aprobaste' : 'Pediste cambios'} — el equipo ya lo ve
+                </span>
+                <button className="btn" onClick={avisarWhatsApp}>Avisar por WhatsApp</button>
+                <button className="btn" onClick={() => setMiVoto(null)}>Cambiar</button>
+              </>
+            ) : (
+              <>
+                <button className="btn primary" onClick={() => votar(true)}>Aprobar</button>
+                <button className="btn" onClick={() => votar(false)}>Pedir cambios</button>
+              </>
+            )}
           </div>
           {!preview.shareId && <p className="preview-note">Así se ve publicada. La foto no viaja en este link — usá "Compartir para revisión" para verla completa.</p>}
         </div>
@@ -618,6 +647,7 @@ export default function App() {
           onImport={importFile}
           shares={shares}
           shareCounts={shareCounts}
+          shareVerdicts={shareVerdicts}
           onOpenShare={openShare}
           onCopyShare={copyShareLink}
           onForgetShare={removeShare}
@@ -704,13 +734,19 @@ export default function App() {
       {toast && (
         <div className="toast">
           {toast}
-          {undoDelete && (
+          {/* Una sola regla: TODO lo que se borra ofrece Deshacer acá mismo.
+              Si no hay nada guardado aparte (un objeto, una slide), el botón
+              usa el historial normal. */}
+          {(undoDelete || toastUndo) && (
             <button className="toast-act" onClick={() => {
-              const { kind, data } = undoDelete
-              if (data && kind === 'project') setProjects(upsertProject(data))
-              if (data && kind === 'template') { saveCustomTemplate(data); setCustomTemplates(loadCustomTemplates()) }
-              if (data && kind === 'element') { addElement({ name: data.name, src: data.src, kind: data.kind }); setElements(loadElements()) }
-              setUndoDelete(null); showToast('Restaurado')
+              if (undoDelete) {
+                const { kind, data } = undoDelete
+                if (data && kind === 'project') setProjects(upsertProject(data))
+                if (data && kind === 'template') { saveCustomTemplate(data); setCustomTemplates(loadCustomTemplates()) }
+                if (data && kind === 'element') { addElement({ name: data.name, src: data.src, kind: data.kind }); setElements(loadElements()) }
+                setUndoDelete(null)
+              } else { undo() }
+              setToastUndo(false); showToast('Listo, lo recuperamos')
             }}>Deshacer</button>
           )}
         </div>

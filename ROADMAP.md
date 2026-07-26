@@ -242,7 +242,7 @@ herramientas reales, y una auditoría de usabilidad de toda la app.
   captura de puntero al arrastrar, marco del texto seleccionado, un solo
   control de capas, el formato en la barra del lienzo).
 
-## 🔵 BLOQUE H — El lienzo se maneja solo
+## ✅ BLOQUE H (HECHO) — El lienzo se maneja solo
 
 - **H1 Zoom** (50 / 100 / Ajustar + ⌘scroll). Hoy una story 1080×1920 en una
   notebook entra al ~35% y ajustar el borde de un recorte es imposible: la
@@ -252,7 +252,7 @@ herramientas reales, y una auditoría de usabilidad de toda la app.
 - **H3 Escape cancela** la edición de texto (hoy ya escribió) y Enter hace
   lo mismo en el lienzo y en el panel. **S**
 
-## 🔵 BLOQUE I — Una sola forma de hacer cada cosa
+## ✅ BLOQUE I (HECHO) — Una sola forma de hacer cada cosa
 
 - **I1 Fondo + Fotos son un solo panel.** Hoy los dos muestran la MISMA
   biblioteca con dos resultados distintos: en uno la foto es el fondo, en el
@@ -265,7 +265,7 @@ herramientas reales, y una auditoría de usabilidad de toda la app.
 - **I4 Carrusel + formato incompatible**: hoy podés quedar con 5 slides en
   formato "Miniatura de YouTube" y nadie avisa. **S**
 
-## 🔵 BLOQUE J — Las palabras del equipo, no las del diseñador
+## ✅ BLOQUE J (HECHO) — Las palabras del equipo, no las del diseñador
 
 - **J1** volanta→etiqueta (¡el mismo campo tiene dos nombres!), placa,
   scrim/degradé, "clima", tratamiento, app-icon, glow, opacidad, esquema de
@@ -275,7 +275,7 @@ herramientas reales, y una auditoría de usabilidad de toda la app.
 - **J3 Nombres de color visibles**, no sólo en el tooltip (en celular no hay
   hover: son puntitos anónimos). **S**
 
-## 🔵 BLOQUE K — Que el estado sea visible
+## ✅ BLOQUE K (HECHO) — Que el estado sea visible
 
 - **K1 Progreso real al exportar** un carrusel: hoy el aviso se va a los
   2,2 s y un ZIP de 8 slides tarda mucho más; parece colgado. **M**
@@ -283,3 +283,21 @@ herramientas reales, y una auditoría de usabilidad de toda la app.
   que revisa cree que terminó y el que espera no se entera. **M**
 - **K3 Miniaturas de galería con foto** — hoy todas las plantillas con foto
   se ven como la misma tarjeta gris. **S**
+
+
+---
+
+## Estado: H, I, J y K completos
+
+Todo el feedback está implementado y verificado en el navegador. Lo medido:
+
+- El resize mantiene la esquina opuesta **exacta** mientras el objeto crece.
+- Un gesto = **un** paso de deshacer (245→315 px con un solo ⌘Z de vuelta).
+- Aprobar queda guardado en Supabase y se ve como **"Aprobada"** en Inicio.
+- El botón de descarga dice **"Slide 3 de 4…"** durante la exportación.
+- La galería muestra 19 plantillas, las de foto con foto de verdad.
+
+### Nueva tabla en Supabase
+
+`verdicts` (share_id, author, verdict ok|changes, created_at) con RLS de
+lectura e inserción anónimas, igual que `comments`.

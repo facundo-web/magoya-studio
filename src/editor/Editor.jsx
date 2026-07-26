@@ -233,6 +233,9 @@ export default function Editor({
 
   const isCarousel = slides && slides.length > 0
   const canCarousel = CAROUSEL_FORMATS.includes(format.id)
+  // podías quedar con 5 slides en formato "Miniatura de YouTube" y nadie
+  // avisaba: se exportaba un ZIP de 5 miniaturas sin sentido
+  const carruselIncompatible = isCarousel && slides.length > 1 && !canCarousel
 
   // `tag` = nombre de la interacción en curso; agrupa todo el gesto en un
   // solo paso de deshacer (ver changeContent en App.jsx).
@@ -240,7 +243,12 @@ export default function Editor({
   const objects = content.objects || []
   const setObjects = (next, tag) => set({ objects: next }, tag)
   const updateObject = (i, patch, tag) => setObjects(objects.map((o, idx) => (idx === i ? { ...o, ...patch } : o)), tag)
-  const objRemove = (i) => { setObjects(objects.filter((_, idx) => idx !== i)); setSelObj(null) }
+  const objRemove = (i) => {
+    const nombre = objectName(objects[i], ICONS_BY_ID[objects[i]?.iconId || objects[i]?.deviceId])
+    setObjects(objects.filter((_, idx) => idx !== i)); setSelObj(null)
+    // misma regla para TODO lo que se borra: aviso con Deshacer
+    onToast('Se quitó «' + nombre + '»', true)
+  }
   const objDuplicate = (i) => {
     const o = objects[i]
     if (!o) return
@@ -534,7 +542,6 @@ export default function Editor({
         {[
           ['style', 'grid', 'Estilo'],
           ['text', 'text', 'Texto'],
-          ['bg', 'layers', 'Fondo'],
           ['photos', 'photo', 'Fotos'],
           ['elements', 'sparkle', 'Elementos'],
           ['brand', 'brand', 'Marca'],
@@ -598,32 +605,16 @@ export default function Editor({
           )
         )}
 
-        {panel === 'bg' && (
-          template.freeform ? (
-            <>
-              <div className="panel-title">Fondo</div>
-              <BgBody content={content} set={set} inputRef={photoInputRef} onPhotoFile={onPhotoFile} onToast={onToast} />
-            </>
-          ) : template.surface === 'photo' ? (
-            <>
-              <div className="panel-title">Foto de fondo</div>
-              <p className="panel-help">Subí una foto o elegí de la biblioteca. Sale en B&N (regla de marca).</p>
-              <PhotoBody content={content} set={set} inputRef={photoInputRef} onPhotoFile={onPhotoFile} onToast={onToast} />
-            </>
-          ) : (
-            <>
-              <div className="panel-title">Fondo</div>
-              <p className="panel-help">Esta plantilla usa un color de marca como fondo.</p>
-              <BrandBody content={content} template={template} set={set} onlyColors />
-            </>
-          )
-        )}
-
         {panel === 'photos' && (
           <>
             <div className="panel-title">Fotos</div>
-            <p className="panel-help">Poné una foto sobre la pieza. Podés quitarle el fondo para recortar la persona u objeto.</p>
-            <PhotosBody objects={objects} setObjects={setObjects} setSelObj={setSelObj}
+            {/* Antes había DOS paneles con la misma biblioteca y dos
+                resultados distintos (fondo vs objeto encima): había que
+                aprender la distinción para saber a cuál entrar. Ahora es
+                uno solo y la pregunta se hace en el momento. */}
+            <FotosBody content={content} template={template} set={set}
+              inputRef={photoInputRef} onPhotoFile={onPhotoFile}
+              objects={objects} setObjects={setObjects} setSelObj={setSelObj}
               elements={elements} onAddElement={onAddElement} onDeleteElement={onDeleteElement} onToast={onToast} />
           </>
         )}
@@ -642,7 +633,7 @@ export default function Editor({
         {panel === 'brand' && (
           <>
             <div className="panel-title">Marca</div>
-            {template.freeform ? <LogoBody content={content} template={template} set={set} /> : <BrandBody content={content} template={template} set={set} />}
+            <BrandBody content={content} template={template} set={set} soloLogo={template.freeform && (content.bg || 'color') === 'photo'} />
           </>
         )}
 
@@ -654,9 +645,9 @@ export default function Editor({
             <div className="panel-title" style={{ marginTop: 16 }}>Tono de la pieza</div>
             <GradientBody content={content} set={set} />
             <div className="panel-title" style={{ marginTop: 16 }}>Efectos de la pieza</div>
-            <Ctl label="Viñeta (oscurece bordes)" value={Math.round((content.vignette ?? 0) * 100)} min={0} max={80} onChange={(v) => set({ vignette: v / 100 })} />
-            <Ctl label="Oscurecer la foto" value={Math.round((content.photoDim ?? 0) * 100)} min={0} max={70} onChange={(v) => set({ photoDim: v / 100 })} />
-            <Ctl label="Desenfocar la foto" value={Math.round(content.photoBlur ?? 0)} min={0} max={30} onChange={(v) => set({ photoBlur: v })} />
+            <Ctl label="Oscurecer los bordes" value={Math.round((content.vignette ?? 0) * 100)} min={0} max={80} onChange={(v) => set({ vignette: v / 100 })} />
+            <Ctl label="Oscurecer el fondo" value={Math.round((content.photoDim ?? 0) * 100)} min={0} max={70} onChange={(v) => set({ photoDim: v / 100 })} />
+            <Ctl label="Desenfocar el fondo" value={Math.round(content.photoBlur ?? 0)} min={0} max={30} onChange={(v) => set({ photoBlur: v })} />
           </>
         )}
       </div>
@@ -677,6 +668,11 @@ export default function Editor({
           <label className="safe-toggle"><input type="checkbox" checked={showSafe} onChange={(e) => setShowSafe(e.target.checked)} /> Ver zona segura</label>
           <div style={{ flex: 1 }} />
           {canCarousel && !isCarousel && <button className="btn" onClick={onConvertToCarousel}>+ Convertir en carrusel</button>}
+          {carruselIncompatible && (
+            <span className="warn-pill" title="Instagram y LinkedIn aceptan carrusel en cuadrado y 4:5">
+              Este tamaño no admite carrusel: se publica sólo la slide 1
+            </span>
+          )}
           {isCarousel && (
             <span className="mode-pill"><Icon n="grid" size={14} /> Carrusel · {slides.length} {slides.length === 1 ? 'slide' : 'slides'}
               {slides.length === 1 && onBackToSingle && <button className="linklike" onClick={onBackToSingle}>Volver a pieza simple</button>}
@@ -761,7 +757,7 @@ export default function Editor({
               // Y lleva al panel Fondo, que es donde vive la foto de FONDO
               // — no al file picker, así también podés usar la biblioteca.
               <button className={'photo-cta' + (objects.length ? ' mini' : '')}
-                onClick={() => { setPanel('bg'); setSheet(true) }}>
+                onClick={() => { setPanel('photos'); setSheet(true) }}>
                 <span className="pc-ic"><Icon n="plus" size={objects.length ? 14 : 20} /></span>
                 <span>{objects.length ? 'Falta la foto de fondo' : 'Elegí la foto de fondo para empezar'}</span>
               </button>
@@ -849,7 +845,7 @@ export default function Editor({
         {selObj != null && objects[selObj] ? (
           <>
             <div className="insp-kicker">Propiedades del elemento</div>
-            <ObjectProps o={objects[selObj]} i={selObj} updateObject={updateObject} objRemove={objRemove} objBringFront={objBringFront} objSendBack={objSendBack} onToast={onToast} goToBg={() => setPanel('bg')} />
+            <ObjectProps o={objects[selObj]} i={selObj} updateObject={updateObject} objRemove={objRemove} objBringFront={objBringFront} objSendBack={objSendBack} onToast={onToast} goToBg={() => setPanel('photos')} />
           </>
         ) : selText ? (
           <>
@@ -921,57 +917,126 @@ function CopySummary({ content }) {
   )
 }
 
-/* ---------------- Photo ---------------- */
-function PhotoBody({ content, set, inputRef, onPhotoFile, onToast }) {
-  const photo = content.photo
-  const treatment = content.treatment || 'bw'
-  // foto de la biblioteca → dataURL (para que exporte bien) + dims naturales
-  const useLibraryPhoto = async (url) => {
-    const src = await fetchCompressed(url, 2048)
+// J2 · el logo se elige VIÉNDOLO sobre su fondo, no deduciendo cuál
+// contrasta a partir de una lista de texto. "Automático" es el default:
+// es la regla de marca que menos debería depender del criterio de cada uno.
+// cada versión se muestra sobre el fondo donde SÍ funciona: si la ponés
+// sobre el fondo actual, la negra sobre oscuro se ve como un cuadrado vacío
+const FONDO_LOGO = { cream: '#20302A', green: '#0D0C0C', black: '#F6F1EB', deep: '#F6F1EB' }
+function LogoSwatches({ content, template, set, logo }) {
+  const auto = !content.logo
+  return (
+    <div className="logo-sw">
+      <button className={'lsw auto' + (auto ? ' on' : '')} onClick={() => set({ logo: null })} title="Elige solo el que contrasta con el fondo">
+        <span>Automático</span>
+      </button>
+      {Object.entries(WORDMARKS).map(([k, w]) => (
+        <button key={k} className={'lsw' + (!auto && logo === k ? ' on' : '')} title={w.label}
+          style={{ background: FONDO_LOGO[k] || '#20302A' }} onClick={() => set({ logo: k })}>
+          <img src={getAsset(w.url) || w.url} alt={w.label} />
+        </button>
+      ))}
+    </div>
+  )
+}
+
+/* ---------------- I1 · Fotos: un solo panel ----------------
+   "Poner una foto" es UNA intención. La app no puede pedir que primero
+   entiendas la diferencia entre fondo y objeto para elegir el panel: la
+   pregunta se hace al elegir la foto, con el default correcto según la
+   plantilla. */
+function FotosBody({ content, template, set, inputRef, onPhotoFile, objects, setObjects, setSelObj, elements, onAddElement, onDeleteElement, onToast }) {
+  const admiteFondo = template.surface === 'photo' || template.freeform
+  const [destino, setDestino] = useState(admiteFondo ? 'fondo' : 'encima')
+  const misFotos = (elements || []).filter((e) => e.kind === 'photo')
+
+  const ponerFondo = async (src) => {
     const natural = await imageSize(src)
-    set({ photo: { src, natural, focal: content.photo?.focal || { x: 0.5, y: 0.5 } } })
+    set({ bg: 'photo', photo: { src, natural, focal: content.photo?.focal || { x: 0.5, y: 0.5 } } })
   }
+  const ponerEncima = async (src, elementId, label) => {
+    const natural = await imageSize(src)
+    setObjects([...objects, enCascada(objects, { kind: 'image', src, elementId, label, natural, x: 0.5, y: 0.5, scale: 0.5, rotation: 0, shadow: false, opacity: 1 })])
+    setSelObj(objects.length)
+  }
+  const usar = (src, elementId, label) => (destino === 'fondo' && admiteFondo ? ponerFondo(src) : ponerEncima(src, elementId, label))
+  const subir = async (file) => {
+    if (!file || !file.type.startsWith('image/')) return onToast('Ese archivo no es una imagen')
+    const src = await compressImage(file, destino === 'fondo' ? 2048 : OBJ_MAX)
+    const nice = file.name.replace(/\.[^.]+$/, '')
+    let elementId
+    if (onAddElement) elementId = onAddElement({ name: nice, src, kind: 'photo' })?.id
+    usar(src, elementId, nice)
+  }
+
   return (
     <>
-      <div className={'dropzone' + (photo?.src ? ' has' : '')}
-        onClick={() => inputRef.current?.click()}
+      {admiteFondo && (
+        <div className="field">
+          <label>¿Dónde va la foto?</label>
+          <div className="chips">
+            <button className={'chip' + (destino === 'fondo' ? ' on' : '')} onClick={() => setDestino('fondo')}>De fondo</button>
+            <button className={'chip' + (destino === 'encima' ? ' on' : '')} onClick={() => setDestino('encima')}>Encima de la pieza</button>
+          </div>
+        </div>
+      )}
+      <div className="dropzone" onClick={() => inputRef.current?.click()}
         onDragOver={(e) => e.preventDefault()}
-        onDrop={(e) => { e.preventDefault(); e.dataTransfer.files[0] && onPhotoFile(e.dataTransfer.files[0]) }}>
-        {photo?.src ? '✓ Foto cargada — click para cambiar' : 'Arrastrá una foto o hacé click'}
+        onDrop={(e) => { e.preventDefault(); e.dataTransfer.files[0] && subir(e.dataTransfer.files[0]) }}>
+        Subí una foto o arrastrala acá
       </div>
-      <input ref={inputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => e.target.files[0] && onPhotoFile(e.target.files[0])} />
+      <input ref={inputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => e.target.files[0] && subir(e.target.files[0])} />
 
-      <label style={{ fontSize: 11, color: '#4A554D', marginTop: 10, display: 'block' }}>Biblioteca Magoya</label>
+      {misFotos.length > 0 && (
+        <>
+          <label style={{ marginTop: 12 }}>Mis fotos</label>
+          <div className="photo-lib">
+            {misFotos.map((el) => (
+              <div key={el.id} className="photo-lib-item wrap" title={el.name}>
+                <img src={el.src} alt={el.name} onClick={() => usar(el.src, el.id, el.name)} />
+                <button className="el-del" title="Quitar de mis fotos" onClick={(e) => { e.stopPropagation(); onDeleteElement && onDeleteElement(el.id) }}><Icon n="close" size={11} /></button>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      <label style={{ marginTop: 12 }}>Biblioteca Magoya</label>
       <div className="photo-lib">
         {PHOTOS.map((p) => (
-          <button key={p.slug} className="photo-lib-item" title={p.label} onClick={() => useLibraryPhoto(p.url)}>
+          <button key={p.slug} className="photo-lib-item" title={p.label}
+            onClick={async () => usar(await fetchCompressed(p.url, destino === 'fondo' ? 2048 : OBJ_MAX), undefined, p.label)}>
             <img src={p.url} alt={p.label} loading="lazy" />
           </button>
         ))}
       </div>
 
-      <div className="field" style={{ marginTop: 12 }}>
-        <label>Tratamiento</label>
-        <div className="chips">
-          <button className={'chip' + (treatment === 'bw' ? ' on' : '')} onClick={() => set({ treatment: 'bw' })}>B&N (marca)</button>
-          <button className={'chip' + (treatment === 'color' ? ' on' : '')} onClick={() => set({ treatment: 'color' })}>Color</button>
-        </div>
-      </div>
-      {photo?.src && <CutoutButton src={photo.src} onDone={(src, natural) => set({ photo: { ...photo, src, natural } })} onToast={onToast} />}
-
-      {photo?.src && (
+      {/* ajustes de la foto de FONDO, sólo si hay una puesta */}
+      {content.photo?.src && admiteFondo && (
         <>
-          <div className="field"><label>Encuadre horizontal</label>
-            <input className="range" type="range" min="0" max="1" step="0.01" value={photo.focal?.x ?? 0.5}
-              onChange={(e) => set({ photo: { ...photo, focal: { ...photo.focal, x: +e.target.value } } })} /></div>
-          <div className="field"><label>Encuadre vertical</label>
-            <input className="range" type="range" min="0" max="1" step="0.01" value={photo.focal?.y ?? 0.5}
-              onChange={(e) => set({ photo: { ...photo, focal: { ...photo.focal, y: +e.target.value } } })} /></div>
+          <div className="panel-title" style={{ marginTop: 18 }}>La foto de fondo</div>
+          <div className="field">
+            <label>Color de la foto</label>
+            <div className="chips">
+              <button className={'chip' + ((content.treatment || 'bw') === 'bw' ? ' on' : '')} onClick={() => set({ treatment: 'bw' })}>Blanco y negro</button>
+              <button className={'chip' + (content.treatment === 'color' ? ' on' : '')} onClick={() => set({ treatment: 'color' })}>Color</button>
+            </div>
+          </div>
+          <label>Encuadre (arrastrá el punto)</label>
+          <Pad2D x={content.photo.focal?.x ?? 0.5} y={content.photo.focal?.y ?? 0.5}
+            onChange={(f) => set({ photo: { ...content.photo, focal: f } })} />
+          <CutoutButton src={content.photo.src} onToast={onToast}
+            onDone={(src, natural) => set({ photo: { ...content.photo, src, natural } })} />
         </>
+      )}
+      {admiteFondo && content.photo?.src && (
+        <button className="btn" style={{ marginTop: 10 }} onClick={() => set({ photo: null, bg: 'color' })}>Sacar la foto de fondo</button>
       )}
     </>
   )
 }
+
+/* ---------------- Photo ---------------- */
 
 /* ---------------- Quitar fondo (recorte IA, 100% en el navegador) ------------- */
 function CutoutButton({ src, onDone, onToast }) {
@@ -1318,8 +1383,8 @@ function ObjectProps({ o, i, updateObject, objRemove, objBringFront, objSendBack
       )}
       {o.kind === 'icon' && !isMark && (
         <div className="chips" style={{ marginBottom: 8 }}>
-          <button className={'chip' + (o.style !== 'plain' ? ' on' : '')} onClick={() => updateObject(i, { style: 'tile' })}>Con fondo (app-icon)</button>
-          <button className={'chip' + (o.style === 'plain' ? ' on' : '')} onClick={() => updateObject(i, { style: 'plain' })}>Sin fondo</button>
+          <button className={'chip' + (o.style !== 'plain' ? ' on' : '')} onClick={() => updateObject(i, { style: 'tile' })}>En cuadradito</button>
+          <button className={'chip' + (o.style === 'plain' ? ' on' : '')} onClick={() => updateObject(i, { style: 'plain' })}>Suelto</button>
         </div>
       )}
       {o.kind === 'image' && o.src && (
@@ -1340,9 +1405,9 @@ function ObjectProps({ o, i, updateObject, objRemove, objBringFront, objSendBack
       )}
       {o.kind === 'image' && !o.frame && (
         <>
-          <label>Efecto (para recortes)</label>
+          <label>Efecto (para fotos con el fondo quitado)</label>
           <div className="chips" style={{ marginBottom: 8 }}>
-            {[['none', 'Ninguno'], ['outline', 'Contorno'], ['glow', 'Glow'], ['hard', 'Sombra dura']].map(([k, l]) => (
+            {[['none', 'Ninguno'], ['outline', 'Contorno blanco'], ['glow', 'Resplandor'], ['hard', 'Sombra recortada']].map(([k, l]) => (
               <button key={k} className={'chip' + ((o.fx || 'none') === k ? ' on' : '')}
                 onClick={() => updateObject(i, { fx: k === 'none' ? null : k })}>{l}</button>
             ))}
@@ -1360,8 +1425,8 @@ function ObjectProps({ o, i, updateObject, objRemove, objBringFront, objSendBack
       {o.kind === 'image' && (
         <>
           <div className="chips" style={{ marginBottom: 8, marginTop: 8 }}>
-            <button className={'chip' + (!o.frame ? ' on' : '')} onClick={() => updateObject(i, { frame: false })}>Imagen libre</button>
-            <button className={'chip' + (o.frame ? ' on' : '')} onClick={() => updateObject(i, { frame: true, ratio: o.ratio || 0.62 })} title="Recortá la imagen en un marco, ej: dentro de una pantalla">Recorte / pantalla</button>
+            <button className={'chip' + (!o.frame ? ' on' : '')} onClick={() => updateObject(i, { frame: false })}>Foto entera</button>
+            <button className={'chip' + (o.frame ? ' on' : '')} onClick={() => updateObject(i, { frame: true, ratio: o.ratio || 0.62 })} title="Recortá la imagen en un marco, ej: dentro de una pantalla">Foto en un marco</button>
           </div>
           {o.frame && (
             <>
@@ -1456,7 +1521,9 @@ function ObjectProps({ o, i, updateObject, objRemove, objBringFront, objSendBack
         <button className={'chip' + (o.flipX ? ' on' : '')} onClick={() => updateObject(i, { flipX: !o.flipX })} title="Espeja el elemento (útil para que una flecha apunte al otro lado)"><Icon n="flipH" size={14} /> Horizontal</button>
         <button className="chip" onClick={() => updateObject(i, { rotation: ((o.rotation || 0) + 180) % 360 > 180 ? ((o.rotation || 0) + 180) - 360 : (o.rotation || 0) + 180 })} title="Gira 180°"><Icon n="flipV" size={14} /> Vertical</button>
       </div>
-      <Ctl label="Opacidad" value={Math.round((o.opacity ?? 1) * 100)} min={10} max={100} step={5} suffix="%" onChange={(v) => updateObject(i, { opacity: v / 100 }, 'op')} />
+      {/* la gente piensa en "cuánto se transparenta", no en "cuánta opacidad" */}
+      <Ctl label="Transparencia" value={Math.round((1 - (o.opacity ?? 1)) * 100)} min={0} max={90} step={5} suffix="%"
+        onChange={(v) => updateObject(i, { opacity: 1 - v / 100 }, 'op')} />
       <label>Sombra</label>
       <div className="chips">
         <button className={'chip' + (o.shadow !== false ? ' on' : '')} onClick={() => updateObject(i, { shadow: true })}>Con sombra</button>
@@ -1488,24 +1555,27 @@ function objectName(o, icon) {
 }
 
 /* ---------------- Brand ---------------- */
-function BrandBody({ content, template, set, onlyColors = false }) {
+function BrandBody({ content, template, set, onlyColors = false, soloLogo = false }) {
   const scheme = content.scheme || template.defaults?.scheme || 'deep'
   const accent = content.accent || template.defaults?.accent || 'emerald'
   const logo = content.logo || template.defaults?.logo || 'cream'
+  // en las piezas en blanco con fondo de color, el color vive acá (los
+  // colores son marca); antes estaba en un panel "Fondo" aparte
+  if (soloLogo) return <LogoBody content={content} template={template} set={set} />
   if (onlyColors) {
     return (
       <>
         <div className="field"><label>Color de fondo</label>
           <div className="swatches">
             {Object.entries(COLOR_SCHEMES).map(([k, s]) => (
-              <button key={k} className={'sw' + (scheme === k ? ' on' : '')} title={s.label} style={{ background: s.surface }} onClick={() => set({ scheme: k })} />
+              <button key={k} className={'sw named' + (scheme === k ? ' on' : '')} onClick={() => set({ scheme: k })}><span className="sw-dot" style={{ background: s.surface }} /><span className="sw-name">{s.label}</span></button>
             ))}
           </div>
         </div>
-        <div className="field"><label>Acento</label>
+        <div className="field"><label>Color de acento</label>
           <div className="swatches">
             {Object.entries(ACCENTS).map(([k, a]) => (
-              <button key={k} className={'sw' + (accent === k ? ' on' : '')} title={a.label} style={{ background: a.value }} onClick={() => set({ accent: k })} />
+              <button key={k} className={'sw named' + (accent === k ? ' on' : '')} onClick={() => set({ accent: k })}><span className="sw-dot" style={{ background: a.value }} /><span className="sw-name">{a.label}</span></button>
             ))}
           </div>
         </div>
@@ -1514,21 +1584,24 @@ function BrandBody({ content, template, set, onlyColors = false }) {
   }
   return (
     <>
-      <div className="field"><label>Esquema de color</label>
+      <div className="field"><label>Color de fondo</label>
         <div className="swatches">
           {Object.entries(COLOR_SCHEMES).map(([k, s]) => (
-            <button key={k} className={'sw' + (scheme === k ? ' on' : '')} title={s.label} style={{ background: s.surface }} onClick={() => set({ scheme: k })} />
+            <button key={k} className={'sw named' + (scheme === k ? ' on' : '')} onClick={() => set({ scheme: k })}><span className="sw-dot" style={{ background: s.surface }} /><span className="sw-name">{s.label}</span></button>
           ))}
         </div>
       </div>
-      <div className="field"><label>Acento</label>
+      <div className="field"><label>Color de acento</label>
         <div className="swatches">
           {Object.entries(ACCENTS).map(([k, a]) => (
-            <button key={k} className={'sw' + (accent === k ? ' on' : '')} title={a.label} style={{ background: a.value }} onClick={() => set({ accent: k })} />
+            <button key={k} className={'sw named' + (accent === k ? ' on' : '')} onClick={() => set({ accent: k })}><span className="sw-dot" style={{ background: a.value }} /><span className="sw-name">{a.label}</span></button>
           ))}
         </div>
       </div>
       <div className="field"><label>Logo Magoya</label>
+        <LogoSwatches content={content} template={template} set={set} logo={logo} />
+      </div>
+      <div className="field" style={{ display: 'none' }}>
         <select value={logo} onChange={(e) => set({ logo: e.target.value })}>
           {Object.entries(WORDMARKS).map(([k, w]) => (<option key={k} value={k}>{w.label}</option>))}
         </select>
@@ -1571,37 +1644,6 @@ const TEXT_STYLE_OPTS = [
   { k: 'cta', label: 'Botón / CTA' },
 ]
 
-function BgBody({ content, set, inputRef, onPhotoFile, onToast }) {
-  const bg = content.bg || 'color'
-  const scheme = content.scheme || 'ink'
-  const accent = content.accent || 'emerald'
-  return (
-    <>
-      <div className="chips" style={{ marginBottom: 10 }}>
-        <button className={'chip' + (bg === 'color' ? ' on' : '')} onClick={() => set({ bg: 'color' })}>Color</button>
-        <button className={'chip' + (bg === 'photo' ? ' on' : '')} onClick={() => set({ bg: 'photo' })}>Foto</button>
-      </div>
-      {bg === 'color' ? (
-        <div className="field"><label>Color de fondo</label>
-          <div className="swatches">
-            {Object.entries(COLOR_SCHEMES).map(([k, s]) => (
-              <button key={k} className={'sw' + (scheme === k ? ' on' : '')} title={s.label} style={{ background: s.surface }} onClick={() => set({ scheme: k })} />
-            ))}
-          </div>
-        </div>
-      ) : (
-        <PhotoBody content={content} set={set} inputRef={inputRef} onPhotoFile={onPhotoFile} onToast={onToast} />
-      )}
-      <div className="field"><label>Acento</label>
-        <div className="swatches">
-          {Object.entries(ACCENTS).map(([k, a]) => (
-            <button key={k} className={'sw' + (accent === k ? ' on' : '')} title={a.label} style={{ background: a.value }} onClick={() => set({ accent: k })} />
-          ))}
-        </div>
-      </div>
-    </>
-  )
-}
 
 function TextBlocksBody({ content, set, onSelectText, selText }) {
   const blocks = content.textBlocks || []
@@ -1849,16 +1891,28 @@ function ShareModal({ onClose, onShare, onShareReview, onExportFile, mockup, set
 /* ---------------- Download menu ---------------- */
 function DownloadMenu({ template, content, format, slides, busy, setBusy, onToast }) {
   const [open, setOpen] = useState(false)
+  const [prog, setProg] = useState(null)     // {hechas, total}
   const isCarousel = slides && slides.length > 0
   const run = async (fn, label) => {
-    setOpen(false); setBusy(true); onToast('Generando ' + label + '…')
+    setOpen(false); setBusy(true); setProg(null); onToast('Generando ' + label + '…')
     try { await fn(); onToast('✓ ' + label + ' descargado') }
-    catch (e) { console.error(e); onToast('⚠ Error al exportar') }
-    finally { setBusy(false) }
+    catch (e) {
+      console.error(e)
+      // decir qué hacer, no sólo que falló
+      onToast(/dynamically imported/i.test(e?.message || '')
+        ? '⚠ Salió una versión nueva: recargá la página y probá de nuevo'
+        : '⚠ No se pudo exportar. Probá con @2x, que pesa menos.')
+    }
+    finally { setBusy(false); setProg(null) }
   }
+  const onProgress = (hechas, total) => setProg({ hechas, total })
   return (
     <div className="menu">
-      <button className="btn primary" disabled={busy} onClick={() => setOpen((o) => !o)}><Icon n="down" size={16} /> Descargar</button>
+      <button className="btn primary" disabled={busy} onClick={() => setOpen((o) => !o)}>
+        {busy
+          ? (prog ? `Slide ${prog.hechas} de ${prog.total}…` : 'Generando…')
+          : <><Icon n="down" size={16} /> Descargar</>}
+      </button>
       {open && (
         <div className="menu-pop" onMouseLeave={() => setOpen(false)}>
           <div className="grp">Recomendado</div>
@@ -1872,8 +1926,8 @@ function DownloadMenu({ template, content, format, slides, busy, setBusy, onToas
           {isCarousel && (
             <>
               <div className="grp">Carrusel ({slides.length} slides)</div>
-              <button onClick={() => run(() => exportCarousel({ slides, format, kind: 'zip', scale: 3 }), 'ZIP de PNGs')}><span>ZIP de PNGs</span><span>@3x</span></button>
-              <button onClick={() => run(() => exportCarousel({ slides, format, kind: 'pdf', scale: 2 }), 'PDF')}><span>PDF</span><span>multipágina</span></button>
+              <button onClick={() => run(() => exportCarousel({ slides, format, kind: 'zip', scale: 3, onProgress }), 'ZIP de PNGs')}><span>ZIP de PNGs</span><span>@3x</span></button>
+              <button onClick={() => run(() => exportCarousel({ slides, format, kind: 'pdf', scale: 2, onProgress }), 'PDF')}><span>PDF</span><span>multipágina</span></button>
             </>
           )}
         </div>

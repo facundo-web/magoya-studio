@@ -40,7 +40,7 @@ export function checkCopy(role, text, ctx = {}) {
     }
   }
   if (role === 'kicker' && /[.]$/.test(t)) {
-    out.push('La volanta no lleva punto final.')
+    out.push('La etiqueta no lleva punto final.')
   }
   if (/\s{2,}/.test(t)) out.push('Hay espacios de más.')
   return out

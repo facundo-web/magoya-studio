@@ -68,7 +68,9 @@ export function resolvePiece(template, content) {
     showLogo: c.showLogo !== undefined ? c.showLogo : d.showLogo !== false,
     logoPos: c.logoPos || d.logoPos || 'left',
     logoScale: c.logoScale || d.logoScale || 1,
-    logo: c.logo || d.logo || 'cream',
+    // logo automático: lo decide el contraste con el fondo. Es la regla de
+    // marca que menos debería depender del criterio de cada uno.
+    logo: c.logo || d.logo || (onPhoto ? 'cream' : (COLOR_SCHEMES[c.scheme || d.scheme || DEFAULT_SCHEME]?.onSurface === '#0D0C0C' ? 'black' : 'cream')),
     treatment: c.treatment || d.treatment || 'bw',
     photo: c.photo || null,
     gradient: c.gradient !== undefined ? c.gradient : d.gradient || null,
