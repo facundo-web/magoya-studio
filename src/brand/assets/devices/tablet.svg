@@ -1,6 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 344 468">
-  <rect x="2" y="2" width="340" height="464" rx="26" fill="#3A3A3C"/>
-  <rect x="6" y="6" width="332" height="456" rx="23" fill="#0B0B0D"/>
-  <rect x="18" y="18" width="308" height="432" rx="12" fill="none" stroke="#5A5A5E" stroke-width="1"/>
-  <circle cx="172" cy="12" r="2.6" fill="#22222a"/>
+  <defs><linearGradient id="tg" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#6E7378"/><stop offset=".5" stop-color="#2C2F33"/><stop offset="1" stop-color="#5A5F64"/>
+  </linearGradient></defs>
+  <path fill-rule="evenodd" fill="url(#tg)" d="M28,0 H316 A28,28 0 0 1 344,28 V440 A28,28 0 0 1 316,468 H28 A28,28 0 0 1 0,440 V28 A28,28 0 0 1 28,0 Z M30,16 H314 A14,14 0 0 1 328,30 V438 A14,14 0 0 1 314,452 H30 A14,14 0 0 1 16,438 V30 A14,14 0 0 1 30,16 Z"/>
+  <path fill-rule="evenodd" fill="#0A0A0C" d="M29,5 H315 A24,24 0 0 1 339,29 V439 A24,24 0 0 1 315,463 H29 A24,24 0 0 1 5,439 V29 A24,24 0 0 1 29,5 Z M30,16 H314 A14,14 0 0 1 328,30 V438 A14,14 0 0 1 314,452 H30 A14,14 0 0 1 16,438 V30 A14,14 0 0 1 30,16 Z"/>
+  <circle cx="172" cy="10" r="2.4" fill="#22252b"/>
 </svg>

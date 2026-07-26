@@ -166,6 +166,14 @@ export default function App() {
     setDirty(true)
     showToast('Slide agregada')
   }
+  function startBlank(fmt) {
+    const f = fmt || FORMATS_BY_ID[galleryFormatId] || FORMATS_BY_ID[DEFAULT_FORMAT]
+    setProjectId(newProjectId())
+    setProjectName('Pieza nueva')
+    setFormatId(f.id)
+    setPieces([{ template: BLANK_TEMPLATE, content: freshContent(BLANK_TEMPLATE) }])
+    setActive(0); setCarousel(false); setDirty(false); setView('editor')
+  }
   function startBlankCarousel(fmt) {
     const format = fmt && CAROUSEL_FORMATS.includes(fmt.id) ? fmt : FORMATS_BY_ID['li-carousel']
     const blank = () => ({ template: BLANK_TEMPLATE, content: freshContent(BLANK_TEMPLATE) })
@@ -414,6 +422,7 @@ export default function App() {
           onDeleteTemplate={removeCustomTemplate}
           onPick={pickTemplate}
           onStartCarousel={startBlankCarousel}
+          onStartBlank={startBlank}
           projects={projects}
           onOpenProject={openFromSerialized}
           onDeleteProject={removeProject}

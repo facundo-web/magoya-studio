@@ -69,9 +69,9 @@ const DEVICE_NAMES = { phone: 'Celular', laptop: 'Notebook', tablet: 'Tablet' }
 // screen = rect de la PANTALLA en fracciones del marco (x, y, w, h, radio)
 // para meter la foto adentro automáticamente, sin que el usuario recorte nada
 const DEVICE_SCREENS = {
-  phone: { x: 12 / 232, y: 12 / 468, w: 208 / 232, h: 444 / 468, r: 0.16, ratio: 232 / 468 },
-  laptop: { x: 86 / 520, y: 18 / 322, w: 348 / 520, h: 224 / 322, r: 0.01, ratio: 520 / 322 },
-  tablet: { x: 18 / 344, y: 18 / 468, w: 308 / 344, h: 432 / 468, r: 0.03, ratio: 344 / 468 },
+  phone: { x: 11 / 232, y: 11 / 468, w: 210 / 232, h: 446 / 468, r: 0.19, ratio: 232 / 468 },
+  laptop: { x: 82 / 520, y: 18 / 322, w: 356 / 520, h: 220 / 322, r: 0.011, ratio: 520 / 322 },
+  tablet: { x: 16 / 344, y: 16 / 468, w: 312 / 344, h: 436 / 468, r: 0.045, ratio: 344 / 468 },
 }
 export const DEVICES = Object.entries(deviceModules).map(([path, url]) => {
   const slug = path.match(/([^/]+)\.svg$/)[1]

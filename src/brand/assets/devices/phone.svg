@@ -1,10 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 232 468">
-  <rect x="2" y="2" width="228" height="464" rx="48" fill="#3A3A3C"/>
-  <rect x="5" y="5" width="222" height="458" rx="45" fill="#0B0B0D"/>
-  <rect x="12" y="12" width="208" height="444" rx="38" fill="none" stroke="#5A5A5E" stroke-width="1"/>
-  <rect x="1" y="120" width="3" height="34" rx="1.5" fill="#4A4A4E"/>
-  <rect x="1" y="168" width="3" height="34" rx="1.5" fill="#4A4A4E"/>
-  <rect x="228" y="150" width="4" height="56" rx="2" fill="#4A4A4E"/>
-  <rect x="88" y="22" width="56" height="17" rx="8.5" fill="#000"/>
-  <circle cx="134" cy="30.5" r="3.4" fill="#14141a"/>
+  <defs><linearGradient id="ti" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#6E7378"/><stop offset=".5" stop-color="#2C2F33"/><stop offset="1" stop-color="#5A5F64"/>
+  </linearGradient></defs>
+  <path fill-rule="evenodd" fill="url(#ti)" d="M50,0 H182 A50,50 0 0 1 232,50 V418 A50,50 0 0 1 182,468 H50 A50,50 0 0 1 0,418 V50 A50,50 0 0 1 50,0 Z M51,11 H181 A40,40 0 0 1 221,51 V417 A40,40 0 0 1 181,457 H51 A40,40 0 0 1 11,417 V51 A40,40 0 0 1 51,11 Z"/>
+  <path fill-rule="evenodd" fill="#0A0A0C" d="M52,7 H180 A45,45 0 0 1 225,52 V416 A45,45 0 0 1 180,461 H52 A45,45 0 0 1 7,416 V52 A45,45 0 0 1 52,7 Z M51,11 H181 A40,40 0 0 1 221,51 V417 A40,40 0 0 1 181,457 H51 A40,40 0 0 1 11,417 V51 A40,40 0 0 1 51,11 Z"/>
+  <rect x="-1" y="118" width="4" height="34" rx="2" fill="#4A4E52"/>
+  <rect x="-1" y="166" width="4" height="34" rx="2" fill="#4A4E52"/>
+  <rect x="229" y="148" width="4" height="58" rx="2" fill="#4A4E52"/>
+  <rect x="88" y="22" width="56" height="17" rx="8.5" fill="#08080A"/>
+  <circle cx="134" cy="30.5" r="3.2" fill="#14161c"/>
 </svg>
