@@ -6,7 +6,10 @@
 
 const EMOJI = /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{1F1E6}-\u{1F1FF}]/u
 // palabras funcionales muy frecuentes: sirven para detectar mezcla de idioma
-const EN = /\b(the|and|with|for|your|our|from|that|this|about|how|why|what|when|into|more|best|new|now|get|make|help|team|data|field|farm)\b/i
+// Sólo palabras FUNCIONALES en inglés. Nada de préstamos que en el agro
+// argentino se usan en castellano (data, team, field, farm, insight…): si
+// no, cualquier texto normal saltaba como "mezcla de idiomas".
+const EN = /\b(the|and|with|for|your|our|from|that|this|about|how|why|what|when|into|which|there|they|will|would|should|because|before|after)\b/i
 const ES = /\b(el|la|los|las|de|del|que|para|con|una|uno|por|en|su|más|cómo|cuándo|dónde|hacer|equipo|campo|dato|datos|productor)\b/i
 // una métrica sin ventana temporal no se puede verificar ni comparar
 const HAS_METRIC = /(^|\s)[−\-+]?\d+([.,]\d+)?\s*%|\b\d+\s*(x|veces)\b/i

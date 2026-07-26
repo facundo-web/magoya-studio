@@ -21,6 +21,10 @@ export default function Gallery({
 }) {
   const fileRef = useRef(null)
   const [filter, setFilter] = React.useState('all')
+  // Se mostraban sólo los 8 primeros y el resto quedaba inalcanzable: si
+  // tenías 19 proyectos, 11 no había forma de abrirlos desde la app.
+  const [verTodos, setVerTodos] = React.useState(false)
+  const [verTodasShares, setVerTodasShares] = React.useState(false)
   const fmt = galleryFormat
   const groups = formatsByNetwork()
   const byId = Object.fromEntries(templates.map((t) => [t.id, t]))
@@ -77,9 +81,16 @@ export default function Gallery({
       {/* 2 · RETOMAR — solo si hay */}
       {projects && projects.length > 0 && (
         <div className="h3-recent">
-          <span className="h3-label">Seguir con lo tuyo</span>
-          <div className="proj-row">
-            {projects.slice(0, 8).map((p) => {
+          <div className="h3-trow">
+            <span className="h3-label">Seguir con lo tuyo</span>
+            {projects.length > 8 && (
+              <button className="linklike" onClick={() => setVerTodos((v) => !v)}>
+                {verTodos ? 'Ver menos' : `Ver los ${projects.length}`}
+              </button>
+            )}
+          </div>
+          <div className={'proj-row' + (verTodos ? ' wrap' : '')}>
+            {(verTodos ? projects : projects.slice(0, 8)).map((p) => {
               const pc = p.pieces?.[0]
               const t = pc && byId[pc.templateId]
               const pf = FORMATS_BY_ID[p.formatId] || fmt
@@ -105,9 +116,16 @@ export default function Gallery({
       {/* 2b · COMPARTIDAS — D4: si perdés el link, perdés el feedback */}
       {shares.length > 0 && (
         <div className="h3-recent">
-          <span className="h3-label">Compartidas para revisión</span>
+          <div className="h3-trow">
+            <span className="h3-label">Compartidas para revisión</span>
+            {shares.length > 6 && (
+              <button className="linklike" onClick={() => setVerTodasShares((v) => !v)}>
+                {verTodasShares ? 'Ver menos' : `Ver las ${shares.length}`}
+              </button>
+            )}
+          </div>
           <div className="share-list">
-            {shares.slice(0, 6).map((sh) => {
+            {(verTodasShares ? shares : shares.slice(0, 6)).map((sh) => {
               const total = shareCounts[sh.id]
               const nuevos = total === undefined ? 0 : Math.max(0, total - (sh.seen || 0))
               return (

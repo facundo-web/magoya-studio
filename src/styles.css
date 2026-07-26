@@ -763,3 +763,5 @@ button.obj-row { width: 100%; cursor: pointer; text-align: left; font: inherit; 
 .photo-cta.mini { inset: auto; top: 10px; left: 10px; margin: 0; transform: none;
   flex-direction: row; padding: 7px 13px; font-size: 12px; gap: 6px; border-radius: 999px; }
 .photo-cta.mini .pc-ic { width: auto; height: auto; }
+/* "Seguir con lo tuyo": expandido pasa a grilla en varias filas */
+.proj-row.wrap { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); overflow: visible; }

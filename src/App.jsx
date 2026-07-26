@@ -82,11 +82,13 @@ export default function App() {
     else if (shared) openFromSerialized(shared)
   }, [])
 
-  // cuántos comentarios tiene cada pieza compartida (para el badge)
+  // Cuántos comentarios tiene cada pieza compartida (para el badge).
+  // Se recuenta también al VOLVER de una revisión: si no, el badge se queda
+  // con el número viejo hasta recargar la página.
   useEffect(() => {
-    if (view !== 'gallery' || !shares.length) return
+    if (preview || view !== 'gallery' || !shares.length) return
     countComments(shares.map((s) => s.id)).then(setShareCounts).catch(() => {})
-  }, [view, shares.length])
+  }, [view, shares.length, preview])
 
   const showToast = (msg) => {
     setToast(msg)
