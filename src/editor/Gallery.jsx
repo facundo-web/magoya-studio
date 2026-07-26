@@ -27,6 +27,7 @@ export default function Gallery({
   const blank = templates.find((t) => t.id === 'blank')
 
   const visible = templates.filter((t) => {
+    if (t.hidden) return false        // es variante de otra, no plantilla propia
     if (t.id === 'blank') return false // vive en el acceso grande de arriba
     if (filter === 'mine') return t.custom
     if (filter === 'photo') return t.surface === 'photo'

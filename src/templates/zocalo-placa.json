@@ -1,7 +1,7 @@
 {
   "id": "zocalo-placa",
   "name": "Zócalo sobre foto (placa)",
-  "purpose": "Foto de fondo con una placa de marca abajo (logo + título). El caso estrella para “AI en campo”.",
+  "purpose": "Ahora es la variante \"Banda\" de Foto + texto.",
   "category": "zocalo",
   "surface": "photo",
   "anchor": "bottom-left",
@@ -18,5 +18,6 @@
     "treatment": "bw",
     "kicker": "AI EN CAMPO",
     "title": "Decisiones agronómicas en tiempo real"
-  }
+  },
+  "hidden": true
 }

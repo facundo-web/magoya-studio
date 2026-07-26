@@ -1,7 +1,7 @@
 {
   "id": "foto-titular",
-  "name": "Foto con titular",
-  "purpose": "Foto con titular grande y una bajada. Para casos de uso y novedades.",
+  "name": "Foto + texto",
+  "purpose": "Foto de fondo con volanta, titular y bajada. Con el panel Estilo se convierte en placa, tarjeta o mensaje centrado.",
   "category": "zocalo",
   "surface": "photo",
   "anchor": "bottom-left",

@@ -31,17 +31,31 @@ const NAMES = {
   reddit: 'Reddit',
 }
 
+// A7 · íconos agro/IA de trazo (MIT). La regla editorial: la IA se muestra
+// por lo que HACE (mapa, alerta, escaneo, chat), nunca robots ni cerebros.
+const AGRO_NAMES = {
+  dron: 'Dron', satelite: 'Satélite', sensor: 'Sensor', lote: 'Lote',
+  'chat-ia': 'Chat con IA', hoja: 'Hoja', gota: 'Riego', sol: 'Clima · sol',
+  'nube-lluvia': 'Clima · lluvia', tractor: 'Maquinaria', escaneo: 'Escaneo',
+  'alerta-lote': 'Alerta', grafico: 'Resultados', 'mapa-pin': 'Ubicación',
+  semilla: 'Semilla', 'reloj-campana': 'Tiempo de campaña',
+}
+
 export const ICONS = Object.entries(modules).map(([path, url]) => {
-  const m = path.match(/icons\/(ai|social)\/([^/]+)\.svg$/)
+  const m = path.match(/icons\/(ai|social|agro)\/([^/]+)\.svg$/)
   const category = m ? m[1] : 'other'
   const slug = m ? m[2] : path
+  const isAgro = category === 'agro'
   return {
     id: `${category}:${slug}`,
     slug,
-    category, // 'ai' | 'social'
-    label: NAMES[slug] || slug,
+    category, // 'ai' | 'social' | 'agro'
+    label: isAgro ? (AGRO_NAMES[slug] || slug) : (NAMES[slug] || slug),
     url,
-    color: COLORS[slug] || '#0D0C0C',
+    color: isAgro ? '#00DE68' : (COLORS[slug] || '#0D0C0C'),
+    // los agro son TRAZOS: se tiñen y se les puede ajustar el grosor,
+    // y nunca van dentro de un tile de app-icon.
+    isMark: isAgro,
   }
 })
 
@@ -93,9 +107,10 @@ export const SHAPES = [
   { id: 'shape:bars', slug: 'bars', category: 'shapes', label: 'Barras', shape: 'bars', isShape: true, color: '#00DE68' },
   { id: 'shape:sparkline', slug: 'sparkline', category: 'shapes', label: 'Curva', shape: 'sparkline', isShape: true, color: '#00DE68' },
   { id: 'shape:callout', slug: 'callout', category: 'shapes', label: 'Bocadillo', shape: 'callout', isShape: true, color: '#00DE68' },
+  { id: 'shape:window', slug: 'window', category: 'shapes', label: 'Captura de pantalla', shape: 'window', isShape: true, color: '#FFFFFF' },
 ]
 
 export const ALL_OBJECTS = [...ICONS, ...MARKS, ...SHAPES, ...MAGOYA_OBJECTS, ...DEVICES]
 export const ICONS_BY_ID = Object.fromEntries(ALL_OBJECTS.map((i) => [i.id, i]))
-export const ICON_CATEGORIES = { ai: 'Logos de IA', social: 'Redes sociales', trazos: 'Trazos', misc: 'Misceláneas', shapes: 'Formas', devices: 'Dispositivos', magoya: 'Logo Magoya' }
+export const ICON_CATEGORIES = { agro: 'Agro e IA', ai: 'Logos de IA', social: 'Redes sociales', trazos: 'Trazos', misc: 'Misceláneas', shapes: 'Formas', devices: 'Dispositivos', magoya: 'Logo Magoya' }
 export const ICON_URLS = ALL_OBJECTS.map((i) => i.url).filter(Boolean)

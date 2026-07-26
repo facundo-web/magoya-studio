@@ -1,7 +1,7 @@
 {
   "id": "foto-centrada",
   "name": "Foto con mensaje centrado",
-  "purpose": "Foto con un mensaje corto centrado. Impacto directo, tipo portada.",
+  "purpose": "Ahora es la variante \"Centrado\" de Foto + texto.",
   "category": "zocalo",
   "surface": "photo",
   "anchor": "center-center",
@@ -18,5 +18,6 @@
     "treatment": "bw",
     "title": "El campo no espera",
     "subtitle": "Soporte que responde donde está el productor."
-  }
+  },
+  "hidden": true
 }

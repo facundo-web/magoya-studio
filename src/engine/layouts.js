@@ -458,6 +458,29 @@ function drawShape(b, { o, W, H, ref, accent, scheme }) {
     b.rect({ x: x0 + last[0] - ref * 0.012, y: y0 + last[1] - ref * 0.012, w: ref * 0.024, h: ref * 0.024, rx: ref * 0.012, fill: color, opacity: op })
     return
   }
+  if (o.shape === 'window') {
+    // A6 · la "prueba visual": una captura dentro de un marco de ventana.
+    // La foto entra sola abajo de la barra; sin foto queda el esqueleto.
+    const w = size, h = w * (o.ratio || 0.62)
+    const x0 = cx - w / 2, y0 = cy - h / 2
+    const barH = Math.max(ref * 0.018, h * 0.1)
+    const r = ref * 0.014
+    const soft = o.shadow !== false ? b.filter({ kind: 'soft', r: ref * 0.02, dy: ref * 0.012, opacity: 0.32 }) : null
+    b.path({ d: roundRect(x0, y0, w, h, r), fill: o.fill || '#FFFFFF', rotation: rot, cx, cy, flipX, opacity: op, filterId: soft })
+    b.framedImage({
+      cx, cy: y0 + barH + (h - barH) / 2, w: w - ref * 0.006, h: h - barH - ref * 0.004,
+      rotation: rot, flipX, href: o.src, natural: o.natural, focal: o.focal || { x: 0.5, y: 0.5 },
+      radius: r * 0.5, zoom: o.zoom || 1, opacity: op,
+    })
+    windowChrome(w, barH).forEach((c) => {
+      b.rect({ x: x0 + c.cx - c.r, y: y0 + c.cy - c.r, w: c.r * 2, h: c.r * 2, rx: c.r, fill: '#D8DBDE', opacity: op })
+    })
+    if (o.text) {
+      const px = barH * 0.5
+      b.text({ x: cx, y: y0 + (barH - px) / 2 - px * 0.05, lines: [String(o.text)], px, weight: 600, fill: '#8A9096', anchor: 'middle' })
+    }
+    return
+  }
   if (o.shape === 'callout') {
     // el bocadillo se ajusta AL TEXTO (como una burbuja de verdad): el ancho
     // lo fija el usuario con el tamaño, el alto sale de las líneas que entran.

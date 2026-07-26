@@ -632,3 +632,13 @@ button.obj-row { width: 100%; cursor: pointer; text-align: left; font: inherit; 
 .sr-badge { margin-left: auto; font-size: 11px; font-weight: 700; background: var(--emerald-500,#00DE68); color: #06301B; padding: 2px 8px; border-radius: 999px; }
 .link-box { width: 100%; padding: 10px 12px; border-radius: 10px; border: 1.5px solid var(--paper-200,#E6E1D8); font: inherit; font-size: 13px; background: #FAF8F5; }
 .link-box:focus { outline: none; border-color: var(--emerald-500,#00DE68); }
+
+/* ---- F3 · avisos de redacción (avisan, no bloquean) ---- */
+.copy-notes { margin: 6px 0 0; padding-left: 16px; font-size: 11.5px; color: #8A6B2E; line-height: 1.4; }
+.copy-notes li { margin-bottom: 2px; }
+.copy-sum { margin-top: 10px; padding: 9px 11px; border-radius: 10px; background: #FDF6E7; border: 1px solid #EFE0BE; font-size: 11.5px; color: #6B5320; }
+.copy-sum b { display: block; font-size: 12px; margin-bottom: 4px; }
+.copy-sum ul { margin: 0; padding-left: 15px; line-height: 1.45; }
+/* miniatura de un trazo: sin tile, el trazo se pinta con el acento */
+.icon-pick.mark { background: #F4F1EC; color: #0D0C0C; }
+.icon-pick.mark img { width: 62%; height: 62%; object-fit: contain; }

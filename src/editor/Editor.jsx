@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import PiecePreview from './PiecePreview.jsx'
 import { TEMPLATES, MAXCHARS } from '../templates/index.js'
 import { variantsFor, activeVariantId } from '../templates/variants.js'
+import { checkCopy, checkPiece } from '../lib/copyCheck.js'
 import MockupPreview, { MOCKUPS } from './MockupPreview.jsx'
 import Icon from '../ui/Icon.jsx'
 import { FORMATS_BY_ID, formatsByNetwork, CAROUSEL_FORMATS } from '../formats/registry.js'
@@ -19,6 +20,7 @@ const TINTS = [
   { k: 'yellow', label: 'Amarillo', value: '#F2C14E', sw: '#F2C14E' },
 ]
 import { imageSize, getAsset, compressImage, removeBackground } from '../engine/assets.js'
+import { measure, wrapText } from '../engine/textLayout.js'
 import { exportPiece, exportCarousel } from '../engine/export.js'
 
 const ROLE_LABELS = {
@@ -33,7 +35,7 @@ const ROLE_LABELS = {
 }
 
 // grilla de posiciones (para ubicar objetos rápido)
-const SHAPE_NAMES = { arrow: 'Flecha gruesa', handArrow: 'Flecha a mano', sparkle: 'Destello', badge: 'Etiqueta', bars: 'Barras', sparkline: 'Curva', callout: 'Bocadillo' }
+const SHAPE_NAMES = { arrow: 'Flecha gruesa', handArrow: 'Flecha a mano', sparkle: 'Destello', badge: 'Etiqueta', bars: 'Barras', sparkline: 'Curva', callout: 'Bocadillo', window: 'Captura de pantalla' }
 // formas dibujadas con trazo (tienen grosor ajustable)
 const STROKE_SHAPES = ['handArrow', 'sparkline']
 
@@ -42,6 +44,32 @@ const POS_GRID = [
   [0.22, 0.5], [0.5, 0.5], [0.78, 0.5],
   [0.22, 0.8], [0.5, 0.8], [0.78, 0.8],
 ]
+
+// Caja real de cada forma — tiene que dar lo MISMO que drawShape() en
+// layouts.js, si no el marco de selección no coincide con el dibujo.
+function shapeBox(o, ref) {
+  const size = ref * (o.scale || 0.3)
+  switch (o.shape) {
+    case 'arrow': case 'handArrow': case 'sparkline': return { w: size, h: size * 0.5 }
+    case 'bars': return { w: size, h: size * 0.62 }
+    case 'window': return { w: size, h: size * (o.ratio || 0.62) }
+    case 'badge': {
+      const px = size * 0.26
+      const w = measure(String(o.text || 'NUEVO').toUpperCase(), { px, weight: 800, tracking: 0.06 }) + px * 1.5
+      return { w, h: px * 2 }
+    }
+    case 'callout': {
+      const w = size
+      const px = w * 0.115
+      const padX = w * 0.09, padY = w * 0.075
+      const lh = 1.28
+      const txt = String(o.text || '').trim()
+      const lines = txt ? wrapText(txt, { px, weight: 600, maxWidth: w - padX * 2 }) : []
+      return { w, h: Math.max(w * 0.42, lines.length * px * lh + padY * 2 - px * (lh - 1) * 0.5) }
+    }
+    default: return { w: size, h: size }
+  }
+}
 
 /* ---------------- Sección colapsable ---------------- */
 function Section({ title, help, summary, defaultOpen = false, children }) {
@@ -167,6 +195,11 @@ export default function Editor({
       const dev = ICONS_BY_ID[o.deviceId]
       w = refDim * (o.scale || 0.5); h = w / (dev?.screen?.ratio || 1)
     } else if (o.kind === 'image' && o.frame) { w = refDim * (o.scale || 0.4); h = w * (o.ratio || 0.6) }
+    else if (o.kind === 'shape') {
+      // cada forma tiene su propia proporción; si la caja no la respeta,
+      // el marco de selección no coincide con lo que se ve dibujado.
+      ;({ w, h } = shapeBox(o, refDim))
+    }
     else { w = refDim * (o.scale || 0.3); h = w }
     const cx = format.w * (o.x ?? 0.72), cy = format.h * (o.y ?? 0.5)
     return { left: ((cx - w / 2) / format.w) * 100, top: ((cy - h / 2) / format.h) * 100, w: (w / format.w) * 100, h: (h / format.h) * 100, rot: o.rotation || 0 }
@@ -188,7 +221,8 @@ export default function Editor({
       // tiraba ReferenceError y NINGUNA forma se podía agregar tocándola.
       setObjects([...objects, { kind: 'shape', shape: icon.shape, tint: 'accent', x: 0.5, y: 0.42, scale: 0.34, rotation: 0, shadow: false, opacity: 1,
         ...(icon.shape === 'badge' ? { text: 'NUEVO' } : {}),
-        ...(icon.shape === 'callout' ? { text: '¿Y si el dato ya lo tenías?', tint: '#FFFFFF', shadow: true } : {}) }])
+        ...(icon.shape === 'callout' ? { text: '¿Y si el dato ya lo tenías?', tint: '#FFFFFF', shadow: true } : {}),
+        ...(icon.shape === 'window' ? { scale: 0.62, ratio: 0.62, shadow: true, text: 'panel.magoya.com', front: true } : {}) }])
       setSelObj(objects.length); closePicker(); return
     }
     if (icon.isDevice) {
@@ -570,7 +604,7 @@ export default function Editor({
                 <button className="btn" onClick={() => setChooser(null)}>Cerrar</button>
               </div>
               <div className="chooser-grid">
-                {templates.map((t) => (
+                {templates.filter((t) => !t.hidden).map((t) => (
                   <button key={t.id} className="tcard" onClick={() => { chooser === 'add' ? onAddSlide(t) : onChangeSlideTemplate(t); setChooser(null) }}>
                     <div className="thumb fixed"><PiecePreview template={t} content={t.defaults} format={format} /></div>
                     <div className="meta"><div className="n">{t.name}</div><div className="purpose">{t.purpose}</div></div>
@@ -667,8 +701,21 @@ function ContentBody({ template, content, onSelectText, selText }) {
           )
         })}
       </div>
+      <CopySummary content={content} />
       <div className="hint">Tocá un texto (acá o en la pieza) → lo editás a la derecha.</div>
     </>
+  )
+}
+
+// F3 · resumen de las reglas editoriales de la pieza entera
+function CopySummary({ content }) {
+  const issues = checkPiece(content)
+  if (!issues.length) return null
+  return (
+    <div className="copy-sum">
+      <b>{issues.length === 1 ? 'Un detalle de redacción' : `${issues.length} detalles de redacción`}</b>
+      <ul>{issues.slice(0, 4).map((it, i) => <li key={i}>{it.msg}</li>)}</ul>
+    </div>
   )
 }
 
@@ -795,7 +842,8 @@ function ObjectsBody({ objects, setObjects, selObj, setSelObj, objRemove, onToas
       // tiraba ReferenceError y NINGUNA forma se podía agregar tocándola.
       setObjects([...objects, { kind: 'shape', shape: icon.shape, tint: 'accent', x: 0.5, y: 0.42, scale: 0.34, rotation: 0, shadow: false, opacity: 1,
         ...(icon.shape === 'badge' ? { text: 'NUEVO' } : {}),
-        ...(icon.shape === 'callout' ? { text: '¿Y si el dato ya lo tenías?', tint: '#FFFFFF', shadow: true } : {}) }])
+        ...(icon.shape === 'callout' ? { text: '¿Y si el dato ya lo tenías?', tint: '#FFFFFF', shadow: true } : {}),
+        ...(icon.shape === 'window' ? { scale: 0.62, ratio: 0.62, shadow: true, text: 'panel.magoya.com', front: true } : {}) }])
       setSelObj(objects.length); closePicker(); return
     }
     if (icon.isDevice) {
@@ -868,10 +916,12 @@ function ObjectsBody({ objects, setObjects, selObj, setSelObj, objRemove, onToas
             <>
               <div className="icon-grid">
                 {iconsInCat.map((icon) => {
-                  const asset = icon.isDevice || icon.category === 'magoya'
+                  // los trazos (agro, marcas) NO llevan tile de color: se colocan
+                  // como trazo suelto, y la miniatura tiene que mostrarlo así.
+                  const asset = icon.isDevice || icon.category === 'magoya' || icon.isMark
                   return (
                     <button key={icon.id} title={icon.label + ' — tocá o arrastrá a la pieza'} onClick={() => addIcon(icon)}
-                      className={'icon-pick' + (asset ? ' asset' : '') + (icon.isShape ? ' shape' : '')}
+                      className={'icon-pick' + (asset ? ' asset' : '') + (icon.isShape ? ' shape' : '') + (icon.isMark ? ' mark' : '')}
                       style={(asset || icon.isShape) ? undefined : { background: icon.color }}
                       draggable onDragStart={(e) => e.dataTransfer.setData('application/x-magoya', JSON.stringify({ type: 'icon', id: icon.id }))}>
                       {icon.isShape ? <ShapeGlyph shape={icon.shape} /> : <img src={icon.url} alt={icon.label} />}
@@ -930,6 +980,7 @@ function ShapeGlyph({ shape }) {
     bars: <g fill={C}><rect x="3" y="14" width="3.6" height="7" rx="1" opacity=".45" /><rect x="8" y="10" width="3.6" height="11" rx="1" opacity=".45" /><rect x="13" y="12" width="3.6" height="9" rx="1" opacity=".45" /><rect x="18" y="5" width="3.6" height="16" rx="1" /></g>,
     sparkline: <g fill="none" stroke={C} strokeWidth="2.2" strokeLinecap="round"><path d="M3,17 C7,17 8,12 12,12 C16,12 16,6 21,5" /></g>,
     callout: <path d="M3,4 H21 V15 H9 L5,19 V15 H3 Z" fill={C} />,
+    window: <g><rect x="2.5" y="4" width="19" height="16" rx="2.5" fill="none" stroke={C} strokeWidth="1.9" /><path d="M2.5,8.5 H21.5" stroke={C} strokeWidth="1.9" /><g fill={C}><circle cx="5.4" cy="6.2" r=".9" /><circle cx="8" cy="6.2" r=".9" /><circle cx="10.6" cy="6.2" r=".9" /></g></g>,
   }[shape]
   return <svg viewBox="0 0 24 24" width="70%" height="70%">{p}</svg>
 }
@@ -1134,8 +1185,20 @@ function ObjectProps({ o, i, updateObject, objRemove, objBringFront, objSendBack
       )}
       {o.kind === 'shape' && (
         <>
-          {(o.shape === 'badge' || o.shape === 'callout') && (
-            <div className="field"><label>Texto</label>
+          {o.shape === 'window' && (
+            <>
+              <label>Captura</label>
+              <div className={'dropzone' + (o.src ? ' has' : '')} onClick={() => devPhotoRef.current?.click()}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => { e.preventDefault(); e.dataTransfer.files[0] && onDevFile(e.dataTransfer.files[0]) }}>
+                {o.src ? '✓ Captura cargada — click para cambiar' : 'Subí la captura (entra sola en la ventana)'}
+              </div>
+              <input ref={devPhotoRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => e.target.files[0] && onDevFile(e.target.files[0])} />
+              <Ctl label="Proporción" value={Math.round((o.ratio || 0.62) * 100)} min={40} max={120} suffix="%" onChange={(v) => updateObject(i, { ratio: v / 100 }, 'ratio')} />
+            </>
+          )}
+          {(o.shape === 'badge' || o.shape === 'callout' || o.shape === 'window') && (
+            <div className="field"><label>{o.shape === 'window' ? 'Barra de la ventana' : 'Texto'}</label>
               <input type="text" value={o.text || ''} onChange={(e) => updateObject(i, { text: e.target.value })} /></div>
           )}
           {(o.shape === 'bars' || o.shape === 'sparkline') && (
@@ -1429,6 +1492,13 @@ function TextProps({ eid, content, set, getText, setText }) {
         if (!max) return null
         const n = String(val || '').length
         return <div className={'charcount' + (n > max ? ' over' : '')}>{n}/{max} {n > max ? '· se va a achicar' : ''}</div>
+      })()}
+      {/* F3 · reglas editoriales: avisa, no bloquea */}
+      {(() => {
+        const role = isTb ? (block?.style || 'title') : eid.slice(5)
+        const notes = checkCopy(role, val, content)
+        if (!notes.length) return null
+        return <ul className="copy-notes">{notes.map((m, i) => <li key={i}>{m}</li>)}</ul>
       })()}
       {isTb && block ? (
         <>
