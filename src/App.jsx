@@ -211,6 +211,12 @@ export default function App() {
       showToast('⚠ Archivo inválido')
     }
   }
+  function duplicateProject(p) {
+    // copia con id propio: abrir el original ya no lo pisa
+    const copy = { ...JSON.parse(JSON.stringify(p)), id: newProjectId(), name: (p.name || 'Proyecto') + ' (copia)' }
+    setProjects(upsertProject(copy))
+    showToast('✓ Duplicado — el original queda intacto')
+  }
   function removeProject(id) {
     setProjects(deleteProject(id))
     showToast('Proyecto eliminado')
@@ -373,6 +379,7 @@ export default function App() {
           projects={projects}
           onOpenProject={openFromSerialized}
           onDeleteProject={removeProject}
+          onDuplicateProject={duplicateProject}
           onImport={importFile}
         />
       ) : current ? (

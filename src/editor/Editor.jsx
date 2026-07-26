@@ -282,6 +282,7 @@ export default function Editor({
         {[
           ['text', 'T', 'Texto'],
           ['bg', '▣', 'Fondo'],
+          ['photos', '▤', 'Fotos'],
           ['elements', '✳', 'Elementos'],
           ['brand', 'M', 'Marca'],
           ['settings', '⚙', 'Ajustes'],
@@ -344,6 +345,15 @@ export default function Editor({
               <BrandBody content={content} template={template} set={set} onlyColors />
             </>
           )
+        )}
+
+        {panel === 'photos' && (
+          <>
+            <div className="panel-title">Fotos</div>
+            <p className="panel-help">Poné una foto sobre la pieza. Podés quitarle el fondo para recortar la persona u objeto.</p>
+            <PhotosBody objects={objects} setObjects={setObjects} setSelObj={setSelObj}
+              elements={elements} onAddElement={onAddElement} onDeleteElement={onDeleteElement} onToast={onToast} />
+          </>
         )}
 
         {panel === 'elements' && (
@@ -513,7 +523,7 @@ export default function Editor({
         {selObj != null && objects[selObj] ? (
           <>
             <div className="insp-kicker">Propiedades del elemento</div>
-            <ObjectProps o={objects[selObj]} i={selObj} updateObject={updateObject} objRemove={objRemove} objBringFront={objBringFront} objSendBack={objSendBack} />
+            <ObjectProps o={objects[selObj]} i={selObj} updateObject={updateObject} objRemove={objRemove} objBringFront={objBringFront} objSendBack={objSendBack} onToast={onToast} goToBg={() => setPanel('bg')} />
           </>
         ) : selText ? (
           <>
@@ -742,7 +752,7 @@ function ObjectsBody({ objects, setObjects, selObj, setSelObj, objRemove, onToas
             <>
               <div className="icon-grid">
                 <button className="icon-pick upload" title="Subir un elemento" onClick={() => fileRef.current?.click()}><span>＋</span></button>
-                {elements.map((el) => (
+                {elements.filter((e) => e.kind !== 'photo').map((el) => (
                   <div key={el.id} className="icon-pick custom" title={el.name + ' — tocá o arrastrá a la pieza'}
                     draggable onDragStart={(e) => e.dataTransfer.setData('application/x-magoya', JSON.stringify({ type: 'element', id: el.id }))}>
                     <img src={el.src} alt={el.name} onClick={() => placeImage(el.src, el.id)} />
@@ -750,7 +760,7 @@ function ObjectsBody({ objects, setObjects, selObj, setSelObj, objRemove, onToas
                   </div>
                 ))}
               </div>
-              {elements.length === 0 && <div className="hint">Subí logos o elementos (PNG/SVG). Quedan guardados acá para reusar siempre.</div>}
+              {elements.filter((e) => e.kind !== 'photo').length === 0 && <div className="hint">Subí logos o elementos (PNG/SVG). Las fotos van en el panel <b>Fotos</b>.</div>}
             </>
           ) : (
             <>
@@ -806,8 +816,68 @@ function Pad2D({ x = 0.5, y = 0.5, onChange }) {
   )
 }
 
+/* ---------------- Fotos: insertar sobre la pieza (con recorte) ---------------- */
+function PhotosBody({ objects, setObjects, setSelObj, elements = [], onAddElement, onDeleteElement, onToast }) {
+  const fileRef = useRef(null)
+  const misFotos = elements.filter((e) => e.kind === 'photo')
+
+  const place = async (src, elementId) => {
+    const natural = await imageSize(src)
+    setObjects([...objects, { kind: 'image', src, elementId, natural, x: 0.5, y: 0.5, scale: 0.5, rotation: 0, shadow: false, opacity: 1 }])
+    setSelObj(objects.length)
+  }
+  const upload = async (file) => {
+    if (!file || !file.type.startsWith('image/')) return onToast('Ese archivo no es una imagen')
+    const src = await compressImage(file)
+    let elementId
+    if (onAddElement) elementId = onAddElement({ name: file.name.replace(/\.[^.]+$/, ''), src, kind: 'photo' })?.id
+    place(src, elementId)
+  }
+  const useLib = async (url) => {
+    const blob = await (await fetch(url)).blob()
+    const src = await new Promise((r) => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(blob) })
+    place(src)
+  }
+
+  return (
+    <>
+      <div className="dropzone" onClick={() => fileRef.current?.click()}
+        onDragOver={(e) => e.preventDefault()}
+        onDrop={(e) => { e.preventDefault(); e.dataTransfer.files[0] && upload(e.dataTransfer.files[0]) }}>
+        Subí una foto o arrastrala acá
+      </div>
+      <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => e.target.files[0] && upload(e.target.files[0])} />
+
+      {misFotos.length > 0 && (
+        <>
+          <label style={{ marginTop: 12 }}>Mis fotos</label>
+          <div className="photo-lib">
+            {misFotos.map((el) => (
+              <div key={el.id} className="photo-lib-item wrap" title={el.name}>
+                <img src={el.src} alt={el.name} onClick={() => place(el.src, el.id)}
+                  draggable onDragStart={(e) => e.dataTransfer.setData('application/x-magoya', JSON.stringify({ type: 'element', id: el.id }))} />
+                <button className="el-del" title="Quitar de mis fotos" onClick={(e) => { e.stopPropagation(); onDeleteElement && onDeleteElement(el.id) }}>✕</button>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      <label style={{ marginTop: 12 }}>Biblioteca Magoya</label>
+      <div className="photo-lib">
+        {PHOTOS.map((p) => (
+          <button key={p.slug} className="photo-lib-item" title={p.label} onClick={() => useLib(p.url)}>
+            <img src={p.url} alt={p.label} loading="lazy" />
+          </button>
+        ))}
+      </div>
+      <div className="hint">Después de ponerla, usá <b>✂ Quitar fondo</b> en el panel de la derecha para recortar la persona u objeto.</div>
+    </>
+  )
+}
+
 /* ---------------- Object properties (panel derecho / inspector) ---------------- */
-function ObjectProps({ o, i, updateObject, objRemove, objBringFront, objSendBack }) {
+function ObjectProps({ o, i, updateObject, objRemove, objBringFront, objSendBack, onToast, goToBg }) {
   const objIcon = (o.kind === 'icon' || o.kind === 'device') ? ICONS_BY_ID[o.iconId || o.deviceId] : null
   const isMark = !!objIcon?.isMark
   const showTint = o.kind === 'icon' && (isMark || o.style === 'plain')
@@ -864,9 +934,25 @@ function ObjectProps({ o, i, updateObject, objRemove, objBringFront, objSendBack
           <button className={'chip' + (o.style === 'plain' ? ' on' : '')} onClick={() => updateObject(i, { style: 'plain' })}>Sin fondo</button>
         </div>
       )}
+      {o.kind === 'image' && o.src && (
+        <>
+          <CutoutButton src={o.src} onToast={onToast}
+            onDone={(src, natural) => updateObject(i, { src, natural, shadow: false, cutout: true })} />
+          {o.cutout && goToBg && (
+            <div className="cutout-next">
+              Recortado ✓ — ahora ponele un fondo
+              <button className="btn" onClick={goToBg}>Elegir fondo →</button>
+            </div>
+          )}
+        </>
+      )}
+      {o.kind === 'device' && o.src && (
+        <CutoutButton src={o.src} onToast={onToast}
+          onDone={(src, natural) => updateObject(i, { src, natural })} />
+      )}
       {o.kind === 'image' && (
         <>
-          <div className="chips" style={{ marginBottom: 8 }}>
+          <div className="chips" style={{ marginBottom: 8, marginTop: 8 }}>
             <button className={'chip' + (!o.frame ? ' on' : '')} onClick={() => updateObject(i, { frame: false })}>Imagen libre</button>
             <button className={'chip' + (o.frame ? ' on' : '')} onClick={() => updateObject(i, { frame: true, ratio: o.ratio || 0.62 })} title="Recortá la imagen en un marco, ej: dentro de una pantalla">Recorte / pantalla</button>
           </div>

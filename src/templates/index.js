@@ -15,7 +15,9 @@ import blank from './blank.json'
 import whatsapp from './whatsapp.json'
 import carruselCierre from './carrusel-cierre.json'
 
-export const TEMPLATES = [blank, zocaloPlaca, fotoTitular, fotoCentrada, carruselPortada, techTitular, bloqueColor, cita, dato, whatsapp, carruselCierre]
+// Orden por OBJETIVO de marketing (auditoría): primero lo que prueba y
+// educa; "en blanco" al final — arrancar en blanco es donde se rompe la marca.
+export const TEMPLATES = [dato, cita, techTitular, carruselPortada, carruselCierre, zocaloPlaca, fotoTitular, fotoCentrada, bloqueColor, whatsapp, blank]
 
 export const TEMPLATES_BY_ID = Object.fromEntries(TEMPLATES.map((t) => [t.id, t]))
 export const BLANK_TEMPLATE = blank

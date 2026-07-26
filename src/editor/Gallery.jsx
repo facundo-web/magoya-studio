@@ -13,7 +13,7 @@ const GROUP_USE = {
 }
 
 // orden de secciones en la home (las de contenido primero, "empezar de cero" al final)
-const SECTION_ORDER = ['zocalo', 'post', 'chat', 'metric', 'quote']
+const SECTION_ORDER = ['metric', 'quote', 'post', 'zocalo', 'chat']
 
 function RatioBox({ w, h, on }) {
   const max = 14
@@ -32,7 +32,7 @@ function varsLine(t) {
   return parts.join(' · ') || 'Listo para usar'
 }
 
-export default function Gallery({ galleryFormat, setGalleryFormat, templates = TEMPLATES, onDeleteTemplate, onPick, onStartCarousel, projects, onOpenProject, onImport, onDeleteProject }) {
+export default function Gallery({ galleryFormat, setGalleryFormat, templates = TEMPLATES, onDeleteTemplate, onPick, onStartCarousel, projects, onOpenProject, onImport, onDeleteProject, onDuplicateProject }) {
   const fileRef = useRef(null)
   const [cat, setCat] = React.useState('all')
   const [surface, setSurface] = React.useState('all') // all | photo | solid
@@ -76,7 +76,13 @@ export default function Gallery({ galleryFormat, setGalleryFormat, templates = T
   return (
     <div className="gallery compact home2">
       <div className="g-head">
-        <h1>¿Qué vas a crear?</h1>
+        <div className="g-head-left">
+          <h1>¿Qué vas a crear?</h1>
+          <button className="linklike" onClick={() => fileRef.current?.click()}
+            title="Si alguien te pasó un archivo .magoya.json, abrilo acá">¿Te compartieron un proyecto?</button>
+          <input ref={fileRef} type="file" accept=".json,application/json" style={{ display: 'none' }}
+            onChange={(e) => e.target.files[0] && onImport(e.target.files[0])} />
+        </div>
         <div className="dest-stack">
           <div className="dest-row">
             <span className="dest-label-sm">1 · Red</span>
@@ -101,6 +107,12 @@ export default function Gallery({ galleryFormat, setGalleryFormat, templates = T
         </div>
       </div>
 
+      {(!projects || projects.length === 0) && (
+        <div className="g-firsttime">
+          <b>Todavía no creaste nada.</b> Elegí una plantilla acá abajo y en 2 minutos tenés la pieza lista para publicar.
+        </div>
+      )}
+
       {projects && projects.length > 0 && (
         <div className="g-retomar">
           <span className="ret-label">Retomar</span>
@@ -116,15 +128,15 @@ export default function Gallery({ galleryFormat, setGalleryFormat, templates = T
                   </button>
                   <div className="proj-meta">
                     <span className="proj-name" title={p.name}>{p.name || 'Sin título'}</span>
-                    <button className="proj-del" onClick={() => onDeleteProject(p.id)} title="Eliminar proyecto">✕</button>
+                    <span className="proj-acts">
+                      {onDuplicateProject && <button className="proj-act" onClick={() => onDuplicateProject(p)} title="Duplicar (no pisa el original)">⧉</button>}
+                      <button className="proj-act del" onClick={() => onDeleteProject(p.id)} title="Eliminar proyecto">✕</button>
+                    </span>
                   </div>
                 </div>
               )
             })}
           </div>
-          <button className="linklike ret-import" onClick={() => fileRef.current?.click()} title="Si alguien te pasó un archivo .magoya.json, abrilo acá">¿Te compartieron un proyecto?</button>
-          <input ref={fileRef} type="file" accept=".json,application/json" style={{ display: 'none' }}
-            onChange={(e) => e.target.files[0] && onImport(e.target.files[0])} />
         </div>
       )}
 

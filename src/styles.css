@@ -307,6 +307,19 @@ button.obj-row { width: 100%; cursor: pointer; text-align: left; font: inherit; 
 .g-retomar .proj-card { width: 84px; }
 .g-retomar .proj-thumb { width: 84px; height: 58px; }
 .ret-import { flex: none; font-size: 12px; }
+.g-head-left { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
+.g-head-left .linklike { font-size: 12px; }
+.g-firsttime { grid-column: 1 / -1; font-size: 13px; color: var(--ui-fg-2); background: var(--ui-sunken); border: 1px solid var(--ui-line); border-radius: 10px; padding: 12px 16px; margin-top: 12px; }
+/* acciones del proyecto: ✕ solo en hover para evitar el misclick */
+.proj-acts { display: inline-flex; gap: 2px; opacity: 0; transition: opacity .12s; }
+.proj-card:hover .proj-acts, .proj-card:focus-within .proj-acts { opacity: 1; }
+.proj-act { width: 18px; height: 18px; border-radius: 999px; border: 0; background: var(--ui-line); color: var(--ui-fg-2); font-size: 9px; line-height: 1; cursor: pointer; }
+.proj-act:hover { background: var(--ui-selected-ink); color: #fff; }
+.proj-act.del:hover { background: var(--ui-danger); color: #fff; }
+/* después del recorte: invitar a poner fondo */
+.cutout-next { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; font-size: 12px; color: var(--ui-fg-2); background: var(--ui-accent-soft); border: 1px solid var(--ui-accent-line); border-radius: 10px; padding: 10px; margin-top: 8px; }
+.photo-lib-item.wrap { position: relative; }
+.photo-lib-item.wrap img { width: 100%; height: 100%; object-fit: cover; cursor: pointer; }
 .fmttabs.slim .fmttab { padding: 5px 9px; }
 .g-rail { overflow: auto; padding: 14px 0; display: flex; flex-direction: column; gap: 2px; }
 .rail-item { display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 7px 10px; border-radius: 8px; font-size: 13px; font-weight: 600; color: #5C6B61; background: transparent; border: 0; cursor: pointer; text-align: left; }

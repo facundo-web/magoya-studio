@@ -58,8 +58,9 @@ export function loadElements() {
   }
 }
 
-export function addElement({ name, src }) {
-  const el = { id: newProjectId().replace('p_', 'el_'), name: name || 'Elemento', src }
+// kind: 'photo' (fotos subidas) | 'element' (logos, PNG recortados, gráficos)
+export function addElement({ name, src, kind = 'element' }) {
+  const el = { id: newProjectId().replace('p_', 'el_'), name: name || 'Elemento', src, kind }
   const list = [el, ...loadElements()]
   try {
     localStorage.setItem(ELEMENTS_KEY, JSON.stringify(list))
