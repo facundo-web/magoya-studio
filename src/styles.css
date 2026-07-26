@@ -857,3 +857,16 @@ button.obj-row { width: 100%; cursor: pointer; text-align: left; font: inherit; 
 .stale-bar .btn { flex: none; }
 .stale-bar.quota { background: #6E2A28; align-items: flex-start; }
 .stale-bar.quota b { display: block; }
+.insp-acts { display: inline-flex; gap: 5px; }
+
+/* marco del texto seleccionado: sin esto, seleccionar un texto no se ve */
+.text-sel { position: absolute; border: 1.5px solid var(--ui-accent,#00DE68); border-radius: 4px;
+  background: rgba(0,222,104,.07); pointer-events: none; z-index: 4; }
+
+/* el formato se elige desde la barra del lienzo */
+.fmt-picker { position: relative; display: inline-flex; align-items: center; gap: 8px;
+  padding: 6px 10px; border-radius: var(--r-pill); border: 1px solid transparent; cursor: pointer; }
+.fmt-picker:hover { border-color: var(--ui-line); background: var(--ui-surface); }
+.fmt-cur { font-size: var(--fs-3); font-weight: 600; color: var(--ui-fg); }
+.fmt-dim { font-size: var(--fs-2); color: var(--ui-fg-3); font-family: var(--font-mono); }
+.fmt-picker select { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; min-height: 0; }

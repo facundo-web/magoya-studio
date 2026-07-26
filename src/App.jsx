@@ -112,10 +112,13 @@ export default function App() {
     countComments(shares.map((s) => s.id)).then(setShareCounts).catch(() => {})
   }, [view, shares.length, preview])
 
-  const showToast = (msg) => {
+  // Un aviso con botón "Deshacer" necesita tiempo para leerlo Y llegar al
+  // botón: 2,2 s no alcanzaba. Y al vencer se limpia la acción, si no el
+  // aviso siguiente heredaba un "Deshacer" de algo borrado hace rato.
+  const showToast = (msg, conAccion = false) => {
     setToast(msg)
     clearTimeout(window.__mt)
-    window.__mt = setTimeout(() => setToast(null), 2200)
+    window.__mt = setTimeout(() => { setToast(null); setUndoDelete(null) }, conAccion ? 9000 : 2400)
   }
 
   const format = FORMATS_BY_ID[formatId] || FORMATS_BY_ID[DEFAULT_FORMAT]
@@ -147,6 +150,7 @@ export default function App() {
     namedByHand.current = false
     setProjectName(template.defaults?.title || template.name)
     setFormatId(chosenFormat?.id || galleryFormatId || DEFAULT_FORMAT)
+    resetHistory()
     piecesRef.current = [{ template, content: freshContent(template) }]
     setPieces([{ template, content: freshContent(template) }])
     setActive(0)
@@ -171,6 +175,7 @@ export default function App() {
     namedByHand.current = true // el proyecto ya tiene su nombre elegido
     setProjectName(p.name || '')
     setFormatId(FORMATS_BY_ID[p.formatId] ? p.formatId : DEFAULT_FORMAT)
+    resetHistory()
     piecesRef.current = ps
     setPieces(ps)
     setActive(0)
@@ -204,6 +209,15 @@ export default function App() {
   const gestureRef = useRef(null)           // { tag, antes } del gesto abierto
   const idleRef = useRef(null)
   useEffect(() => { piecesRef.current = pieces }, [pieces])
+
+  // Abrir otra pieza tiene que empezar con el historial en cero: si no,
+  // ⌘Z te inyecta las slides del proyecto anterior en el que estás.
+  function resetHistory() {
+    undoRef.current = []
+    redoRef.current = []
+    gestureRef.current = null
+    setHistTick((t) => t + 1)
+  }
 
   function endGesture() {
     clearTimeout(idleRef.current)
@@ -296,6 +310,7 @@ export default function App() {
     namedByHand.current = false
     setProjectName('Pieza nueva')
     setFormatId(f.id)
+    resetHistory()
     piecesRef.current = [{ template: BLANK_TEMPLATE, content: freshContent(BLANK_TEMPLATE) }]
     setPieces([{ template: BLANK_TEMPLATE, content: freshContent(BLANK_TEMPLATE) }])
     setActive(0); setCarousel(false); setDirty(false); setView('editor')
@@ -307,6 +322,7 @@ export default function App() {
     namedByHand.current = false
     setProjectName('Carrusel')
     setFormatId(format.id)
+    resetHistory()
     piecesRef.current = [blank(), blank(), blank()]
     setPieces([blank(), blank(), blank()])
     setActive(0)
@@ -383,7 +399,7 @@ export default function App() {
     const backup = loadProjects().find((p) => p.id === id)
     setProjects(deleteProject(id))
     setUndoDelete({ kind: 'project', data: backup })
-    showToast('Se eliminó «' + (backup?.name || 'el proyecto') + '»')
+    showToast('Se eliminó «' + (backup?.name || 'el proyecto') + '»', true)
   }
   function addCustomElement({ name, src }) {
     const { el, saved } = addElement({ name, src })
@@ -395,7 +411,7 @@ export default function App() {
     const backup = loadElements().find((e) => e.id === id)
     setElements(deleteElement(id))
     setUndoDelete({ kind: 'element', data: backup })
-    showToast('Elemento eliminado de tu biblioteca')
+    showToast('Elemento eliminado de tu biblioteca', true)
   }
   function saveAsTemplate(name) {
     if (!current) return
@@ -425,7 +441,7 @@ export default function App() {
     const backup = loadCustomTemplates().find((t) => t.id === id)
     setCustomTemplates(deleteCustomTemplate(id))
     setUndoDelete({ kind: 'template', data: backup })
-    showToast('Se eliminó «' + (backup?.name || 'la plantilla') + '»')
+    showToast('Se eliminó «' + (backup?.name || 'la plantilla') + '»', true)
   }
 
   // ---- compartir para revisión (nube: con foto + comentarios) ----
@@ -614,7 +630,7 @@ export default function App() {
           slides={carousel ? pieces : null}
           activeSlide={active}
           onChangeContent={changeContent}
-          onChangeFormat={(f) => { setFormatId(f.id); setDirty(true) }}
+          onChangeFormat={(f) => { endGesture(); pushHistory(piecesRef.current); setFormatId(f.id); setDirty(true) }}
           onSelectSlide={setActive}
           onAddSlide={addSlide}
           onDuplicateSlide={duplicateSlide}

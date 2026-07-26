@@ -81,6 +81,37 @@ function shapeBox(o, ref) {
   }
 }
 
+const clampScale = (v) => Math.min(1.2, Math.max(0.05, v))
+
+// Cada elemento nuevo cae un poquito corrido del anterior. Si todos caen en
+// el mismo punto quedan perfectamente apilados y sólo se puede agarrar el
+// último — hay que acordarse de mover cada uno apenas lo ponés.
+function enCascada(objects, base) {
+  const n = objects.length
+  const paso = 0.075
+  const i = n % 6
+  return { ...base, x: Math.min(0.92, (base.x ?? 0.5) + i * paso), y: Math.min(0.92, (base.y ?? 0.5) + i * paso) }
+}
+
+// El formato es "dónde lo publico": el paso final del flujo. Vive arriba
+// del lienzo, que es donde la gente hace click, no escondido en un panel.
+function FormatPicker({ format, onChangeFormat }) {
+  const groups = formatsByNetwork()
+  return (
+    <label className="fmt-picker" title="Dónde se publica: la pieza se re-acomoda sola">
+      <span className="fmt-cur">{format.network} · {format.label}</span>
+      <span className="fmt-dim">{format.w}×{format.h}</span>
+      <select value={format.id} onChange={(e) => onChangeFormat(FORMATS_BY_ID[e.target.value])}>
+        {Object.entries(groups).map(([net, list]) => (
+          <optgroup key={net} label={net}>
+            {list.map((f) => <option key={f.id} value={f.id}>{f.label} · {f.w}×{f.h}</option>)}
+          </optgroup>
+        ))}
+      </select>
+    </label>
+  )
+}
+
 /* ---------------- Sección colapsable ---------------- */
 function Section({ title, help, summary, defaultOpen = false, children }) {
   const [open, setOpen] = useState(defaultOpen)
@@ -168,6 +199,7 @@ export default function Editor({
   const frameRef = useRef(null)
   const photoInputRef = useRef(null)
   const dragRef = useRef({ i: null })
+  const textDragRef = useRef(null)
 
   const isCarousel = slides && slides.length > 0
   const canCarousel = CAROUSEL_FORMATS.includes(format.id)
@@ -179,6 +211,12 @@ export default function Editor({
   const setObjects = (next, tag) => set({ objects: next }, tag)
   const updateObject = (i, patch, tag) => setObjects(objects.map((o, idx) => (idx === i ? { ...o, ...patch } : o)), tag)
   const objRemove = (i) => { setObjects(objects.filter((_, idx) => idx !== i)); setSelObj(null) }
+  const objDuplicate = (i) => {
+    const o = objects[i]
+    if (!o) return
+    setObjects([...objects, enCascada(objects, { ...JSON.parse(JSON.stringify(o)) })])
+    setSelObj(objects.length)
+  }
   const objBringFront = (i) => { const a = [...objects]; const [it] = a.splice(i, 1); a.push(it); setObjects(a); setSelObj(a.length - 1) }
   const objSendBack = (i) => { const a = [...objects]; const [it] = a.splice(i, 1); a.unshift(it); setObjects(a); setSelObj(0) }
 
@@ -195,10 +233,11 @@ export default function Editor({
   // ---- interacción directa sobre la pieza (hover / seleccionar / arrastrar) ----
   const posFromEvent = (e) => {
     const r = frameRef.current.getBoundingClientRect()
-    return {
-      x: Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)),
-      y: Math.min(1, Math.max(0, (e.clientY - r.top) / r.height)),
-    }
+    // se permite salir un poco del borde: recortar a 0..1 no protegía de
+    // nada (con el slider de tamaño el objeto igual queda medio afuera) y
+    // sí impedía sangrar un elemento, que es algo que se hace todo el tiempo
+    const c = (v) => Math.min(1.25, Math.max(-0.25, v))
+    return { x: c((e.clientX - r.left) / r.width), y: c((e.clientY - r.top) / r.height) }
   }
   // caja aprox del objeto en % de la pieza (para el área de selección)
   const refDim = Math.min(format.w, format.h)
@@ -232,10 +271,10 @@ export default function Editor({
     if (icon.isShape) {
       // `pos` no existe acá (venía copiado del drop): sin x/y explícitos esto
       // tiraba ReferenceError y NINGUNA forma se podía agregar tocándola.
-      setObjects([...objects, { kind: 'shape', shape: icon.shape, tint: 'accent', x: 0.5, y: 0.42, scale: 0.34, rotation: 0, shadow: false, opacity: 1,
+      setObjects([...objects, enCascada(objects, { kind: 'shape', shape: icon.shape, tint: 'accent', x: 0.5, y: 0.42, scale: 0.34, rotation: 0, shadow: false, opacity: 1,
         ...(icon.shape === 'badge' ? { text: 'NUEVO' } : {}),
         ...(icon.shape === 'callout' ? { text: '¿Y si el dato ya lo tenías?', tint: '#FFFFFF', shadow: true } : {}),
-        ...(icon.shape === 'window' ? { scale: 0.62, ratio: 0.62, shadow: true, text: 'panel.magoya.com', front: true } : {}) }])
+        ...(icon.shape === 'window' ? { scale: 0.62, ratio: 0.62, shadow: true, text: 'panel.magoya.com', front: true } : {}) })])
       setSelObj(objects.length); closePicker(); return
     }
     if (icon.isDevice) {
@@ -249,7 +288,7 @@ export default function Editor({
       setObjects([...objects, { kind: 'image', src, natural, ...pos, scale: icon.isDevice ? 0.5 : 0.34, rotation: 0, shadow: true, opacity: 1 }])
     } else {
       const isMark = !!icon.isMark
-      setObjects([...objects, { kind: 'icon', iconId: icon.id, style: isMark ? 'plain' : 'tile', tint: isMark ? 'accent' : undefined, ...pos, scale: isMark ? 0.34 : 0.3, rotation: isMark ? 0 : -8, shadow: true, opacity: 1 }])
+      setObjects([...objects, { kind: 'icon', iconId: icon.id, style: isMark ? 'plain' : 'tile', tint: isMark ? 'accent' : undefined, ...pos, scale: icon.category === 'agro' ? 0.16 : isMark ? 0.34 : 0.3, rotation: isMark ? 0 : -8, shadow: true, opacity: 1 }])
     }
     setSelObj(objects.length)
   }
@@ -271,8 +310,7 @@ export default function Editor({
       if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); objRemove(selObj); return }
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'd') {
         e.preventDefault()
-        setObjects([...objects, { ...o, x: Math.min(1, (o.x ?? 0.5) + 0.05), y: Math.min(1, (o.y ?? 0.5) + 0.05) }])
-        setSelObj(objects.length)
+        objDuplicate(selObj)
         return
       }
       const step = e.shiftKey ? 0.05 : 0.01
@@ -290,19 +328,37 @@ export default function Editor({
   })
 
   // handles de resize: arrastrás una esquina y cambia la escala
-  const startHandleResize = (e, i) => {
+  // Resize como en Figma/Canva/Keynote: la esquina OPUESTA queda clavada y
+  // la que agarrás sigue al cursor. Antes escalaba desde el centro y la
+  // esquina se te escapaba de la mano. Con Alt vuelve a ser desde el centro.
+  const startHandleResize = (e, i, corner) => {
     e.stopPropagation()
     e.preventDefault()
     const o = objects[i]
     if (!o) return
+    try { e.currentTarget.setPointerCapture(e.pointerId) } catch {}
     const fr = frameRef.current.getBoundingClientRect()
-    const cx = fr.left + fr.width * (o.x ?? 0.5)
-    const cy = fr.top + fr.height * (o.y ?? 0.5)
-    const d0 = Math.hypot(e.clientX - cx, e.clientY - cy)
+    const box = objBox(o)                       // en % de la pieza
+    const cx0 = (o.x ?? 0.5), cy0 = (o.y ?? 0.5)
+    const halfW = box.w / 200, halfH = box.h / 200
+    // ancla = la esquina de enfrente a la que agarraste
+    const ax = corner.includes('w') ? cx0 + halfW : cx0 - halfW
+    const ay = corner.includes('n') ? cy0 + halfH : cy0 - halfH
+    const d0 = Math.hypot(e.clientX - (fr.left + fr.width * ax), e.clientY - (fr.top + fr.height * ay)) || 1
     const s0 = o.scale || 0.3
     const move = (ev) => {
-      const d = Math.hypot(ev.clientX - cx, ev.clientY - cy)
-      updateObject(i, { scale: Math.min(1.2, Math.max(0.05, s0 * (d / Math.max(d0, 1)))) }, 'resize')
+      const desdeCentro = ev.altKey
+      const px = (ev.clientX - fr.left) / fr.width, py = (ev.clientY - fr.top) / fr.height
+      if (desdeCentro) {
+        const d = Math.hypot(ev.clientX - (fr.left + fr.width * cx0), ev.clientY - (fr.top + fr.height * cy0))
+        const d0c = Math.hypot(halfW * fr.width, halfH * fr.height) || 1
+        updateObject(i, { scale: clampScale(s0 * (d / d0c)) }, 'resize')
+        return
+      }
+      const d = Math.hypot(ev.clientX - (fr.left + fr.width * ax), ev.clientY - (fr.top + fr.height * ay))
+      const k = d / d0
+      // el ancla no se mueve: el centro se recalcula a mitad de camino
+      updateObject(i, { scale: clampScale(s0 * k), x: ax + (px - ax) / 2, y: ay + (py - ay) / 2 }, 'resize')
     }
     const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up) }
     window.addEventListener('pointermove', move)
@@ -311,8 +367,38 @@ export default function Editor({
 
   const onSelectText = (eid) => { setSelText(eid); setSelObj(null) }
   const [guides, setGuides] = useState({ v: false, h: false })
-  const startDrag = (e, i) => { e.stopPropagation(); setSelObj(i); setSelText(null); dragRef.current.i = i }
+  // Un texto seleccionado no se veía seleccionado EN LA PIEZA: cambiaba el
+  // panel de la derecha y en el lienzo no pasaba nada, así que no sabías si
+  // le habías pegado al título o al subtítulo.
+  const [textBox, setTextBox] = useState(null)
+  useEffect(() => {
+    if (!selText || !frameRef.current) { setTextBox(null); return }
+    const t = frameRef.current.querySelector(`text[data-eid="${CSS.escape(selText)}"]`)
+    if (!t) { setTextBox(null); return }
+    const fr = frameRef.current.getBoundingClientRect()
+    const r = t.getBoundingClientRect()
+    const pad = 6
+    setTextBox({
+      left: r.left - fr.left - pad, top: r.top - fr.top - pad,
+      width: r.width + pad * 2, height: r.height + pad * 2,
+    })
+  }, [selText, content, format.id, panelW.left, panelW.right])
+  const startDrag = (e, i) => {
+    e.stopPropagation()
+    setSelObj(i); setSelText(null); dragRef.current.i = i
+    // sin capturar el puntero, arrastrar rápido hacia el borde soltaba el
+    // objeto a mitad de camino (en cualquier editor podés salir y volver)
+    try { e.currentTarget.setPointerCapture(e.pointerId) } catch {}
+  }
   const onFrameMove = (e) => {
+    if (textDragRef.current) {
+      const d = Math.hypot(e.clientX - textDragRef.current.x, e.clientY - textDragRef.current.y)
+      if (d > 12) {
+        textDragRef.current = null
+        setPanel(template.freeform ? 'text' : 'style'); setSheet(true)
+        onToast('Los textos se ubican con la posición del bloque, no arrastrando')
+      }
+    }
     if (dragRef.current.i == null) return
     let pos = posFromEvent(e)
     // snapping al centro (guías)
@@ -323,13 +409,16 @@ export default function Editor({
     setGuides({ v: snapV, h: snapH })
     updateObject(dragRef.current.i, pos, 'drag')
   }
-  const endDrag = () => { dragRef.current.i = null; setGuides({ v: false, h: false }) }
+  const endDrag = () => { dragRef.current.i = null; textDragRef.current = null; setGuides({ v: false, h: false }) }
   const onFrameDown = (e) => {
     const t = e.target.closest && e.target.closest('text[data-eid]')
     if (t) {
       const eid = t.getAttribute('data-eid')
       // segundo tap/click sobre el texto ya seleccionado → editar (touch-friendly)
       if (selText === eid) { openTextEditor(t) } else { setSelText(eid); setSelObj(null) }
+      // el primer reflejo de cualquiera es arrastrar el título; los textos
+      // se ubican con el bloque, así que lo decimos en vez de no hacer nada
+      textDragRef.current = { x: e.clientX, y: e.clientY }
       return
     }
     // cualquier click que no caiga sobre un objeto o un texto DESELECCIONA:
@@ -370,24 +459,27 @@ export default function Editor({
     if (t) openTextEditor(t)
   }
 
+  // Cambiar de slide (o de diseño) con algo seleccionado hacía que el
+  // inspector editara el objeto del MISMO índice en la slide nueva.
+  useEffect(() => { setSelObj(null); setSelText(null); setEditing(null) }, [activeSlide, template.id])
+
   const needsPhoto = template.surface === 'photo' && !content.photo?.src
   // Bloque B — variantes: misma plantilla, otra composición
   const variants = React.useMemo(() => variantsFor(template), [template])
   const activeVar = activeVariantId(template, content)
   // si la plantilla no tiene variantes (chat), el panel no existe
-  useEffect(() => { if (panel === 'style' && !variants.length) setPanel('text') }, [panel, variants.length])
 
   return (
     <div className={'editor' + (selObj != null || selText ? ' has-sel' : '') + (sheet ? ' sheet-open' : '')}>
       <nav className="insert-rail">
         {[
-          ...(variants.length ? [['style', 'grid', 'Estilo']] : []),
+          ['style', 'grid', 'Estilo'],
           ['text', 'text', 'Texto'],
           ['bg', 'layers', 'Fondo'],
           ['photos', 'photo', 'Fotos'],
           ['elements', 'sparkle', 'Elementos'],
           ['brand', 'brand', 'Marca'],
-          ['settings', 'settings', 'Ajustes'],
+          ['settings', 'settings', 'Efectos'],
         ].map(([k, ico, label]) => (
           <button key={k} className={'rail-btn' + (panel === k ? ' on' : '')}
             onClick={() => { if (panel === k) setSheet((v) => !v); else { setPanel(k); setSheet(true) } }} title={label}>
@@ -409,7 +501,9 @@ export default function Editor({
           <>
             <div className="panel-title">Estilo de la pieza</div>
             <p className="panel-help">La misma pieza, compuesta distinto. Cambia el diseño — nunca tus textos, tu foto ni los elementos que sumaste.</p>
-            <VariantsBody template={template} content={content} format={format} variants={variants} active={activeVar} set={set} />
+            {variants.length
+              ? <VariantsBody template={template} content={content} format={format} variants={variants} active={activeVar} set={set} />
+              : <div className="hint">Esta plantilla no tiene variantes de composición: el chat se arma con los mensajes.</div>}
           </>
         )}
 
@@ -495,10 +589,10 @@ export default function Editor({
 
         {panel === 'settings' && (
           <>
-            <div className="panel-title">Formato / red</div>
+            <div className="panel-title">Dónde se publica</div>
             <p className="panel-help">Cambiá el tamaño según dónde publiques. La pieza se re-acomoda sola.</p>
             <FormatBody format={format} onChangeFormat={onChangeFormat} />
-            <div className="panel-title" style={{ marginTop: 16 }}>Clima (degradé)</div>
+            <div className="panel-title" style={{ marginTop: 16 }}>Tono de la pieza</div>
             <GradientBody content={content} set={set} />
             <div className="panel-title" style={{ marginTop: 16 }}>Efectos de la pieza</div>
             <Ctl label="Viñeta (oscurece bordes)" value={Math.round((content.vignette ?? 0) * 100)} min={0} max={80} onChange={(v) => set({ vignette: v / 100 })} />
@@ -512,7 +606,8 @@ export default function Editor({
 
       <div className="stage">
         <div className="stage-tools">
-          <span style={{ fontSize: 13, color: '#5C6B61' }}>{format.network} · {format.label} · {format.w}×{format.h}</span>
+          {/* era texto muerto y es el lugar donde todos hacen click */}
+          <FormatPicker format={format} onChangeFormat={onChangeFormat} />
           {onUndo && (
             <span className="undo-group">
               <button className="btn icon-btn" onClick={onUndo} disabled={!canUndo} title="Deshacer (⌘Z)"><Icon n="undo" size={16} /></button>
@@ -540,7 +635,6 @@ export default function Editor({
             onPointerDown={onFrameDown}
             onPointerMove={onFrameMove}
             onPointerUp={endDrag}
-            onPointerLeave={endDrag}
             onDoubleClick={onFrameDblClick}
             onDragOver={(e) => e.preventDefault()}
             onDrop={onFrameDrop}
@@ -567,11 +661,12 @@ export default function Editor({
                   onMouseEnter={() => setHoverObj(i)} onMouseLeave={() => setHoverObj(null)}
                   onPointerDown={(e) => startDrag(e, i)}>
                   {selObj === i && ['nw', 'ne', 'sw', 'se'].map((c) => (
-                    <span key={c} className={'rs-handle ' + c} onPointerDown={(e) => startHandleResize(e, i)} />
+                    <span key={c} className={'rs-handle ' + c} onPointerDown={(e) => startHandleResize(e, i, c)} />
                   ))}
                 </div>
               )
             })}
+            {textBox && <div className="text-sel" style={{ left: textBox.left, top: textBox.top, width: textBox.width, height: textBox.height }} />}
             {guides.v && <div className="guide-v" />}
             {guides.h && <div className="guide-h" />}
             {showSafe && (
@@ -855,7 +950,7 @@ function ObjectsBody({ objects, setObjects, selObj, setSelObj, objRemove, onToas
   // `label` = cómo se llama en el inspector (antes todo decía "Logo")
   const placeImage = async (src, elementId, label) => {
     const natural = await imageSize(src)
-    setObjects([...objects, { kind: 'image', src, elementId, label, natural, x: 0.72, y: 0.42, scale: 0.34, rotation: 0, shadow: true, opacity: 1 }])
+    setObjects([...objects, enCascada(objects, { kind: 'image', src, elementId, label, natural, x: 0.72, y: 0.42, scale: 0.34, rotation: 0, shadow: true, opacity: 1 })])
     setSelObj(objects.length)
   }
   // el picker sólo se cierra si vive dentro de una sección colapsable
@@ -865,21 +960,21 @@ function ObjectsBody({ objects, setObjects, selObj, setSelObj, objRemove, onToas
     if (icon.isShape) {
       // `pos` no existe acá (venía copiado del drop): sin x/y explícitos esto
       // tiraba ReferenceError y NINGUNA forma se podía agregar tocándola.
-      setObjects([...objects, { kind: 'shape', shape: icon.shape, tint: 'accent', x: 0.5, y: 0.42, scale: 0.34, rotation: 0, shadow: false, opacity: 1,
+      setObjects([...objects, enCascada(objects, { kind: 'shape', shape: icon.shape, tint: 'accent', x: 0.5, y: 0.42, scale: 0.34, rotation: 0, shadow: false, opacity: 1,
         ...(icon.shape === 'badge' ? { text: 'NUEVO' } : {}),
         ...(icon.shape === 'callout' ? { text: '¿Y si el dato ya lo tenías?', tint: '#FFFFFF', shadow: true } : {}),
-        ...(icon.shape === 'window' ? { scale: 0.62, ratio: 0.62, shadow: true, text: 'panel.magoya.com', front: true } : {}) }])
+        ...(icon.shape === 'window' ? { scale: 0.62, ratio: 0.62, shadow: true, text: 'panel.magoya.com', front: true } : {}) })])
       setSelObj(objects.length); closePicker(); return
     }
     if (icon.isDevice) {
-      setObjects([...objects, { kind: 'device', deviceId: icon.id, x: 0.5, y: 0.5, scale: 0.55, rotation: 0, shadow: true, opacity: 1, focal: { x: 0.5, y: 0.5 }, zoom: 1 }])
+      setObjects([...objects, enCascada(objects, { kind: 'device', deviceId: icon.id, x: 0.5, y: 0.5, scale: 0.55, rotation: 0, shadow: true, opacity: 1, focal: { x: 0.5, y: 0.5 }, zoom: 1 })])
       setSelObj(objects.length)
       closePicker()
       return
     }
     if (icon.category === 'magoya' && !icon.isMark) { placeImage(getAsset(icon.url) || icon.url, undefined, icon.label); closePicker(); return }
     const isMark = !!icon.isMark
-    setObjects([...objects, { kind: 'icon', iconId: icon.id, style: isMark ? 'plain' : 'tile', tint: isMark ? 'accent' : undefined, x: 0.72, y: 0.42, scale: isMark ? 0.34 : 0.3, rotation: 0, shadow: false, opacity: 1 }])
+    setObjects([...objects, enCascada(objects, { kind: 'icon', iconId: icon.id, style: isMark ? 'plain' : 'tile', tint: isMark ? 'accent' : undefined, x: 0.72, y: 0.42, scale: icon.category === 'agro' ? 0.16 : isMark ? 0.34 : 0.3, rotation: 0, shadow: false, opacity: 1 })])
     setSelObj(objects.length)
     closePicker()
   }
@@ -1036,7 +1131,7 @@ function PhotosBody({ objects, setObjects, setSelObj, elements = [], onAddElemen
   // `label` = cómo se llama en el inspector; sin esto toda foto decía "Imagen"
   const place = async (src, elementId, label) => {
     const natural = await imageSize(src)
-    setObjects([...objects, { kind: 'image', src, elementId, label, natural, x: 0.5, y: 0.5, scale: 0.5, rotation: 0, shadow: false, opacity: 1 }])
+    setObjects([...objects, enCascada(objects, { kind: 'image', src, elementId, label, natural, x: 0.5, y: 0.5, scale: 0.5, rotation: 0, shadow: false, opacity: 1 })])
     setSelObj(objects.length)
   }
   const upload = async (file) => {
@@ -1110,7 +1205,10 @@ function ObjectProps({ o, i, updateObject, objRemove, objBringFront, objSendBack
     <>
       <div className="insp-head">
         <span className="insp-name">{objectName(o, objIcon)}</span>
-        <button className="btn" style={{ padding: '2px 8px' }} onClick={() => objRemove(i)}>Quitar</button>
+        <span className="insp-acts">
+          <button className="btn" style={{ padding: '2px 8px' }} onClick={() => objDuplicate(i)} title="Duplicar (⌘D)"><Icon n="copy" size={13} /></button>
+          <button className="btn" style={{ padding: '2px 8px' }} onClick={() => objRemove(i)}>Quitar</button>
+        </span>
       </div>
       {o.kind === 'device' && (
         <>
@@ -1246,15 +1344,19 @@ function ObjectProps({ o, i, updateObject, objRemove, objBringFront, objSendBack
         <Ctl label="Grosor del trazo" value={Math.round((o.sw || 1) * 100)} min={40} max={300} step={10} suffix="%"
           onChange={(v) => updateObject(i, { sw: v / 100 }, 'sw')} />
       )}
-      <label>Profundidad</label>
+      {/* Un solo control de capas. Antes había dos sistemas distintos con
+          el mismo nombre: "Traer al frente" no hacía nada visible si el
+          objeto estaba en la capa de atrás. */}
+      <label>Capa</label>
       <div className="chips" style={{ marginBottom: 6 }}>
         <button className={'chip' + (!o.front ? ' on' : '')} onClick={() => updateObject(i, { front: false })}>Detrás del texto</button>
         <button className={'chip' + (o.front ? ' on' : '')} onClick={() => updateObject(i, { front: true })}>Delante del texto</button>
       </div>
-      <div className="chips" style={{ marginBottom: 10 }}>
-        <button className="chip" onClick={() => objBringFront(i)}>↑ Traer al frente</button>
-        <button className="chip" onClick={() => objSendBack(i)}>↓ Enviar al fondo</button>
+      <div className="chips" style={{ marginBottom: 4 }}>
+        <button className="chip" onClick={() => objBringFront(i)}><Icon n="up" size={13} /> Subir</button>
+        <button className="chip" onClick={() => objSendBack(i)}><Icon n="down" size={13} /> Bajar</button>
       </div>
+      <div className="hint" style={{ marginBottom: 10 }}>Subir y bajar ordenan dentro de esta capa.</div>
       <label>Posición</label>
       <div className="posgrid">
         {POS_GRID.map(([px, py], k) => (
@@ -1275,7 +1377,7 @@ function ObjectProps({ o, i, updateObject, objRemove, objBringFront, objSendBack
         <button className="chip" onClick={() => updateObject(i, { rotation: ((o.rotation || 0) + 180) % 360 > 180 ? ((o.rotation || 0) + 180) - 360 : (o.rotation || 0) + 180 })} title="Gira 180°"><Icon n="flipV" size={14} /> Vertical</button>
       </div>
       <Ctl label="Opacidad" value={Math.round((o.opacity ?? 1) * 100)} min={10} max={100} step={5} suffix="%" onChange={(v) => updateObject(i, { opacity: v / 100 }, 'op')} />
-      <label>Sombra (profundidad)</label>
+      <label>Sombra</label>
       <div className="chips">
         <button className={'chip' + (o.shadow !== false ? ' on' : '')} onClick={() => updateObject(i, { shadow: true })}>Con sombra</button>
         <button className={'chip' + (o.shadow === false ? ' on' : '')} onClick={() => updateObject(i, { shadow: false })}>Sin sombra</button>
