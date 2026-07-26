@@ -695,7 +695,7 @@ function ObjectsBody({ objects, setObjects, selObj, setSelObj, objRemove, onToas
     }
     if (icon.category === 'magoya') { placeImage(getAsset(icon.url) || icon.url); setPicking(false); return }
     const isMark = !!icon.isMark
-    setObjects([...objects, { kind: 'icon', iconId: icon.id, style: isMark ? 'plain' : 'tile', tint: isMark ? 'accent' : undefined, x: 0.72, y: 0.42, scale: isMark ? 0.34 : 0.3, rotation: isMark ? 0 : -8, shadow: true, opacity: 1 }])
+    setObjects([...objects, { kind: 'icon', iconId: icon.id, style: isMark ? 'plain' : 'tile', tint: isMark ? 'accent' : undefined, x: 0.72, y: 0.42, scale: isMark ? 0.34 : 0.3, rotation: 0, shadow: false, opacity: 1 }])
     setSelObj(objects.length)
     setPicking(false)
   }

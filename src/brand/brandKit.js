@@ -13,12 +13,6 @@ import wordmarkBlack from './assets/magoya-wordmark-black.svg'
 import wordmarkDeep from './assets/magoya-wordmark-deep.svg'
 import motifEstratos from './assets/motif-estratos.svg'
 
-// Logos de cliente
-import logoBasf from './assets/logos/basf.svg'
-import logoBayer from './assets/logos/bayer.svg'
-import logoCorteva from './assets/logos/corteva.svg'
-import logoJohnDeere from './assets/logos/john-deere.svg'
-import logoSyngenta from './assets/logos/syngenta.svg'
 
 // ---------- PRIMITIVOS DE COLOR (mirror de tokens.css) ----------
 export const PALETTE = {
@@ -36,13 +30,6 @@ export const PALETTE = {
   gray600: '#666666',
   gray400: '#AAAAAA',
   white: '#FFFFFF',
-  // paleta ampliada (flexibilidad, pedida por el usuario)
-  blue900: '#0E2740',
-  blue500: '#2E7DD1',
-  blue300: '#5FA8E0',
-  sand200: '#E8DFD1',
-  sand400: '#CBB48F',
-  yellow400: '#F2C14E',
 }
 
 // ---------- ROLES DE COLOR APROBADOS ----------
@@ -83,23 +70,6 @@ export const COLOR_SCHEMES = {
     onAccent: PALETTE.ink900,
     muted: PALETTE.gray600,
   },
-  // paleta ampliada
-  blue: {
-    label: 'Azul noche',
-    surface: PALETTE.blue900,
-    onSurface: PALETTE.cream50,
-    accent: PALETTE.blue300,
-    onAccent: PALETTE.blue900,
-    muted: '#8AA6BD',
-  },
-  sand: {
-    label: 'Beige',
-    surface: PALETTE.sand200,
-    onSurface: PALETTE.ink900,
-    accent: PALETTE.green900,
-    onAccent: PALETTE.cream50,
-    muted: '#8A8172',
-  },
 }
 export const DEFAULT_SCHEME = 'deep'
 
@@ -108,8 +78,6 @@ export const ACCENTS = {
   emerald: { label: 'Verde digital', value: PALETTE.emerald500 },
   lime: { label: 'Lime marcador', value: PALETTE.lime300 },
   deep: { label: 'Verde profundo', value: PALETTE.green900 },
-  blue: { label: 'Azul', value: PALETTE.blue500 },
-  yellow: { label: 'Amarillo', value: PALETTE.yellow400 },
   ink: { label: 'Negro', value: PALETTE.ink900 },
 }
 
@@ -123,13 +91,12 @@ export const WORDMARKS = {
 // El wordmark tiene proporción ~139x38
 export const WORDMARK_RATIO = 139 / 38
 
+// ⚠ Solo CLIENTES REALES y con permiso vigente. Nunca prospectos:
+// publicar el logo de un prospecto implica una relación que no existe
+// (riesgo legal y de credibilidad, y puede matar la propuesta en curso).
+// Apeel y Biome Makers son los clientes reales — falta su SVG.
 export const CLIENT_LOGOS = {
   none: { label: 'Sin logo de cliente', url: null },
-  basf: { label: 'BASF', url: logoBasf },
-  bayer: { label: 'Bayer', url: logoBayer },
-  corteva: { label: 'Corteva', url: logoCorteva },
-  johndeere: { label: 'John Deere', url: logoJohnDeere },
-  syngenta: { label: 'Syngenta', url: logoSyngenta },
 }
 
 export const MOTIF_ESTRATOS = motifEstratos
@@ -152,11 +119,6 @@ export const GRADIENTS = {
     angle: 160,
     stops: [{ at: 0, color: PALETTE.green950, opacity: 0 }, { at: 1, color: PALETTE.green950, opacity: 0.92 }],
   },
-  emeraldGlow: {
-    label: 'Glow verde',
-    angle: 135,
-    stops: [{ at: 0, color: PALETTE.emerald500, opacity: 0.55 }, { at: 0.6, color: PALETTE.emerald500, opacity: 0 }],
-  },
   inkFade: {
     label: 'Negro lateral',
     angle: 90,
@@ -175,7 +137,7 @@ export const FONT_FAMILY = 'Manrope'
 export const FONT_STACK = "'Manrope', system-ui, -apple-system, sans-serif"
 // Segunda fuente: handwritten para acentos en carruseles (no reels/subtítulos)
 export const FONT_HAND = 'Caveat'
-export const FONT_HAND_STACK = "'Caveat', 'Comic Sans MS', cursive"
+export const FONT_HAND_STACK = "'Caveat', cursive"
 
 // Estilos de texto semánticos (rol → tratamiento)
 // weights disponibles: 400,500,600,700,800
@@ -193,9 +155,7 @@ export const TEXT_STYLES = {
 // colores de resaltado (marcador detrás del texto, estilo "YouTube")
 export const HIGHLIGHTS = {
   none: { label: 'Sin resaltado', value: null },
-  yellow: { label: 'Amarillo', value: PALETTE.yellow400 },
   lime: { label: 'Lime', value: PALETTE.lime300 },
   emerald: { label: 'Verde', value: PALETTE.emerald500 },
   ink: { label: 'Negro', value: PALETTE.ink900 },
-  cream: { label: 'Crema', value: PALETTE.cream100 },
 }

@@ -28,25 +28,16 @@ export const FORMATS = [
 
   // ---------- LinkedIn ----------
   { id: 'li-square', network: 'LinkedIn', label: 'Post cuadrado', group: 'square', w: 1200, h: 1200, safe: S_DEFAULT },
-  { id: 'li-landscape', network: 'LinkedIn', label: 'Post horizontal', group: 'landscapeWide', w: 1200, h: 627, safe: S_DEFAULT },
   { id: 'li-carousel', network: 'LinkedIn', label: 'Carrusel (retrato)', group: 'portrait45', w: 1080, h: 1350, safe: S_DEFAULT },
 
-  // ---------- WhatsApp ----------
-  { id: 'wa-status', network: 'WhatsApp', label: 'Estado 9:16', group: 'vertical916', w: 1080, h: 1920, safe: S_STORY },
 
-  // ---------- Facebook ----------
-  { id: 'fb-post', network: 'Facebook', label: 'Post', group: 'landscapeWide', w: 1200, h: 630, safe: S_DEFAULT },
-  { id: 'fb-story', network: 'Facebook', label: 'Story 9:16', group: 'vertical916', w: 1080, h: 1920, safe: S_STORY },
 
-  // ---------- X / Twitter ----------
-  { id: 'x-post', network: 'X / Twitter', label: 'Post 16:9', group: 'landscape169', w: 1600, h: 900, safe: S_DEFAULT },
 
   // ---------- YouTube ----------
   { id: 'yt-thumb', network: 'YouTube', label: 'Miniatura', group: 'landscape169', w: 1280, h: 720, safe: S_DEFAULT },
 
   // ---------- Genérico ----------
   { id: 'gen-169', network: 'Genérico', label: 'Presentación 16:9', group: 'landscape169', w: 1920, h: 1080, safe: S_DEFAULT },
-  { id: 'gen-43', network: 'Genérico', label: 'Clásico 4:3', group: 'landscape43', w: 1600, h: 1200, safe: S_DEFAULT },
 ]
 
 export const FORMATS_BY_ID = Object.fromEntries(FORMATS.map((f) => [f.id, f]))
