@@ -6,12 +6,15 @@
   "surface": "solid",
   "anchor": "center-left",
   "motif": false,
-  "roles": ["kicker", "title", "subtitle"],
+  "roles": [
+    "kicker",
+    "title",
+    "subtitle"
+  ],
   "defaults": {
     "scheme": "ink",
     "accent": "emerald",
     "logo": "cream",
-    "clientLogo": "none",
     "hasPhoto": false,
     "kicker": "IA APLICADA",
     "title": "La IA no reemplaza al agrónomo. Lo potencia.",

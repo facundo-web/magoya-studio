@@ -12,12 +12,14 @@
     "scheme": "ink",
     "accent": "emerald",
     "logo": "cream",
-    "clientLogo": "none",
     "hasPhoto": false,
     "bg": "color",
     "showLogo": true,
     "textBlocks": [
-      { "style": "title", "text": "Tu texto acá" }
+      {
+        "style": "title",
+        "text": "Tu texto acá"
+      }
     ]
   }
 }

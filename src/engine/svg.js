@@ -20,10 +20,61 @@ export function createBuilder() {
   const body = []
   let uid = 0
   const id = (p) => `${p}${uid++}`
+  const filterCache = new Map()
   return {
     defs,
     body,
     id,
+    // ---- registro de filtros reutilizables (cache por spec) ----
+    filter(spec) {
+      const key = JSON.stringify(spec)
+      if (filterCache.has(key)) return filterCache.get(key)
+      const fid = id('f')
+      let inner = ''
+      const box = ' x="-50%" y="-50%" width="200%" height="200%"'
+      if (spec.kind === 'hard') {
+        // sombra dura tipo sticker (sin blur)
+        inner = `<feDropShadow dx="${n(spec.dx ?? 12)}" dy="${n(spec.dy ?? 12)}" stdDeviation="0" flood-color="${spec.color || '#0D0C0C'}" flood-opacity="${spec.opacity ?? 1}"/>`
+      } else if (spec.kind === 'glow') {
+        inner = `<feDropShadow dx="0" dy="0" stdDeviation="${n(spec.r ?? 30)}" flood-color="${spec.color}" flood-opacity="${spec.opacity ?? .8}"/>` +
+                `<feDropShadow dx="0" dy="0" stdDeviation="${n((spec.r ?? 30) * .4)}" flood-color="${spec.color}" flood-opacity="${(spec.opacity ?? .8) * .7}"/>`
+      } else if (spec.kind === 'outline') {
+        // contorno alrededor del recorte: lo que lo "pega" al fondo
+        inner = `<feMorphology in="SourceAlpha" operator="dilate" radius="${n(spec.r ?? 8)}" result="d"/>` +
+                `<feFlood flood-color="${spec.color || '#FFFFFF'}"/><feComposite in2="d" operator="in" result="ring"/>` +
+                `<feMerge><feMergeNode in="ring"/><feMergeNode in="SourceGraphic"/></feMerge>`
+      } else if (spec.kind === 'soft') {
+        inner = `<feDropShadow dx="0" dy="${n(spec.dy ?? 20)}" stdDeviation="${n(spec.r ?? 24)}" flood-color="#000" flood-opacity="${spec.opacity ?? .45}"/>`
+      } else if (spec.kind === 'blur') {
+        inner = `<feGaussianBlur stdDeviation="${n(spec.r ?? 16)}" edgeMode="duplicate"/>`
+      } else if (spec.kind === 'dim') {
+        const k = spec.k ?? 0.55
+        inner = `<feComponentTransfer><feFuncR type="linear" slope="${k}"/><feFuncG type="linear" slope="${k}"/><feFuncB type="linear" slope="${k}"/></feComponentTransfer>`
+      } else if (spec.kind === 'bw') {
+        inner = `<feColorMatrix type="matrix" values="0.33 0.33 0.33 0 0  0.33 0.33 0.33 0 0  0.33 0.33 0.33 0 0  0 0 0 1 0"/>`
+      }
+      defs.push(`<filter id="${fid}"${box}>${inner}</filter>`)
+      filterCache.set(key, fid)
+      return fid
+    },
+    // ---- path genérico (flechas, badges, formas paramétricas) ----
+    path({ d, fill = 'none', stroke = null, sw = 0, cap = 'round', join = 'round', rotation = 0, cx = 0, cy = 0, opacity = 1, filterId = null, evenodd = false }) {
+      const t = rotation ? ` transform="rotate(${n(rotation)} ${n(cx)} ${n(cy)})"` : ''
+      const f = filterId ? ` filter="url(#${filterId})"` : ''
+      const st = stroke ? ` stroke="${stroke}" stroke-width="${n(sw)}" stroke-linecap="${cap}" stroke-linejoin="${join}"` : ''
+      const fr = evenodd ? ' fill-rule="evenodd"' : ''
+      const op = opacity < 1 ? ` opacity="${opacity}"` : ''
+      body.push(`<g${t}${f}${op}><path d="${d}" fill="${fill}"${fr}${st}/></g>`)
+    },
+    // ---- viñeta (oscurece los bordes, sube el contraste del centro) ----
+    vignette({ w, h, strength = 0.6 }) {
+      const gid = id('vig')
+      defs.push(
+        `<radialGradient id="${gid}" gradientUnits="userSpaceOnUse" cx="${n(w / 2)}" cy="${n(h / 2)}" r="${n(Math.max(w, h) * 0.72)}">` +
+        `<stop offset="0.5" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity="${strength}"/></radialGradient>`
+      )
+      body.push(`<rect x="0" y="0" width="${n(w)}" height="${n(h)}" fill="url(#${gid})"/>`)
+    },
     rect({ x, y, w, h, fill, rx = 0, opacity = 1 }) {
       body.push(
         `<rect x="${n(x)}" y="${n(y)}" width="${n(w)}" height="${n(h)}" rx="${n(rx)}" fill="${fill}" opacity="${opacity}"/>`
@@ -45,7 +96,7 @@ export function createBuilder() {
       body.push(`<rect x="${n(x)}" y="${n(y)}" width="${n(w)}" height="${n(h)}" fill="url(#${gid})"/>`)
     },
     // imagen con cover + focal point + B&N opcional
-    imageCover({ x, y, w, h, href, natural, focal = { x: 0.5, y: 0.5 }, grayscale = false }) {
+    imageCover({ x, y, w, h, href, natural, focal = { x: 0.5, y: 0.5 }, grayscale = false, dim = 0, blur = 0 }) {
       if (!href) {
         // esqueleto estático (acá va una foto): fondo neutro + pictograma
         this.rect({ x, y, w, h, fill: '#DAD5CC' })
@@ -60,11 +111,13 @@ export function createBuilder() {
       const clipId = id('clip')
       defs.push(`<clipPath id="${clipId}"><rect x="${n(x)}" y="${n(y)}" width="${n(w)}" height="${n(h)}"/></clipPath>`)
       let filterAttr = ''
-      if (grayscale) {
-        const fId = id('bw')
-        defs.push(
-          `<filter id="${fId}"><feColorMatrix type="matrix" values="0.33 0.33 0.33 0 0  0.33 0.33 0.33 0 0  0.33 0.33 0.33 0 0  0 0 0 1 0"/></filter>`
-        )
+      if (grayscale || dim > 0 || blur > 0) {
+        const fId = id('tr')
+        let fx = ''
+        if (blur > 0) fx += `<feGaussianBlur stdDeviation="${n(blur)}" edgeMode="duplicate"/>`
+        if (grayscale) fx += `<feColorMatrix type="matrix" values="0.33 0.33 0.33 0 0  0.33 0.33 0.33 0 0  0.33 0.33 0.33 0 0  0 0 0 1 0"/>`
+        if (dim > 0) { const k = 1 - dim; fx += `<feComponentTransfer><feFuncR type="linear" slope="${k}"/><feFuncG type="linear" slope="${k}"/><feFuncB type="linear" slope="${k}"/></feComponentTransfer>` }
+        defs.push(`<filter id="${fId}">${fx}</filter>`)
         filterAttr = ` filter="url(#${fId})"`
       }
       let ix = x
@@ -108,15 +161,15 @@ export function createBuilder() {
       body.push(`<rect x="0" y="0" width="${n(w)}" height="${n(h)}" fill="url(#${gid})" opacity="${opacity}"/>`)
     },
     // objeto flotante: ícono en "tile" (app-icon) o imagen, con sombra + rotación
-    object({ cx, cy, size, rotation = 0, href, tile = false, tileColor = '#000', tileRadius = 0.22, shadow = true, iconInset = 0.22, opacity = 1, aspect = 1 }) {
+    object({ cx, cy, size, rotation = 0, href, tile = false, tileColor = '#000', tileRadius = 0.22, shadow = true, iconInset = 0.22, opacity = 1, aspect = 1, extraFilter = null }) {
       if (!href) return
       const w = size
       const h = size * aspect
       const x = cx - w / 2
       const y = cy - h / 2
       const half = size / 2
-      let filterAttr = ''
-      if (shadow) {
+      let filterAttr = extraFilter ? ` filter="url(#${extraFilter})"` : ''
+      if (shadow && !extraFilter) {
         const fId = id('sh')
         const blur = size * 0.06
         defs.push(
@@ -167,14 +220,17 @@ export function createBuilder() {
       )
     },
     // texto multilínea con tracking
-    text({ x, y, lines, px, weight = 400, fill, anchor = 'start', tracking = 0, lineHeight = 1.15, fontFamily = FONT_STACK, eid = null }) {
+    text({ x, y, lines, px, weight = 400, fill, anchor = 'start', tracking = 0, lineHeight = 1.15, fontFamily = FONT_STACK, eid = null, stroke = null, strokeW = null, filterId = null }) {
       const ls = tracking * px
       const tspans = lines
         .map((ln, i) => `<tspan x="${n(x)}" dy="${i === 0 ? 0 : n(px * lineHeight)}">${esc(ln)}</tspan>`)
         .join('')
       const eidAttr = eid ? ` data-eid="${esc(eid)}"` : ''
+      // stroke: paint-order evita que el borde se coma el glifo
+      const stAttr = stroke ? ` paint-order="stroke fill" stroke="${stroke}" stroke-width="${n(strokeW ?? px * 0.09)}" stroke-linejoin="round"` : ''
+      const fAttr = filterId ? ` filter="url(#${filterId})"` : ''
       body.push(
-        `<text${eidAttr} x="${n(x)}" y="${n(y + px * 0.8)}" font-family="${fontFamily}" font-size="${n(px)}" font-weight="${weight}" letter-spacing="${n(ls)}" fill="${fill}" text-anchor="${anchor}" style="white-space:pre">${tspans}</text>`
+        `<text${eidAttr} x="${n(x)}" y="${n(y + px * 0.8)}" font-family="${fontFamily}" font-size="${n(px)}" font-weight="${weight}" letter-spacing="${n(ls)}" fill="${fill}" text-anchor="${anchor}"${stAttr}${fAttr} style="white-space:pre">${tspans}</text>`
       )
     },
   }

@@ -6,12 +6,16 @@
   "surface": "solid",
   "anchor": "center-left",
   "motif": false,
-  "roles": ["kicker", "metric", "metricLabel", "subtitle"],
+  "roles": [
+    "kicker",
+    "metric",
+    "metricLabel",
+    "subtitle"
+  ],
   "defaults": {
     "scheme": "ink",
     "accent": "emerald",
     "logo": "cream",
-    "clientLogo": "johndeere",
     "hasPhoto": false,
     "kicker": "CASO",
     "metric": "−70%",

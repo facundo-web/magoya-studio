@@ -12,6 +12,10 @@ import wordmarkGreen from './assets/magoya-wordmark-green.svg'
 import wordmarkBlack from './assets/magoya-wordmark-black.svg'
 import wordmarkDeep from './assets/magoya-wordmark-deep.svg'
 import motifEstratos from './assets/motif-estratos.svg'
+import isoCream from './assets/magoya-isotipo.svg'
+import isoGreen from './assets/magoya-isotipo-verde.svg'
+import isoMono from './assets/magoya-isotipo-mono.svg'
+import tramaSvg from './assets/magoya-trama.svg'
 
 
 // ---------- PRIMITIVOS DE COLOR (mirror de tokens.css) ----------
@@ -95,11 +99,17 @@ export const WORDMARK_RATIO = 139 / 38
 // publicar el logo de un prospecto implica una relación que no existe
 // (riesgo legal y de credibilidad, y puede matar la propuesta en curso).
 // Apeel y Biome Makers son los clientes reales — falta su SVG.
-export const CLIENT_LOGOS = {
-  none: { label: 'Sin logo de cliente', url: null },
-}
 
 export const MOTIF_ESTRATOS = motifEstratos
+
+// ISOTIPO (monograma M del buzo) — el símbolo suelto, sin el wordmark
+export const ISOTIPOS = {
+  cream: { label: 'Isotipo · círculo crema', url: isoCream },
+  green: { label: 'Isotipo · círculo verde', url: isoGreen },
+  mono: { label: 'Isotipo · monocromo', url: isoMono, tintable: true },
+}
+// TRAMA de marca (patrón de la capucha) — textura de fondo
+export const TRAMA = tramaSvg
 
 // ---------- DEGRADÉS (overlay sobre el fondo) ----------
 // stops: at 0..1, color, opacity. angle en grados (180 = de arriba a abajo).

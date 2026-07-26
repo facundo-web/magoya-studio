@@ -1,0 +1,23 @@
+{
+  "id": "impacto-cifra",
+  "name": "Impacto · recorte + cifra",
+  "purpose": "Foto de fondo, persona recortada y una cifra gigante. Para contenido educativo de AI en campo.",
+  "category": "impacto",
+  "surface": "photo",
+  "anchor": "center-left",
+  "zocalo": false,
+  "roles": ["kicker", "metric", "metricLabel"],
+  "defaults": {
+    "scheme": "ink",
+    "accent": "emerald",
+    "logo": "cream",
+    "hasPhoto": true,
+    "treatment": "color",
+    "photoDim": 0.45,
+    "photoBlur": 8,
+    "vignette": 0.55,
+    "kicker": "AI EN CAMPO",
+    "metric": "−70%",
+    "metricLabel": "tiempo de scouting"
+  }
+}

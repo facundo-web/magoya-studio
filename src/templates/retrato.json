@@ -6,12 +6,14 @@
   "surface": "photo",
   "anchor": "bottom-left",
   "zocalo": true,
-  "roles": ["quote", "author"],
+  "roles": [
+    "quote",
+    "author"
+  ],
   "defaults": {
     "scheme": "deep",
     "accent": "emerald",
     "logo": "cream",
-    "clientLogo": "none",
     "hasPhoto": true,
     "treatment": "bw",
     "quote": "Mi trabajo es que el equipo del cliente deje de necesitarme.",

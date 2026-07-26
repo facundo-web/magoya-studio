@@ -7,7 +7,7 @@
 // recolorearlos (blanco en tiles, color de marca en plano).
 // ============================================================
 
-import { WORDMARKS, CLIENT_LOGOS, MOTIF_ESTRATOS } from '../brand/brandKit.js'
+import { WORDMARKS, MOTIF_ESTRATOS } from '../brand/brandKit.js'
 import { ICON_URLS } from '../brand/iconLibrary.js'
 
 const cache = new Map() // url -> dataURL (assets simples)
@@ -58,7 +58,6 @@ export function coloredIcon(url, color) {
 export async function preloadBrandAssets() {
   const simple = new Set()
   Object.values(WORDMARKS).forEach((w) => w.url && simple.add(w.url))
-  Object.values(CLIENT_LOGOS).forEach((l) => l.url && simple.add(l.url))
   if (MOTIF_ESTRATOS) simple.add(MOTIF_ESTRATOS)
 
   await Promise.all([

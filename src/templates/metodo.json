@@ -6,12 +6,14 @@
   "surface": "solid",
   "anchor": "center-left",
   "motif": false,
-  "roles": ["kicker", "title"],
+  "roles": [
+    "kicker",
+    "title"
+  ],
   "defaults": {
     "scheme": "cream",
     "accent": "deep",
     "logo": "deep",
-    "clientLogo": "none",
     "hasPhoto": false,
     "kicker": "CÓMO TRABAJAMOS",
     "title": "Antes de escribir código, dos semanas en tu operación.",

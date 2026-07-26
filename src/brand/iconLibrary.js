@@ -56,11 +56,17 @@ export const MARKS = Object.entries(markModules)
   .filter((x) => MARK_NAMES[x.slug])
   .map((x) => ({ id: `marks:${x.slug}`, slug: x.slug, category: x.slug.startsWith('flourish') ? 'trazos' : 'misc', label: MARK_NAMES[x.slug], url: x.url, color: '#0D0C0C', isMark: true }))
 
-// ---- logo de Magoya como elemento colocable (se ubica libre, no auto) ----
-import { WORDMARKS } from './brandKit.js'
-export const MAGOYA_OBJECTS = Object.entries(WORDMARKS).map(([k, w]) => ({
-  id: `magoya:${k}`, slug: k, category: 'magoya', label: `Magoya ${w.label}`, url: w.url, color: null, isWordmark: true,
-}))
+// ---- marca de Magoya como elemento colocable (wordmark + isotipo) ----
+import { WORDMARKS, ISOTIPOS } from './brandKit.js'
+export const MAGOYA_OBJECTS = [
+  ...Object.entries(ISOTIPOS).map(([k, i]) => ({
+    id: `magoya:iso-${k}`, slug: `iso-${k}`, category: 'magoya', label: i.label, url: i.url,
+    color: i.tintable ? '#0D0C0C' : null, isWordmark: !i.tintable, isMark: !!i.tintable, isIsotipo: true,
+  })),
+  ...Object.entries(WORDMARKS).map(([k, w]) => ({
+    id: `magoya:${k}`, slug: k, category: 'magoya', label: `Wordmark ${w.label}`, url: w.url, color: null, isWordmark: true,
+  })),
+]
 
 // ---- dispositivos (celular / notebook / tablet) — se colocan como imagen,
 // y adentro se les mete una foto/gráfico con "Recorte / pantalla" ----
@@ -78,7 +84,18 @@ export const DEVICES = Object.entries(deviceModules).map(([path, url]) => {
   return { id: `devices:${slug}`, slug, category: 'devices', label: DEVICE_NAMES[slug] || slug, url, color: '#1B1B1B', isDevice: true, screen: DEVICE_SCREENS[slug] }
 })
 
-export const ALL_OBJECTS = [...ICONS, ...MARKS, ...MAGOYA_OBJECTS, ...DEVICES]
+// ---- FORMAS generativas (alto impacto "AI en campo") ----
+export const SHAPES = [
+  { id: 'shape:arrow', slug: 'arrow', category: 'shapes', label: 'Flecha gruesa', shape: 'arrow', isShape: true, color: '#00DE68' },
+  { id: 'shape:handArrow', slug: 'handArrow', category: 'shapes', label: 'Flecha a mano', shape: 'handArrow', isShape: true, color: '#00DE68' },
+  { id: 'shape:sparkle', slug: 'sparkle', category: 'shapes', label: 'Destello', shape: 'sparkle', isShape: true, color: '#00DE68' },
+  { id: 'shape:badge', slug: 'badge', category: 'shapes', label: 'Etiqueta', shape: 'badge', isShape: true, color: '#00DE68' },
+  { id: 'shape:bars', slug: 'bars', category: 'shapes', label: 'Barras', shape: 'bars', isShape: true, color: '#00DE68' },
+  { id: 'shape:sparkline', slug: 'sparkline', category: 'shapes', label: 'Curva', shape: 'sparkline', isShape: true, color: '#00DE68' },
+  { id: 'shape:callout', slug: 'callout', category: 'shapes', label: 'Bocadillo', shape: 'callout', isShape: true, color: '#00DE68' },
+]
+
+export const ALL_OBJECTS = [...ICONS, ...MARKS, ...SHAPES, ...MAGOYA_OBJECTS, ...DEVICES]
 export const ICONS_BY_ID = Object.fromEntries(ALL_OBJECTS.map((i) => [i.id, i]))
-export const ICON_CATEGORIES = { ai: 'Logos de IA', social: 'Redes sociales', trazos: 'Trazos', misc: 'Misceláneas', devices: 'Dispositivos', magoya: 'Logo Magoya' }
-export const ICON_URLS = ALL_OBJECTS.map((i) => i.url)
+export const ICON_CATEGORIES = { ai: 'Logos de IA', social: 'Redes sociales', trazos: 'Trazos', misc: 'Misceláneas', shapes: 'Formas', devices: 'Dispositivos', magoya: 'Logo Magoya' }
+export const ICON_URLS = ALL_OBJECTS.map((i) => i.url).filter(Boolean)

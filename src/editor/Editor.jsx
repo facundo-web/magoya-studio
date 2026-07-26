@@ -3,7 +3,7 @@ import PiecePreview from './PiecePreview.jsx'
 import { TEMPLATES, MAXCHARS } from '../templates/index.js'
 import MockupPreview, { MOCKUPS } from './MockupPreview.jsx'
 import { FORMATS_BY_ID, formatsByNetwork, CAROUSEL_FORMATS } from '../formats/registry.js'
-import { COLOR_SCHEMES, ACCENTS, WORDMARKS, CLIENT_LOGOS, TEXT_STYLES, GRADIENTS, HIGHLIGHTS } from '../brand/brandKit.js'
+import { COLOR_SCHEMES, ACCENTS, WORDMARKS, TEXT_STYLES, GRADIENTS, HIGHLIGHTS } from '../brand/brandKit.js'
 import { ALL_OBJECTS, ICONS_BY_ID, ICON_CATEGORIES } from '../brand/iconLibrary.js'
 import { PHOTOS } from '../brand/photoLibrary.js'
 
@@ -31,6 +31,8 @@ const ROLE_LABELS = {
 }
 
 // grilla de posiciones (para ubicar objetos rápido)
+const SHAPE_NAMES = { arrow: 'Flecha gruesa', handArrow: 'Flecha a mano', sparkle: 'Destello', badge: 'Etiqueta', bars: 'Barras', sparkline: 'Curva', callout: 'Bocadillo' }
+
 const POS_GRID = [
   [0.22, 0.2], [0.5, 0.2], [0.78, 0.2],
   [0.22, 0.5], [0.5, 0.5], [0.78, 0.5],
@@ -149,12 +151,17 @@ export default function Editor({
     }
     const icon = ICONS_BY_ID[data.id]
     if (!icon) return
+    if (icon.isShape) {
+      setObjects([...objects, { kind: 'shape', shape: icon.shape, tint: 'accent', ...pos, scale: 0.3, rotation: 0, shadow: false, opacity: 1,
+        ...(icon.shape === 'badge' ? { text: 'NUEVO' } : {}) }])
+      setSelObj(objects.length); return
+    }
     if (icon.isDevice) {
       setObjects([...objects, { kind: 'device', deviceId: icon.id, ...pos, scale: 0.55, rotation: 0, shadow: true, opacity: 1, focal: { x: 0.5, y: 0.5 }, zoom: 1 }])
       setSelObj(objects.length)
       return
     }
-    if (icon.category === 'magoya') {
+    if (icon.category === 'magoya' && !icon.isMark) {
       const src = getAsset(icon.url) || icon.url
       const natural = await imageSize(src)
       setObjects([...objects, { kind: 'image', src, natural, ...pos, scale: icon.isDevice ? 0.5 : 0.34, rotation: 0, shadow: true, opacity: 1 }])
@@ -387,6 +394,10 @@ export default function Editor({
             <FormatBody format={format} onChangeFormat={onChangeFormat} />
             <div className="panel-title" style={{ marginTop: 16 }}>Clima (degradé)</div>
             <GradientBody content={content} set={set} />
+            <div className="panel-title" style={{ marginTop: 16 }}>Efectos de la pieza</div>
+            <Ctl label="Viñeta (oscurece bordes)" value={Math.round((content.vignette ?? 0) * 100)} min={0} max={80} onChange={(v) => set({ vignette: v / 100 })} />
+            <Ctl label="Oscurecer la foto" value={Math.round((content.photoDim ?? 0) * 100)} min={0} max={70} onChange={(v) => set({ photoDim: v / 100 })} />
+            <Ctl label="Desenfocar la foto" value={Math.round(content.photoBlur ?? 0)} min={0} max={30} onChange={(v) => set({ photoBlur: v })} />
           </>
         )}
       </div>
@@ -709,13 +720,18 @@ function ObjectsBody({ objects, setObjects, selObj, setSelObj, objRemove, onToas
   }
   const addIcon = (icon) => {
     // dispositivo: objeto con PANTALLA (la foto va adentro automáticamente)
+    if (icon.isShape) {
+      setObjects([...objects, { kind: 'shape', shape: icon.shape, tint: 'accent', ...pos, scale: 0.3, rotation: 0, shadow: false, opacity: 1,
+        ...(icon.shape === 'badge' ? { text: 'NUEVO' } : {}) }])
+      setSelObj(objects.length); return
+    }
     if (icon.isDevice) {
       setObjects([...objects, { kind: 'device', deviceId: icon.id, x: 0.5, y: 0.5, scale: 0.55, rotation: 0, shadow: true, opacity: 1, focal: { x: 0.5, y: 0.5 }, zoom: 1 }])
       setSelObj(objects.length)
       setPicking(false)
       return
     }
-    if (icon.category === 'magoya') { placeImage(getAsset(icon.url) || icon.url); setPicking(false); return }
+    if (icon.category === 'magoya' && !icon.isMark) { placeImage(getAsset(icon.url) || icon.url); setPicking(false); return }
     const isMark = !!icon.isMark
     setObjects([...objects, { kind: 'icon', iconId: icon.id, style: isMark ? 'plain' : 'tile', tint: isMark ? 'accent' : undefined, x: 0.72, y: 0.42, scale: isMark ? 0.34 : 0.3, rotation: 0, shadow: false, opacity: 1 }])
     setSelObj(objects.length)
@@ -781,9 +797,10 @@ function ObjectsBody({ objects, setObjects, selObj, setSelObj, objRemove, onToas
                   const asset = icon.isDevice || icon.category === 'magoya'
                   return (
                     <button key={icon.id} title={icon.label + ' — tocá o arrastrá a la pieza'} onClick={() => addIcon(icon)}
-                      className={'icon-pick' + (asset ? ' asset' : '')} style={asset ? undefined : { background: icon.color }}
+                      className={'icon-pick' + (asset ? ' asset' : '') + (icon.isShape ? ' shape' : '')}
+                      style={(asset || icon.isShape) ? undefined : { background: icon.color }}
                       draggable onDragStart={(e) => e.dataTransfer.setData('application/x-magoya', JSON.stringify({ type: 'icon', id: icon.id }))}>
-                      <img src={icon.url} alt={icon.label} />
+                      {icon.isShape ? <ShapeGlyph shape={icon.shape} /> : <img src={icon.url} alt={icon.label} />}
                     </button>
                   )
                 })}
@@ -826,6 +843,21 @@ function Pad2D({ x = 0.5, y = 0.5, onChange }) {
       <div className="pad2d-dot" style={{ left: x * 100 + '%', top: y * 100 + '%' }} />
     </div>
   )
+}
+
+/* ---------------- Preview de forma en el picker ---------------- */
+function ShapeGlyph({ shape }) {
+  const C = 'var(--ui-accent)'
+  const p = {
+    arrow: <path d="M2,9 H14 V5 L22,12 L14,19 V15 H2 Z" fill={C} />,
+    handArrow: <g fill="none" stroke={C} strokeWidth="2.2" strokeLinecap="round"><path d="M3,5 C10,3 18,8 20,19" /><path d="M14,15 L21,20 L22,12" /></g>,
+    sparkle: <path d="M12,2 C13,9 15,11 22,12 C15,13 13,15 12,22 C11,15 9,13 2,12 C9,11 11,9 12,2 Z" fill={C} />,
+    badge: <g><rect x="2" y="8" width="20" height="8" rx="4" fill={C} /></g>,
+    bars: <g fill={C}><rect x="3" y="14" width="3.6" height="7" rx="1" opacity=".45" /><rect x="8" y="10" width="3.6" height="11" rx="1" opacity=".45" /><rect x="13" y="12" width="3.6" height="9" rx="1" opacity=".45" /><rect x="18" y="5" width="3.6" height="16" rx="1" /></g>,
+    sparkline: <g fill="none" stroke={C} strokeWidth="2.2" strokeLinecap="round"><path d="M3,17 C7,17 8,12 12,12 C16,12 16,6 21,5" /></g>,
+    callout: <path d="M3,4 H21 V15 H9 L5,19 V15 H3 Z" fill={C} />,
+  }[shape]
+  return <svg viewBox="0 0 24 24" width="70%" height="70%">{p}</svg>
 }
 
 /* ---------------- Pasos numerados (plantilla método) ---------------- */
@@ -929,7 +961,7 @@ function ObjectProps({ o, i, updateObject, objRemove, objBringFront, objSendBack
   return (
     <>
       <div className="insp-head">
-        <span className="insp-name">{o.kind === 'device' ? (objIcon?.label || 'Dispositivo') : o.kind === 'image' ? 'PNG / foto' : (objIcon?.label || 'Logo')}</span>
+        <span className="insp-name">{o.kind === 'shape' ? (SHAPE_NAMES[o.shape] || 'Forma') : o.kind === 'device' ? (objIcon?.label || 'Dispositivo') : o.kind === 'image' ? 'PNG / foto' : (objIcon?.label || 'Logo')}</span>
         <button className="btn" style={{ padding: '2px 8px' }} onClick={() => objRemove(i)}>Quitar</button>
       </div>
       {o.kind === 'device' && (
@@ -980,6 +1012,25 @@ function ObjectProps({ o, i, updateObject, objRemove, objBringFront, objSendBack
         <CutoutButton src={o.src} onToast={onToast}
           onDone={(src, natural) => updateObject(i, { src, natural })} />
       )}
+      {o.kind === 'image' && !o.frame && (
+        <>
+          <label>Efecto (para recortes)</label>
+          <div className="chips" style={{ marginBottom: 8 }}>
+            {[['none', 'Ninguno'], ['outline', 'Contorno'], ['glow', 'Glow'], ['hard', 'Sombra dura']].map(([k, l]) => (
+              <button key={k} className={'chip' + ((o.fx || 'none') === k ? ' on' : '')}
+                onClick={() => updateObject(i, { fx: k === 'none' ? null : k })}>{l}</button>
+            ))}
+          </div>
+          {o.fx && (
+            <div className="swatches" style={{ marginBottom: 8 }}>
+              {[['#FFFFFF', 'Blanco'], ['#00DE68', 'Verde'], ['#0D0C0C', 'Negro'], ['#CBF06E', 'Lime']].map(([c, t]) => (
+                <button key={c} className={'sw' + ((o.fxColor || (o.fx === 'outline' ? '#FFFFFF' : '#00DE68')) === c ? ' on' : '')}
+                  title={t} style={{ background: c }} onClick={() => updateObject(i, { fxColor: c })} />
+              ))}
+            </div>
+          )}
+        </>
+      )}
       {o.kind === 'image' && (
         <>
           <div className="chips" style={{ marginBottom: 8, marginTop: 8 }}>
@@ -1003,6 +1054,26 @@ function ObjectProps({ o, i, updateObject, objRemove, objBringFront, objSendBack
           <div className="swatches" style={{ marginBottom: 8 }}>
             {TINTS.map((t) => (
               <button key={t.k} className={'sw' + ((o.tint || 'accent') === t.value ? ' on' : '')} title={t.label} style={{ background: t.sw }} onClick={() => updateObject(i, { tint: t.value })} />
+            ))}
+          </div>
+        </>
+      )}
+      {o.kind === 'shape' && (
+        <>
+          {(o.shape === 'badge' || o.shape === 'callout') && (
+            <div className="field"><label>Texto</label>
+              <input type="text" value={o.text || ''} onChange={(e) => updateObject(i, { text: e.target.value })} /></div>
+          )}
+          {(o.shape === 'bars' || o.shape === 'sparkline') && (
+            <div className="field"><label>Valores (separados por coma)</label>
+              <input type="text" value={(o.values || [3, 5, 4, 7, 9]).join(', ')}
+                onChange={(e) => updateObject(i, { values: e.target.value.split(',').map((v) => +v.trim() || 0).filter((v) => v >= 0) })} /></div>
+          )}
+          <label>Color</label>
+          <div className="swatches" style={{ marginBottom: 8 }}>
+            {TINTS.map((t) => (
+              <button key={t.k} className={'sw' + ((o.tint || 'accent') === t.value ? ' on' : '')} title={t.label}
+                style={{ background: t.sw }} onClick={() => updateObject(i, { tint: t.value })} />
             ))}
           </div>
         </>
@@ -1050,7 +1121,6 @@ function BrandBody({ content, template, set, onlyColors = false }) {
   const scheme = content.scheme || template.defaults?.scheme || 'deep'
   const accent = content.accent || template.defaults?.accent || 'emerald'
   const logo = content.logo || template.defaults?.logo || 'cream'
-  const clientLogo = content.clientLogo || template.defaults?.clientLogo || 'none'
   if (onlyColors) {
     return (
       <>
@@ -1093,11 +1163,6 @@ function BrandBody({ content, template, set, onlyColors = false }) {
         </select>
       </div>
       <LogoPosition content={content} template={template} set={set} />
-      <div className="field"><label>Logo de cliente</label>
-        <select value={clientLogo} onChange={(e) => set({ clientLogo: e.target.value })}>
-          {Object.entries(CLIENT_LOGOS).map(([k, l]) => (<option key={k} value={k}>{l.label}</option>))}
-        </select>
-      </div>
     </>
   )
 }
@@ -1223,7 +1288,6 @@ function AnchorBody({ content, template, set }) {
 function LogoBody({ content, template, set }) {
   const showLogo = content.showLogo !== false
   const logo = content.logo || template.defaults?.logo || 'cream'
-  const clientLogo = content.clientLogo || 'none'
   return (
     <>
       <div className="chips" style={{ marginBottom: 10 }}>
@@ -1238,11 +1302,6 @@ function LogoBody({ content, template, set }) {
             </select>
           </div>
           <LogoPosition content={content} template={template} set={set} />
-          <div className="field"><label>Logo de cliente</label>
-            <select value={clientLogo} onChange={(e) => set({ clientLogo: e.target.value })}>
-              {Object.entries(CLIENT_LOGOS).map(([k, l]) => (<option key={k} value={k}>{l.label}</option>))}
-            </select>
-          </div>
         </>
       )}
     </>

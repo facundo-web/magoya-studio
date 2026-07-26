@@ -12,15 +12,27 @@
     "scheme": "deep",
     "accent": "emerald",
     "logo": "cream",
-    "clientLogo": "none",
     "hasPhoto": false,
     "bg": "color",
     "showLogo": true,
     "textBlocks": [
-      { "style": "kicker", "text": "WEBINAR" },
-      { "style": "title", "text": "Mapeá tu lote sin un FMS", "highlight": "yellow" },
-      { "style": "subtitle", "text": "Jueves 23 de julio · 11 h ARG · YouTube" },
-      { "style": "cta", "text": "Inscribite gratis" }
+      {
+        "style": "kicker",
+        "text": "WEBINAR"
+      },
+      {
+        "style": "title",
+        "text": "Mapeá tu lote sin un FMS",
+        "highlight": "yellow"
+      },
+      {
+        "style": "subtitle",
+        "text": "Jueves 23 de julio · 11 h ARG · YouTube"
+      },
+      {
+        "style": "cta",
+        "text": "Inscribite gratis"
+      }
     ]
   }
 }

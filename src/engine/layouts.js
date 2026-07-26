@@ -8,10 +8,11 @@
 // ============================================================
 
 import { safeRect } from '../formats/registry.js'
-import { COLOR_SCHEMES, DEFAULT_SCHEME, ACCENTS, TEXT_STYLES, WORDMARKS, CLIENT_LOGOS, WORDMARK_RATIO, MOTIF_ESTRATOS, GRADIENTS, FONT_HAND_STACK, HIGHLIGHTS } from '../brand/brandKit.js'
+import { COLOR_SCHEMES, DEFAULT_SCHEME, ACCENTS, TEXT_STYLES, WORDMARKS, WORDMARK_RATIO, MOTIF_ESTRATOS, GRADIENTS, FONT_HAND_STACK, HIGHLIGHTS } from '../brand/brandKit.js'
 import { ICONS_BY_ID } from '../brand/iconLibrary.js'
 import { getAsset, coloredIcon } from './assets.js'
 import { fitText, measure, wrapText } from './textLayout.js'
+import { arrowPath, handArrowPath, sparklePath, calloutPath, barsRects, sparkline, windowChrome } from './shapes.js'
 
 // texto oscuro o claro según luminancia del fondo
 function contrastOn(hex) {
@@ -46,12 +47,14 @@ export function resolvePiece(template, content) {
     logoPos: c.logoPos || d.logoPos || 'left',
     logoScale: c.logoScale || d.logoScale || 1,
     logo: c.logo || d.logo || 'cream',
-    clientLogo: c.clientLogo || d.clientLogo || 'none',
     treatment: c.treatment || d.treatment || 'bw',
     photo: c.photo || null,
     gradient: c.gradient !== undefined ? c.gradient : d.gradient || null,
     objects: c.objects || d.objects || [],
     steps: c.steps || d.steps || [],
+    vignette: c.vignette ?? d.vignette ?? 0,
+    photoDim: c.photoDim ?? d.photoDim ?? 0,
+    photoBlur: c.photoBlur ?? d.photoBlur ?? 0,
     handAccent: template.handAccent || false,
     text: {
       kicker: pick(c.kicker, d.kicker),
@@ -86,6 +89,7 @@ export function drawPiece(b, { template, content, format }) {
       x: 0, y: 0, w: W, h: H,
       href: p.photo?.src, natural: p.photo?.natural, focal: p.photo?.focal,
       grayscale: p.treatment === 'bw',
+      dim: p.photoDim, blur: p.photoBlur * (ref / 1000),
     })
   } else {
     b.rect({ x: 0, y: 0, w: W, h: H, fill: p.scheme.surface })
@@ -106,6 +110,9 @@ export function drawPiece(b, { template, content, format }) {
       opacity: p.gradient.opacity ?? 1,
     })
   }
+
+  // ---- viñeta (sube el contraste del centro) ----
+  if (p.vignette > 0) b.vignette({ w: W, h: H, strength: p.vignette })
 
   // ---- stack de texto ----
   const blocks = []
@@ -172,7 +179,7 @@ export function drawPiece(b, { template, content, format }) {
   }
 
   // ---- objetos DETRÁS del texto (profundidad) ----
-  drawObjects(b, { objects: (p.objects || []).filter((o) => !o.front), W, H, ref, accent: p.accent })
+  drawObjects(b, { objects: (p.objects || []).filter((o) => !o.front), W, H, ref, accent: p.accent, scheme: p.scheme })
 
   // dibujar bloques
   for (const bl of blocks) {
@@ -220,7 +227,7 @@ export function drawPiece(b, { template, content, format }) {
   if (p.showLogo) drawLogo(b, { p, W, H, safe, ref, textAnchor, hAnchor, vAnchor })
 
   // ---- objetos DELANTE del texto (profundidad) ----
-  drawObjects(b, { objects: (p.objects || []).filter((o) => o.front), W, H, ref, accent: p.accent })
+  drawObjects(b, { objects: (p.objects || []).filter((o) => o.front), W, H, ref, accent: p.accent, scheme: p.scheme })
 }
 
 // ---- renderer de chat (WhatsApp) ----
@@ -275,8 +282,10 @@ function drawChat(b, { template, content, format }) {
   }
 }
 
-function drawObjects(b, { objects, W, H, ref, accent }) {
+function drawObjects(b, { objects, W, H, ref, accent, scheme }) {
   for (const o of objects || []) {
+    // ---- FORMAS generativas (flecha, sparkle, badge, barras, bocadillo) ----
+    if (o.kind === 'shape') { drawShape(b, { o, W, H, ref, accent, scheme }); continue }
     const size = ref * (o.scale || 0.28)
     const cx = W * (o.x ?? 0.72)
     const cy = H * (o.y ?? 0.5)
@@ -317,7 +326,12 @@ function drawObjects(b, { objects, W, H, ref, accent }) {
           zoom: o.zoom || 1, shadow, opacity,
         })
       } else {
-        b.object({ cx, cy, size, rotation, href: o.src, tile: false, shadow, opacity })
+        // efectos del recorte: contorno / glow / sombra dura
+        let extraFilter = null
+        if (o.fx === 'outline') extraFilter = b.filter({ kind: 'outline', r: ref * 0.008, color: o.fxColor || '#FFFFFF' })
+        else if (o.fx === 'glow') extraFilter = b.filter({ kind: 'glow', r: ref * 0.05, color: o.fxColor || accent, opacity: 0.85 })
+        else if (o.fx === 'hard') extraFilter = b.filter({ kind: 'hard', dx: ref * 0.018, dy: ref * 0.018, color: o.fxColor || '#0D0C0C' })
+        b.object({ cx, cy, size, rotation, href: o.src, tile: false, shadow: shadow && !extraFilter, opacity, extraFilter })
       }
       continue
     }
@@ -333,6 +347,83 @@ function drawObjects(b, { objects, W, H, ref, accent }) {
   }
 }
 
+// ---- formas paramétricas (Bloque A: alto impacto) ----
+function drawShape(b, { o, W, H, ref, accent, scheme }) {
+  const size = ref * (o.scale || 0.3)
+  const cx = W * (o.x ?? 0.5), cy = H * (o.y ?? 0.5)
+  const rot = o.rotation || 0
+  const color = o.tint === 'accent' ? accent : (o.tint || accent)
+  const op = o.opacity ?? 1
+  const shadowF = o.shadow ? b.filter({ kind: 'hard', dx: ref * 0.012, dy: ref * 0.012, color: '#0D0C0C', opacity: 0.9 }) : null
+
+  if (o.shape === 'arrow' || o.shape === 'handArrow') {
+    const w = size, h = size * 0.5
+    if (o.shape === 'arrow') {
+      const d = arrowPath(w, h)
+      b.path({ d: shiftPath(d, cx - w / 2, cy - h / 2), fill: color, rotation: rot, cx, cy, opacity: op, filterId: shadowF })
+    } else {
+      const { body, head } = handArrowPath(w, h)
+      const sw = Math.max(3, ref * 0.012)
+      b.path({ d: shiftPath(body, cx - w / 2, cy - h / 2), stroke: color, sw, rotation: rot, cx, cy, opacity: op })
+      b.path({ d: shiftPath(head, cx - w / 2, cy - h / 2), stroke: color, sw, rotation: rot, cx, cy, opacity: op })
+    }
+    return
+  }
+  if (o.shape === 'sparkle') {
+    b.path({ d: shiftPath(sparklePath(size / 2), cx, cy), fill: color, rotation: rot, cx, cy, opacity: op })
+    return
+  }
+  if (o.shape === 'badge') {
+    const txt = String(o.text || 'NUEVO').toUpperCase()
+    const px = size * 0.26
+    const w = measure(txt, { px, weight: 800, tracking: 0.06 }) + px * 1.5
+    const h = px * 2
+    const solid = o.style !== 'outline'
+    b.rect({ x: cx - w / 2, y: cy - h / 2, w, h, rx: h / 2, fill: solid ? color : 'none' })
+    if (!solid) b.path({ d: roundRect(cx - w / 2, cy - h / 2, w, h, h / 2), stroke: color, sw: Math.max(2, ref * 0.006) })
+    b.text({ x: cx, y: cy - px * 0.62, lines: [txt], px, weight: 800, tracking: 0.06,
+      fill: solid ? contrastOn(color) : color, anchor: 'middle' })
+    return
+  }
+  if (o.shape === 'bars') {
+    const vals = o.values || [3, 5, 4, 7, 9]
+    const w = size, h = size * 0.62
+    const x0 = cx - w / 2, y0 = cy - h / 2
+    barsRects(w, h, vals).forEach((r, i) => {
+      b.rect({ x: x0 + r.x, y: y0 + r.y, w: r.w, h: r.h, rx: r.rx,
+        fill: i === vals.length - 1 ? color : (scheme?.muted || color), opacity: i === vals.length - 1 ? 1 : 0.45 })
+    })
+    return
+  }
+  if (o.shape === 'sparkline') {
+    const vals = o.values || [2, 3, 3, 5, 4, 7, 9]
+    const w = size, h = size * 0.5
+    const x0 = cx - w / 2, y0 = cy - h / 2
+    const { line, last } = sparkline(w, h, vals)
+    b.path({ d: shiftPath(line, x0, y0), stroke: color, sw: Math.max(3, ref * 0.01) })
+    b.rect({ x: x0 + last[0] - ref * 0.012, y: y0 + last[1] - ref * 0.012, w: ref * 0.024, h: ref * 0.024, rx: ref * 0.012, fill: color })
+    return
+  }
+  if (o.shape === 'callout') {
+    const w = size, h = size * 0.62
+    const x0 = cx - w / 2, y0 = cy - h / 2
+    b.path({ d: shiftPath(calloutPath(w, h, { r: ref * 0.03 }), x0, y0), fill: o.fill || '#FFFFFF', filterId: shadowF })
+    if (o.text) {
+      const px = size * 0.09
+      const lines = wrapText(String(o.text), { px, weight: 600, maxWidth: w * 0.84 })
+      b.text({ x: x0 + w * 0.08, y: y0 + h * 0.2, lines, px, weight: 600, fill: '#0D0C0C', lineHeight: 1.3 })
+    }
+    return
+  }
+}
+// desplaza un path (los generadores dibujan en origen 0,0)
+function shiftPath(d, dx, dy) {
+  return d.replace(/(-?[\d.]+),(-?[\d.]+)/g, (m, x, y) => `${(+x + dx).toFixed(2)},${(+y + dy).toFixed(2)}`)
+}
+function roundRect(x, y, w, h, r) {
+  return `M${x + r},${y} H${x + w - r} A${r},${r} 0 0 1 ${x + w},${y + r} V${y + h - r} A${r},${r} 0 0 1 ${x + w - r},${y + h} H${x + r} A${r},${r} 0 0 1 ${x},${y + h - r} V${y + r} A${r},${r} 0 0 1 ${x + r},${y} Z`
+}
+
 function drawLogo(b, { p, W, H, safe, ref, hAnchor, vAnchor }) {
   const wm = WORDMARKS[p.logo] || WORDMARKS.cream
   const logoUrl = getAsset(wm.url)
@@ -345,15 +436,4 @@ function drawLogo(b, { p, W, H, safe, ref, hAnchor, vAnchor }) {
   const ly = vAnchor === 'top' ? safe.y + safe.h - lh : safe.y
   b.asset({ x: lx, y: ly, w: lw, h: lh, href: logoUrl })
 
-  // logo de cliente del lado opuesto al de Magoya (si hay)
-  const cl = CLIENT_LOGOS[p.clientLogo]
-  if (cl && cl.url) {
-    const clUrl = getAsset(cl.url)
-    if (clUrl) {
-      const ch = lh * 1.1
-      const cw = ch * 2.4
-      const cx = onRight ? safe.x : W - safe.x - cw
-      b.asset({ x: cx, y: ly, w: cw, h: ch, href: clUrl })
-    }
-  }
 }
