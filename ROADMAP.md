@@ -23,7 +23,7 @@ pedir cambios por WhatsApp.
 
 ---
 
-## 🔴 BLOQUE A — "AI en campo": piezas de alto impacto
+## ✅ BLOQUE A (HECHO) — "AI en campo": piezas de alto impacto
 > **El foco de esta etapa.** Hoy el motor no llega al nivel de las
 > referencias (miniaturas tipo YouTube educativas). Esto es lo que falta.
 
@@ -59,7 +59,7 @@ pedir cambios por WhatsApp.
 
 ---
 
-## 🟡 BLOQUE C — Confianza (que no se pierda trabajo)
+## ✅ BLOQUE C (HECHO) — Confianza (que no se pierda trabajo)
 
 - **C1** Autosave honesto: si se llena el navegador hoy dice "✓ Guardado" y
   **miente**. Chip en rojo + aviso + "descargar ahora". **S**
@@ -70,7 +70,7 @@ pedir cambios por WhatsApp.
 
 ---
 
-## 🟡 BLOQUE D — Carrusel y revisión
+## 🟠 BLOQUE D (D1 y D2 hechos) — Carrusel y revisión
 
 - **D1** **Reordenar slides arrastrando** + numeración 1/5 en la tira. **M**
 - **D2** El preview compartido muestra **solo la slide 1**: que muestre el
@@ -83,7 +83,7 @@ pedir cambios por WhatsApp.
 
 ---
 
-## 🟢 BLOQUE E — Sistema visual (que se vea 5 niveles arriba)
+## 🟠 BLOQUE E (E2 hecho: íconos SVG) — Sistema visual (que se vea 5 niveles arriba)
 
 - **E1** Unificar componentes: hay **7 implementaciones del mismo pill** y 5
   tipos de card → `.u-btn` / `.u-card` (CSS ya especificado). **M**
@@ -95,7 +95,7 @@ pedir cambios por WhatsApp.
 
 ---
 
-## 🟢 BLOQUE F — Contenido y plantillas
+## 🟠 BLOQUE F (F1 hecho: 2 plantillas) — Contenido y plantillas
 
 - **F1** 2 plantillas más: **"Mito vs realidad"** (el formato de mayor
   engagement en LinkedIn B2B) e **"Insight con fuente"** (dato externo
@@ -118,6 +118,9 @@ pedir cambios por WhatsApp.
 ---
 
 ## 🙋 Decisiones que dependen de vos
+
+0. **RESUELTO:** isotipo extraído del PDF del buzo (3 variantes) + trama de
+   la capucha, ya usables. Logos de clientes: eliminados por completo.
 
 1. **Los dos pilares de marca.** Un commit de limpieza sacó el highlight
    amarillo, el glow y los sparkles por "estilo YouTube / genérico de IA" —
