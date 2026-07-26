@@ -23,6 +23,9 @@ const P = {
   cursor: 'M6 3l13 9-6 1.5L10 20z',
   undo: 'M9 14L4 9l5-5M4 9h11a5 5 0 010 10h-4',
   redo: 'M15 14l5-5-5-5M20 9H9a5 5 0 000 10h4',
+  check: 'M4 12l5 5L20 6',
+  flipH: 'M12 3v18M8 7L4 12l4 5M16 7l4 5-4 5',
+  flipV: 'M3 12h18M7 8l5-4 5 4M7 16l5 4 5-4',
   scissors: 'M6 3l12 12M6 21L18 9M8 6a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0zM8 18a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z',
 }
 export default function Icon({ n, size = 20, ...rest }) {

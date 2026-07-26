@@ -37,9 +37,9 @@ export const TEMPLATES = [
 ]
 
 export const TEMPLATES_BY_ID = Object.fromEntries(TEMPLATES.map((t) => [t.id, t]))
-// Las ocultas siguen existiendo (hay proyectos guardados que las usan) pero
-// ya no se ofrecen: son variantes de otra plantilla, no plantillas propias.
-export const VISIBLE_TEMPLATES = TEMPLATES.filter((t) => !t.hidden)
+// Nota: las plantillas con `hidden` siguen existiendo (hay proyectos
+// guardados que las referencian) pero la galería y el selector de slides no
+// las ofrecen: son variantes de otra plantilla, no plantillas propias.
 export const BLANK_TEMPLATE = blank
 
 // El copy NO vive en la plantilla: la plantilla es estructura. Estos son

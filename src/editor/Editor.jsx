@@ -79,7 +79,7 @@ function Section({ title, help, summary, defaultOpen = false, children }) {
       <button className="sec-head" onClick={() => setOpen((o) => !o)}>
         <span className="sec-title">{title}</span>
         {!open && summary ? <span className="sec-sum">{summary}</span> : null}
-        <span className="sec-chev">{open ? '▾' : '▸'}</span>
+        <span className={'sec-chev' + (open ? ' open' : '')}><Icon n="chevron" size={13} /></span>
       </button>
       {open && (
         <div className="sec-body">
@@ -377,8 +377,8 @@ export default function Editor({
           ['brand', 'brand', 'Marca'],
           ['settings', 'settings', 'Ajustes'],
         ].map(([k, ico, label]) => (
-          <button key={k} className={'rail-btn' + (panel === k && sheet ? ' on' : '') + (panel === k ? ' cur' : '')}
-            onClick={() => { setSheet(panel === k ? !sheet : true); setPanel(k) }} title={label}>
+          <button key={k} className={'rail-btn' + (panel === k ? ' on' : '')}
+            onClick={() => { if (panel === k) setSheet((v) => !v); else { setPanel(k); setSheet(true) } }} title={label}>
             <span className="rail-ico"><Icon n={ico} size={21} /></span>
             <span className="rail-label">{label}</span>
           </button>
@@ -511,7 +511,7 @@ export default function Editor({
           <div style={{ flex: 1 }} />
           {canCarousel && !isCarousel && <button className="btn" onClick={onConvertToCarousel}>+ Convertir en carrusel</button>}
           {isCarousel && (
-            <span className="mode-pill">▦ Carrusel · {slides.length} {slides.length === 1 ? 'slide' : 'slides'}
+            <span className="mode-pill"><Icon n="grid" size={14} /> Carrusel · {slides.length} {slides.length === 1 ? 'slide' : 'slides'}
               {slides.length === 1 && onBackToSingle && <button className="linklike" onClick={onBackToSingle}>Volver a pieza simple</button>}
             </span>
           )}
@@ -569,9 +569,14 @@ export default function Editor({
               }} />
             )}
             {needsPhoto && (
-              <button className="photo-cta" onClick={() => photoInputRef.current?.click()}>
-                <span className="pc-ic">＋</span>
-                <span>Subí una foto para empezar</span>
+              // Si ya hay algo puesto en la pieza, el cartel grande estorba
+              // (tapa justo lo que acabás de colocar): pasa a ser un chip.
+              // Y lleva al panel Fondo, que es donde vive la foto de FONDO
+              // — no al file picker, así también podés usar la biblioteca.
+              <button className={'photo-cta' + (objects.length ? ' mini' : '')}
+                onClick={() => { setPanel('bg'); setSheet(true) }}>
+                <span className="pc-ic"><Icon n="plus" size={objects.length ? 14 : 20} /></span>
+                <span>{objects.length ? 'Falta la foto de fondo' : 'Elegí la foto de fondo para empezar'}</span>
               </button>
             )}
             {selObj != null && objects[selObj] && (
@@ -661,7 +666,7 @@ export default function Editor({
           </>
         ) : (
           <div className="insp-empty">
-            <div className="insp-empty-ic">☞</div>
+            <div className="insp-empty-ic"><Icon n="cursor" size={22} /></div>
             Tocá un elemento o un texto en la pieza para editar sus propiedades acá.
             <span className="insp-empty-sub">Doble-click en un texto para escribir directo.</span>
           </div>
@@ -881,8 +886,8 @@ function ObjectsBody({ objects, setObjects, selObj, setSelObj, objRemove, onToas
             const oi = (o.kind === 'icon' || o.kind === 'device') ? ICONS_BY_ID[o.iconId || o.deviceId] : null
             return (
               <div key={i} className={'obj-row' + (selObj === i ? ' sel' : '')}>
-                <button className="obj-row-name" onClick={() => setSelObj(i)}>{selObj === i ? '◉ ' : '○ '}{objectName(o, oi)}</button>
-                <button className="obj-row-del" onClick={() => objRemove(i)} title="Quitar">✕</button>
+                <button className="obj-row-name" onClick={() => setSelObj(i)}><span className={'row-dot' + (selObj === i ? ' on' : '')} />{objectName(o, oi)}</button>
+                <button className="obj-row-del" onClick={() => objRemove(i)} title="Quitar"><Icon n="close" size={13} /></button>
               </div>
             )
           })}
@@ -906,12 +911,12 @@ function ObjectsBody({ objects, setObjects, selObj, setSelObj, objRemove, onToas
           {cat === 'custom' ? (
             <>
               <div className="icon-grid">
-                <button className="icon-pick upload" title="Subir un elemento" onClick={() => fileRef.current?.click()}><span>＋</span></button>
+                <button className="icon-pick upload" title="Subir un elemento" onClick={() => fileRef.current?.click()}><span><Icon n="plus" size={18} /></span></button>
                 {elements.filter((e) => e.kind !== 'photo').map((el) => (
                   <div key={el.id} className="icon-pick custom" title={el.name + ' — tocá o arrastrá a la pieza'}
                     draggable onDragStart={(e) => e.dataTransfer.setData('application/x-magoya', JSON.stringify({ type: 'element', id: el.id }))}>
                     <img src={el.src} alt={el.name} onClick={() => placeImage(el.src, el.id)} />
-                    <button className="el-del" title="Quitar de la biblioteca" onClick={(e) => { e.stopPropagation(); onDeleteElement && onDeleteElement(el.id) }}>✕</button>
+                    <button className="el-del" title="Quitar de la biblioteca" onClick={(e) => { e.stopPropagation(); onDeleteElement && onDeleteElement(el.id) }}><Icon n="close" size={11} /></button>
                   </div>
                 ))}
               </div>
@@ -1013,22 +1018,24 @@ function PhotosBody({ objects, setObjects, setSelObj, elements = [], onAddElemen
   const fileRef = useRef(null)
   const misFotos = elements.filter((e) => e.kind === 'photo')
 
-  const place = async (src, elementId) => {
+  // `label` = cómo se llama en el inspector; sin esto toda foto decía "Imagen"
+  const place = async (src, elementId, label) => {
     const natural = await imageSize(src)
-    setObjects([...objects, { kind: 'image', src, elementId, natural, x: 0.5, y: 0.5, scale: 0.5, rotation: 0, shadow: false, opacity: 1 }])
+    setObjects([...objects, { kind: 'image', src, elementId, label, natural, x: 0.5, y: 0.5, scale: 0.5, rotation: 0, shadow: false, opacity: 1 }])
     setSelObj(objects.length)
   }
   const upload = async (file) => {
     if (!file || !file.type.startsWith('image/')) return onToast('Ese archivo no es una imagen')
     const src = await compressImage(file)
+    const nice = file.name.replace(/\.[^.]+$/, '')
     let elementId
-    if (onAddElement) elementId = onAddElement({ name: file.name.replace(/\.[^.]+$/, ''), src, kind: 'photo' })?.id
-    place(src, elementId)
+    if (onAddElement) elementId = onAddElement({ name: nice, src, kind: 'photo' })?.id
+    place(src, elementId, nice)
   }
-  const useLib = async (url) => {
+  const useLib = async (url, label) => {
     const blob = await (await fetch(url)).blob()
     const src = await new Promise((r) => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(blob) })
-    place(src)
+    place(src, undefined, label)
   }
 
   return (
@@ -1046,9 +1053,9 @@ function PhotosBody({ objects, setObjects, setSelObj, elements = [], onAddElemen
           <div className="photo-lib">
             {misFotos.map((el) => (
               <div key={el.id} className="photo-lib-item wrap" title={el.name}>
-                <img src={el.src} alt={el.name} onClick={() => place(el.src, el.id)}
+                <img src={el.src} alt={el.name} onClick={() => place(el.src, el.id, el.name)}
                   draggable onDragStart={(e) => e.dataTransfer.setData('application/x-magoya', JSON.stringify({ type: 'element', id: el.id }))} />
-                <button className="el-del" title="Quitar de mis fotos" onClick={(e) => { e.stopPropagation(); onDeleteElement && onDeleteElement(el.id) }}>✕</button>
+                <button className="el-del" title="Quitar de mis fotos" onClick={(e) => { e.stopPropagation(); onDeleteElement && onDeleteElement(el.id) }}><Icon n="close" size={11} /></button>
               </div>
             ))}
           </div>
@@ -1058,7 +1065,7 @@ function PhotosBody({ objects, setObjects, setSelObj, elements = [], onAddElemen
       <label style={{ marginTop: 12 }}>Biblioteca Magoya</label>
       <div className="photo-lib">
         {PHOTOS.map((p) => (
-          <button key={p.slug} className="photo-lib-item" title={p.label} onClick={() => useLib(p.url)}>
+          <button key={p.slug} className="photo-lib-item" title={p.label} onClick={() => useLib(p.url, p.label)}>
             <img src={p.url} alt={p.label} loading="lazy" />
           </button>
         ))}
@@ -1224,7 +1231,7 @@ function ObjectProps({ o, i, updateObject, objRemove, objBringFront, objSendBack
           )}
         </>
       )}
-      {o.kind === 'icon' && isMark && (
+      {o.kind === 'icon' && (objIcon?.category === 'agro' || objIcon?.category === 'trazos') && (
         <Ctl label="Grosor del trazo" value={Math.round((o.sw || 1) * 100)} min={40} max={300} step={10} suffix="%"
           onChange={(v) => updateObject(i, { sw: v / 100 }, 'sw')} />
       )}
@@ -1253,8 +1260,8 @@ function ObjectProps({ o, i, updateObject, objRemove, objBringFront, objSendBack
       </div>
       <label>Reflejar</label>
       <div className="chips" style={{ marginBottom: 10 }}>
-        <button className={'chip' + (o.flipX ? ' on' : '')} onClick={() => updateObject(i, { flipX: !o.flipX })} title="Espeja el elemento (útil para que una flecha apunte al otro lado)">⇄ Horizontal</button>
-        <button className="chip" onClick={() => updateObject(i, { rotation: ((o.rotation || 0) + 180) % 360 > 180 ? ((o.rotation || 0) + 180) - 360 : (o.rotation || 0) + 180 })} title="Gira 180°">⇅ Vertical</button>
+        <button className={'chip' + (o.flipX ? ' on' : '')} onClick={() => updateObject(i, { flipX: !o.flipX })} title="Espeja el elemento (útil para que una flecha apunte al otro lado)"><Icon n="flipH" size={14} /> Horizontal</button>
+        <button className="chip" onClick={() => updateObject(i, { rotation: ((o.rotation || 0) + 180) % 360 > 180 ? ((o.rotation || 0) + 180) - 360 : (o.rotation || 0) + 180 })} title="Gira 180°"><Icon n="flipV" size={14} /> Vertical</button>
       </div>
       <Ctl label="Opacidad" value={Math.round((o.opacity ?? 1) * 100)} min={10} max={100} step={5} suffix="%" onChange={(v) => updateObject(i, { opacity: v / 100 }, 'op')} />
       <label>Sombra (profundidad)</label>
@@ -1421,9 +1428,9 @@ function TextBlocksBody({ content, set, onSelectText, selText }) {
                 <span className="row-preview">{String(b.text).trim() || '—'}</span>
               </button>
               <span style={{ display: 'flex' }}>
-                <button className="obj-row-del" onClick={() => move(i, -1)} title="Subir">↑</button>
-                <button className="obj-row-del" onClick={() => move(i, 1)} title="Bajar">↓</button>
-                <button className="obj-row-del" onClick={() => remove(i)} title="Quitar">✕</button>
+                <button className="obj-row-del" onClick={() => move(i, -1)} title="Subir"><Icon n="up" size={13} /></button>
+                <button className="obj-row-del" onClick={() => move(i, 1)} title="Bajar"><Icon n="down" size={13} /></button>
+                <button className="obj-row-del" onClick={() => remove(i)} title="Quitar"><Icon n="close" size={13} /></button>
               </span>
             </div>
           )
@@ -1546,9 +1553,9 @@ function ChatBody({ content, template, set }) {
               <button className={'chip' + (m.from === 'me' ? ' on' : '')} onClick={() => update(i, { from: 'me' })}>Enviado</button>
             </div>
             <span style={{ display: 'flex' }}>
-              <button className="obj-row-del" onClick={() => move(i, -1)} title="Subir">↑</button>
-              <button className="obj-row-del" onClick={() => move(i, 1)} title="Bajar">↓</button>
-              <button className="obj-row-del" onClick={() => remove(i)} title="Quitar">✕</button>
+              <button className="obj-row-del" onClick={() => move(i, -1)} title="Subir"><Icon n="up" size={13} /></button>
+              <button className="obj-row-del" onClick={() => move(i, 1)} title="Bajar"><Icon n="down" size={13} /></button>
+              <button className="obj-row-del" onClick={() => remove(i)} title="Quitar"><Icon n="close" size={13} /></button>
             </span>
           </div>
           <textarea value={m.text} onChange={(e) => update(i, { text: e.target.value })} rows={2} />
@@ -1570,7 +1577,7 @@ function MoreMenu({ onSaveTemplate, onExportFile }) {
   const act = (fn) => { setOpen(false); fn && fn() }
   return (
     <div className="menu">
-      <button className="btn" onClick={() => setOpen((o) => !o)}>Más ▾</button>
+      <button className="btn" onClick={() => setOpen((o) => !o)}>Más <span className={'sec-chev chev-menu' + (open ? ' open' : '')}><Icon n="chevron" size={12} /></span></button>
       {open && (
         <div className="menu-pop" onMouseLeave={() => setOpen(false)}>
           <button onClick={() => act(onSaveTemplate)}><span>Guardar como plantilla</span><Icon n="bookmark" size={15} /></button>

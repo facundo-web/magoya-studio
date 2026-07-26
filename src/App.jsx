@@ -37,6 +37,7 @@ export default function App() {
   const [shares, setShares] = useState([])       // D4 · links de revisión propios
   const [shareCounts, setShareCounts] = useState({})
   const [linkToCopy, setLinkToCopy] = useState(null) // fallback si el portapapeles falla
+  const [tplName, setTplName] = useState(null)       // C4 · nombre al guardar plantilla
   const [pvSlide, setPvSlide] = useState(0)
 
   useEffect(() => {
@@ -53,6 +54,8 @@ export default function App() {
   // pieza(s) en edición
   const [projectId, setProjectId] = useState(null)
   const [projectName, setProjectName] = useState('')
+  // si lo renombraste a mano, editar el título de la pieza NO puede pisarlo
+  const namedByHand = useRef(false)
   const [formatId, setFormatId] = useState(DEFAULT_FORMAT)
   const [galleryFormatId, setGalleryFormatId] = useState(DEFAULT_FORMAT)
   const [pieces, setPieces] = useState([]) // [{template, content}]
@@ -111,6 +114,7 @@ export default function App() {
   // ---- iniciar desde template ----
   function pickTemplate(template, chosenFormat) {
     setProjectId(newProjectId())
+    namedByHand.current = false
     setProjectName(template.defaults?.title || template.name)
     setFormatId(chosenFormat?.id || galleryFormatId || DEFAULT_FORMAT)
     setPieces([{ template, content: freshContent(template) }])
@@ -131,6 +135,7 @@ export default function App() {
       return
     }
     setProjectId(p.id || newProjectId())
+    namedByHand.current = true // el proyecto ya tiene su nombre elegido
     setProjectName(p.name || '')
     setFormatId(FORMATS_BY_ID[p.formatId] ? p.formatId : DEFAULT_FORMAT)
     setPieces(ps)
@@ -171,9 +176,18 @@ export default function App() {
       if (!sameGesture) pushHistory(ps)
       return ps.map((p, i) => (i === active ? { ...p, content: next } : p))
     })
-    if (active === 0 && next.title) setProjectName(next.title)
+    if (active === 0 && next.title && !namedByHand.current) setProjectName(next.title)
     setDirty(true)
   }
+  // Toda operación de SLIDE (agregar, duplicar, reordenar, cambiar diseño,
+  // borrar) tiene que entrar al historial. Antes tocaban setPieces directo:
+  // ⌘Z no deshacía nada y una slide borrada se perdía para siempre.
+  function mutatePieces(fn) {
+    lastTagRef.current = null
+    setPieces((ps) => { pushHistory(ps); return fn(ps) })
+    setDirty(true)
+  }
+
   // ---- undo / redo (últimos 40 estados de pieces) ----
   function pushHistory(prev) {
     undoRef.current.push(prev)
@@ -196,15 +210,15 @@ export default function App() {
   function addSlide(template) {
     // sin plantilla → slide EN BLANCO para componer con bloques
     const tpl = template || BLANK_TEMPLATE
-    setPieces((ps) => [...ps, { template: tpl, content: freshContent(tpl) }])
+    mutatePieces((ps) => [...ps, { template: tpl, content: freshContent(tpl) }])
     setCarousel(true)
     setActive(pieces.length)
-    setDirty(true)
     showToast('Slide agregada')
   }
   function startBlank(fmt) {
     const f = fmt || FORMATS_BY_ID[galleryFormatId] || FORMATS_BY_ID[DEFAULT_FORMAT]
     setProjectId(newProjectId())
+    namedByHand.current = false
     setProjectName('Pieza nueva')
     setFormatId(f.id)
     setPieces([{ template: BLANK_TEMPLATE, content: freshContent(BLANK_TEMPLATE) }])
@@ -214,6 +228,7 @@ export default function App() {
     const format = fmt && CAROUSEL_FORMATS.includes(fmt.id) ? fmt : FORMATS_BY_ID['li-carousel']
     const blank = () => ({ template: BLANK_TEMPLATE, content: freshContent(BLANK_TEMPLATE) })
     setProjectId(newProjectId())
+    namedByHand.current = false
     setProjectName('Carrusel')
     setFormatId(format.id)
     setPieces([blank(), blank(), blank()])
@@ -227,9 +242,10 @@ export default function App() {
     showToast('Listo: ya es un carrusel. Sumá la slide 2 con el +')
   }
   function backToSingle() { setCarousel(false); setActive(0); setDirty(true) }
+  // C2 · lo que se borra de las bibliotecas también se puede recuperar
   function duplicateSlide() {
     // clona la slide activa (deep) para continuar la historia (ej: chat que sigue)
-    setPieces((ps) => {
+    mutatePieces((ps) => {
       const src = ps[active]
       if (!src) return ps
       const content = JSON.parse(JSON.stringify(src.content))
@@ -239,27 +255,22 @@ export default function App() {
     })
     setCarousel(true)
     setActive((a) => a + 1)
-    setDirty(true)
     showToast('Slide duplicada — seguí la historia')
   }
   function reorderSlides(from, to) {
-    setPieces((ps) => { const a = [...ps]; const [it] = a.splice(from, 1); a.splice(to, 0, it); return a })
-    setActive(to); setDirty(true)
+    mutatePieces((ps) => { const a = [...ps]; const [it] = a.splice(from, 1); a.splice(to, 0, it); return a })
+    setActive(to)
   }
   function changeSlideTemplate(template) {
     // cambia el diseño de la slide activa, conservando el contenido (textos/foto/marca)
-    setPieces((ps) => ps.map((p, i) => (i === active ? { template, content: p.content } : p)))
-    setDirty(true)
+    mutatePieces((ps) => ps.map((p, i) => (i === active ? { template, content: p.content } : p)))
     showToast('Diseño de la slide cambiado')
   }
   function deleteSlide(i) {
-    setPieces((ps) => {
-      const next = ps.filter((_, idx) => idx !== i)
-      return next.length ? next : ps
-    })
+    if (pieces.length <= 1) { showToast('Es la única slide: no se puede borrar'); return }
+    mutatePieces((ps) => ps.filter((_, idx) => idx !== i))
     setActive((a) => Math.max(0, a - (i <= a ? 1 : 0)))
-    if (pieces.length - 1 < 1) setCarousel(false)
-    setDirty(true)
+    showToast('Slide borrada — ⌘Z para recuperarla')
   }
 
   // ---- acciones ----
@@ -304,11 +315,14 @@ export default function App() {
     return el
   }
   function removeCustomElement(id) {
+    const backup = loadElements().find((e) => e.id === id)
     setElements(deleteElement(id))
+    setUndoDelete({ kind: 'element', data: backup })
     showToast('Elemento eliminado de tu biblioteca')
   }
   function saveAsTemplate(name) {
     if (!current) return
+    if (name === undefined) { setTplName(projectName || current.template.name); return } // pide nombre
     const tpl = buildTemplateFromPiece(current.template, current.content, name)
     if (saveCustomTemplate(tpl)) {
       setCustomTemplates(loadCustomTemplates())
@@ -331,8 +345,10 @@ export default function App() {
   function removeShare(id) { setShares(forgetShare(id)); showToast('Sacado de tu lista (el link sigue vivo)') }
 
   function removeCustomTemplate(id) {
+    const backup = loadCustomTemplates().find((t) => t.id === id)
     setCustomTemplates(deleteCustomTemplate(id))
-    showToast('Plantilla eliminada')
+    setUndoDelete({ kind: 'template', data: backup })
+    showToast('Se eliminó «' + (backup?.name || 'la plantilla') + '»')
   }
 
   // ---- compartir para revisión (nube: con foto + comentarios) ----
@@ -476,7 +492,7 @@ export default function App() {
             <input className="crumb-name" value={projectName}
               placeholder="Sin título"
               title="Nombre de esta pieza"
-              onChange={(e) => { setProjectName(e.target.value); setDirty(true) }} />
+              onChange={(e) => { namedByHand.current = true; setProjectName(e.target.value); setDirty(true) }} />
           </nav>
         )}
         <div className="spacer" />
@@ -546,6 +562,22 @@ export default function App() {
         <div className="center-note">Cargando…</div>
       )}
 
+      {tplName !== null && (
+        <div className="mk-modal-ov" onClick={() => setTplName(null)}>
+          <div className="share-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="share-head"><strong>Guardar como plantilla</strong><button className="btn" onClick={() => setTplName(null)}>Cancelar</button></div>
+            <p className="panel-help" style={{ margin: '0 0 10px' }}>Con qué nombre la va a encontrar el resto del equipo. El diseño se guarda; los textos y la foto no.</p>
+            <input className="link-box" value={tplName} autoFocus placeholder="Ej: Caso de cliente · versión corta"
+              onChange={(e) => setTplName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter' && tplName.trim()) { const n = tplName.trim(); setTplName(null); saveAsTemplate(n) } }} />
+            <div className="share-foot">
+              <button className="btn primary" disabled={!tplName.trim()}
+                onClick={() => { const n = tplName.trim(); setTplName(null); saveAsTemplate(n) }}>Guardar plantilla</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {linkToCopy && (
         <div className="mk-modal-ov" onClick={() => setLinkToCopy(null)}>
           <div className="share-modal" onClick={(e) => e.stopPropagation()}>
@@ -561,7 +593,10 @@ export default function App() {
           {toast}
           {undoDelete && (
             <button className="toast-act" onClick={() => {
-              if (undoDelete.kind === 'project' && undoDelete.data) setProjects(upsertProject(undoDelete.data))
+              const { kind, data } = undoDelete
+              if (data && kind === 'project') setProjects(upsertProject(data))
+              if (data && kind === 'template') { saveCustomTemplate(data); setCustomTemplates(loadCustomTemplates()) }
+              if (data && kind === 'element') { addElement({ name: data.name, src: data.src, kind: data.kind }); setElements(loadElements()) }
               setUndoDelete(null); showToast('Restaurado')
             }}>Deshacer</button>
           )}

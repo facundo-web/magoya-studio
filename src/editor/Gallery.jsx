@@ -148,7 +148,7 @@ export default function Gallery({
               <div className="h3-thumb">
                 <PiecePreview template={t} content={placeholderContent(t)} format={fmt} />
                 {t.custom && onDeleteTemplate && (
-                  <button className="tpl-del" title="Eliminar plantilla" onClick={(e) => { e.stopPropagation(); onDeleteTemplate(t.id) }}>✕</button>
+                  <button className="tpl-del" title="Eliminar plantilla" onClick={(e) => { e.stopPropagation(); onDeleteTemplate(t.id) }}><Icon n="close" size={11} /></button>
                 )}
                 <span className="h3-use">Usar →</span>
               </div>
