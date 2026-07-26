@@ -1,0 +1,24 @@
+{
+  "id": "contraste",
+  "name": "Mito vs realidad",
+  "purpose": "Lo que te venden vs lo que pasa. El formato de más engagement en LinkedIn B2B.",
+  "category": "post",
+  "surface": "solid",
+  "anchor": "center-left",
+  "motif": false,
+  "freeform": true,
+  "roles": [],
+  "defaults": {
+    "scheme": "ink",
+    "accent": "emerald",
+    "logo": "cream",
+    "hasPhoto": false,
+    "bg": "color",
+    "showLogo": true,
+    "textBlocks": [
+      { "style": "kicker", "text": "LO QUE NO HACEMOS" },
+      { "style": "subtitle", "text": "Lo que te venden: un piloto de IA en seis semanas." },
+      { "style": "title", "text": "Lo que pasa: seis semanas para descubrir que los datos están en cuatro planillas." }
+    ]
+  }
+}

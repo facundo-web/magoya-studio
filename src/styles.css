@@ -583,3 +583,7 @@ button.obj-row { width: 100%; cursor: pointer; text-align: left; font: inherit; 
 .pv-nav { display: flex; align-items: center; gap: 12px; }
 .pv-count { font-size: 12px; font-family: var(--font-mono); color: var(--ui-fg-2); }
 .c-slide { color: var(--ui-fg-3); font-size: 11px; }
+.u-ico { display: block; flex: none; }
+.rail-ico { display: flex; align-items: center; justify-content: center; }
+.btn .u-ico, .h3-filter .u-ico { margin-right: -1px; }
+.proj-act { display: inline-flex; align-items: center; justify-content: center; }

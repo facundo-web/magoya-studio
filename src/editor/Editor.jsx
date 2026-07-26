@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import PiecePreview from './PiecePreview.jsx'
 import { TEMPLATES, MAXCHARS } from '../templates/index.js'
 import MockupPreview, { MOCKUPS } from './MockupPreview.jsx'
+import Icon from '../ui/Icon.jsx'
 import { FORMATS_BY_ID, formatsByNetwork, CAROUSEL_FORMATS } from '../formats/registry.js'
 import { COLOR_SCHEMES, ACCENTS, WORDMARKS, TEXT_STYLES, GRADIENTS, HIGHLIGHTS } from '../brand/brandKit.js'
 import { ALL_OBJECTS, ICONS_BY_ID, ICON_CATEGORIES } from '../brand/iconLibrary.js'
@@ -288,15 +289,15 @@ export default function Editor({
     <div className={'editor' + (selObj != null || selText ? ' has-sel' : '')}>
       <nav className="insert-rail">
         {[
-          ['text', 'T', 'Texto'],
-          ['bg', '▣', 'Fondo'],
-          ['photos', '▤', 'Fotos'],
-          ['elements', '✳', 'Elementos'],
-          ['brand', 'M', 'Marca'],
-          ['settings', '⚙', 'Ajustes'],
+          ['text', 'text', 'Texto'],
+          ['bg', 'layers', 'Fondo'],
+          ['photos', 'photo', 'Fotos'],
+          ['elements', 'sparkle', 'Elementos'],
+          ['brand', 'brand', 'Marca'],
+          ['settings', 'settings', 'Ajustes'],
         ].map(([k, ico, label]) => (
           <button key={k} className={'rail-btn' + (panel === k ? ' on' : '')} onClick={() => setPanel(k)} title={label}>
-            <span className="rail-ico">{ico}</span>
+            <span className="rail-ico"><Icon n={ico} size={21} /></span>
             <span className="rail-label">{label}</span>
           </button>
         ))}
@@ -410,8 +411,8 @@ export default function Editor({
           <span style={{ fontSize: 13, color: '#5C6B61' }}>{format.network} · {format.label} · {format.w}×{format.h}</span>
           {onUndo && (
             <span className="undo-group">
-              <button className="btn icon-btn" onClick={onUndo} disabled={!canUndo} title="Deshacer (⌘Z)">↶</button>
-              <button className="btn icon-btn" onClick={onRedo} disabled={!canRedo} title="Rehacer (⇧⌘Z)">↷</button>
+              <button className="btn icon-btn" onClick={onUndo} disabled={!canUndo} title="Deshacer (⌘Z)"><Icon n="undo" size={16} /></button>
+              <button className="btn icon-btn" onClick={onRedo} disabled={!canRedo} title="Rehacer (⇧⌘Z)"><Icon n="redo" size={16} /></button>
             </span>
           )}
           <label className="safe-toggle"><input type="checkbox" checked={showSafe} onChange={(e) => setShowSafe(e.target.checked)} /> Ver zona segura</label>
@@ -422,7 +423,7 @@ export default function Editor({
               {slides.length === 1 && onBackToSingle && <button className="linklike" onClick={onBackToSingle}>Volver a pieza simple</button>}
             </span>
           )}
-          <button className="btn" onClick={() => setMockupOpen(true)}>👁 Ver en mockup</button>
+          <button className="btn" onClick={() => setMockupOpen(true)}><Icon n="eye" size={16} /> Ver en mockup</button>
           <MoreMenu onSaveTemplate={onSaveTemplate} onShare={onShare} onShareReview={onShareReview ? () => onShareReview(mockup) : undefined} onExportFile={onExportFile} />
           <DownloadMenu template={template} content={content} format={format} slides={slides} busy={busy} setBusy={setBusy} onToast={onToast} />
         </div>
@@ -499,7 +500,7 @@ export default function Editor({
               </button>
             ))}
             <button className="add" onClick={() => onAddSlide()} title="Agregar slide en blanco (componer con bloques)">+</button>
-            {onDuplicateSlide && <button className="btn" style={{ marginLeft: 8 }} onClick={onDuplicateSlide} title="Duplica esta slide para continuar la historia (ej: el chat que sigue)">⧉ Duplicar slide</button>}
+            {onDuplicateSlide && <button className="btn" style={{ marginLeft: 8 }} onClick={onDuplicateSlide} title="Duplica esta slide para continuar la historia (ej: el chat que sigue)"><Icon n="copy" size={15} /> Duplicar slide</button>}
             <button className="btn" onClick={() => setChooser('add')}>Desde plantilla</button>
             <button className="btn" onClick={() => setChooser('change')}>Cambiar diseño</button>
             {slides.length > 1 && <button className="btn" onClick={() => onDeleteSlide(activeSlide)}>Borrar slide</button>}
@@ -685,7 +686,7 @@ function CutoutButton({ src, onDone, onToast }) {
   return (
     <button className="btn" style={{ marginTop: 8, width: '100%' }} onClick={run} disabled={busy}
       title="Recorta la persona u objeto y deja el fondo transparente">
-      {busy ? `Quitando fondo… ${pct}%` : '✂ Quitar fondo'}
+      {busy ? `Quitando fondo… ${pct}%` : <><Icon n="scissors" size={15} /> Quitar fondo</>}
     </button>
   )
 }
@@ -1423,7 +1424,7 @@ function DownloadMenu({ template, content, format, slides, busy, setBusy, onToas
   }
   return (
     <div className="menu">
-      <button className="btn primary" disabled={busy} onClick={() => setOpen((o) => !o)}>↓ Descargar</button>
+      <button className="btn primary" disabled={busy} onClick={() => setOpen((o) => !o)}><Icon n="down" size={16} /> Descargar</button>
       {open && (
         <div className="menu-pop" onMouseLeave={() => setOpen(false)}>
           <div className="grp">Recomendado</div>

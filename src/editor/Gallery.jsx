@@ -2,6 +2,7 @@ import React, { useRef } from 'react'
 import { TEMPLATES, placeholderContent } from '../templates/index.js'
 import { FORMATS_BY_ID, FORMATS, formatsByNetwork } from '../formats/registry.js'
 import PiecePreview from './PiecePreview.jsx'
+import Icon from '../ui/Icon.jsx'
 
 // La home resuelve UNA cosa: cómo arrancás. Tres caminos, siempre visibles.
 // El formato NO se decide acá (se cambia en el editor cuando querés): sacarlo
@@ -55,17 +56,17 @@ export default function Gallery({
 
       <div className="h3-start">
         <button className="start-card primary" onClick={() => onStartBlank(fmt)}>
-          <span className="sc-ico">＋</span>
+          <span className="sc-ico"><Icon n="plus" size={24} /></span>
           <span className="sc-t">Empezar en blanco</span>
           <span className="sc-s">Armá la tuya desde cero</span>
         </button>
         <button className="start-card" onClick={() => onStartCarousel(fmt)}>
-          <span className="sc-ico">▦</span>
+          <span className="sc-ico"><Icon n="grid" size={24} /></span>
           <span className="sc-t">Carrusel</span>
           <span className="sc-s">Varias slides que cuentan algo</span>
         </button>
         <button className="start-card" onClick={() => document.querySelector('.h3-templates')?.scrollIntoView({ behavior: 'smooth' })}>
-          <span className="sc-ico">▤</span>
+          <span className="sc-ico"><Icon n="layers" size={24} /></span>
           <span className="sc-t">Desde una plantilla</span>
           <span className="sc-s">{visible.length} diseños ya resueltos</span>
         </button>
@@ -88,8 +89,8 @@ export default function Gallery({
                   <div className="proj-meta">
                     <span className="proj-name" title={p.name}>{p.name || 'Sin título'}</span>
                     <span className="proj-acts">
-                      {onDuplicateProject && <button className="proj-act" onClick={() => onDuplicateProject(p)} title="Duplicar">⧉</button>}
-                      <button className="proj-act del" onClick={() => onDeleteProject(p.id)} title="Eliminar">✕</button>
+                      {onDuplicateProject && <button className="proj-act" onClick={() => onDuplicateProject(p)} title="Duplicar"><Icon n="copy" size={12} /></button>}
+                      <button className="proj-act del" onClick={() => onDeleteProject(p.id)} title="Eliminar"><Icon n="close" size={12} /></button>
                     </span>
                   </div>
                 </div>

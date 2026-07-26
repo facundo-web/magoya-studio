@@ -1,0 +1,20 @@
+{
+  "id": "insight",
+  "name": "Insight con fuente",
+  "purpose": "Un dato externo citado + tu lectura. Curaduría con opinión, no autobombo.",
+  "category": "metric",
+  "surface": "solid",
+  "anchor": "center-left",
+  "motif": true,
+  "roles": ["metric", "metricLabel", "body", "author"],
+  "defaults": {
+    "scheme": "cream",
+    "accent": "deep",
+    "logo": "deep",
+    "hasPhoto": false,
+    "metric": "34%",
+    "metricLabel": "abandona una herramienta digital en el primer año",
+    "body": "No es adopción. Es onboarding mal diseñado.",
+    "author": "Fuente: USDA ERS, 2025"
+  }
+}

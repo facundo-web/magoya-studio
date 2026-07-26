@@ -22,13 +22,15 @@ import impCifra from './impacto-cifra.json'
 import impPantalla from './impacto-pantalla.json'
 import impApps from './impacto-apps.json'
 import impPregunta from './impacto-pregunta.json'
+import contraste from './contraste.json'
+import insight from './insight.json'
 
 // Orden por OBJETIVO de marketing (auditoría): primero lo que prueba y
 // educa; "en blanco" al final — arrancar en blanco es donde se rompe la marca.
 export const TEMPLATES = [
   impCifra, impApps, impPantalla, impPregunta, // AI en campo · alto impacto
-  casoCliente, dato, cita, retrato,          // prueba social y resultados
-  metodo, techTitular, evento, bloqueColor,  // autoridad y anuncios
+  casoCliente, dato, insight, cita, retrato,          // prueba social y resultados
+  metodo, contraste, techTitular, evento, bloqueColor,  // autoridad y anuncios
   carruselPortada, carruselCierre, whatsapp, // carrusel
   zocaloPlaca, fotoTitular, fotoCentrada,    // foto + texto
   blank,                                      // último a propósito
