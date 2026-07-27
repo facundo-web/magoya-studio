@@ -5,6 +5,7 @@ import BrandKit from './editor/BrandKit.jsx'
 import MockupPreview from './editor/MockupPreview.jsx'
 import { createShare, loadShare, listComments, addComment, countComments, setVerdict, getVerdicts } from './lib/supabase.js'
 import { TEMPLATES, TEMPLATES_BY_ID, BLANK_TEMPLATE, placeholderContent } from './templates/index.js'
+import { tamanoComun } from './engine/layouts.js'
 import { FORMATS_BY_ID, CAROUSEL_FORMATS } from './formats/registry.js'
 import {
   loadProjects, upsertProject, deleteProject, newProjectId,
@@ -591,6 +592,10 @@ export default function App() {
     const t = pc && allById[pc.templateId]
     const multi = pvPieces.length > 1
     const pfmt = FORMATS_BY_ID[preview.formatId] || FORMATS_BY_ID[DEFAULT_FORMAT]
+    // el carrusel se pasa entero: antes el que revisaba veía sólo la slide 1
+    // y sin los puntos, o sea no podía revisar cómo encadena
+    const pvSlides = multi ? pvPieces.map((x) => ({ template: allById[x.templateId], content: x.content })).filter((x) => x.template) : null
+    const pvLock = pvSlides && pvSlides.length > 1 && pc?.content?.mismoTamano !== false ? tamanoComun(pvSlides, pfmt) : null
     const exitPreview = () => { setPreview(null); if (location.hash) location.hash = '' }
     // K2 · antes esto sólo abría WhatsApp: el que revisaba creía que había
     // terminado y el que esperaba no se enteraba nunca. Ahora queda guardado
@@ -623,11 +628,14 @@ export default function App() {
           <div className={'review-wrap' + (preview.shareId ? ' comentable' : '')}
             onClick={(e) => {
               if (!preview.shareId) return
+              // pasar de slide no es dejar un comentario
               if (e.target.closest('.c-pin') || e.target.closest('.pin-form')) return
+              if (e.target.closest('.mk-carrusel') || e.target.closest('.mkc-dot') || e.target.closest('.mk-story-top')) return
               const r = e.currentTarget.getBoundingClientRect()
               setPin({ x: ((e.clientX - r.left) / r.width) * 100, y: ((e.clientY - r.top) / r.height) * 100, slide: idx })
             }}>
-            {t ? <MockupPreview template={t} content={pc.content} format={pfmt} mockup={preview.mockup || 'ig'} dark={!!preview.dark} /> : <div className="center-note">No se pudo cargar la pieza compartida.</div>}
+            {t ? <MockupPreview template={t} content={pc.content} format={pfmt} mockup={preview.mockup || 'ig'} dark={!!preview.dark}
+              slides={pvSlides} sizeLock={pvLock} slideIdx={idx} onSlide={setPvSlide} /> : <div className="center-note">No se pudo cargar la pieza compartida.</div>}
             {preview.shareId && comments.filter((c) => (c.slide ?? 0) === idx).map((c, i) => (
               <span key={c.id} className="c-pin" style={{ left: c.x + '%', top: c.y + '%' }} title={`${c.author}: ${c.text}`}>{i + 1}</span>
             ))}
@@ -642,13 +650,7 @@ export default function App() {
               </div>
             )}
           </div>
-          {multi && (
-            <div className="pv-nav">
-              <button className="btn" onClick={() => setPvSlide((v) => Math.max(0, v - 1))} disabled={idx === 0}>‹</button>
-              <span className="pv-count">{idx + 1} / {pvPieces.length}</span>
-              <button className="btn" onClick={() => setPvSlide((v) => Math.min(pvPieces.length - 1, v + 1))} disabled={idx === pvPieces.length - 1}>›</button>
-            </div>
-          )}
+
           {preview.shareId && (
             <p className="preview-note"><b>Tocá un punto de la pieza para dejar un comentario ahí</b> — quedan anclados como en Figma.</p>
           )}

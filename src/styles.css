@@ -584,7 +584,12 @@ button.obj-row { width: 100%; cursor: pointer; text-align: left; font: inherit; 
 
 .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--ink-900); color: #fff; padding: 10px 18px; border-radius: 999px; font-size: 13px; z-index: 100; box-shadow: 0 10px 30px rgba(0,0,0,.25); }
 .center-note { padding: 40px; font-family: var(--font-mono); color: #8A9389; }
-.preview-stage { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding: 28px; background: #E9E4DC; }
+.preview-stage { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; align-items: center; justify-content: safe center; gap: 16px; padding: 28px; background: #E9E4DC; }
+/* En una columna con scroll, `justify-content: center` deja la parte de
+   ARRIBA fuera del alcance: el contenido se desborda por los dos lados y no
+   hay forma de scrollear hasta el principio. Con `safe center` se centra
+   sólo mientras entra, y si no, se apoya arriba.
+   Era lo que cortaba el header de la pieza en la vista de revisión. */
 .preview-note { font-size: 12px; color: #8A9389; text-align: center; max-width: 46ch; }
 /* revisión con comentarios (pines tipo Figma) */
 .review-wrap { position: relative; }
