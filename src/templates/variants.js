@@ -45,7 +45,13 @@ export function variantsFor(template) {
     return template.variants.map((v) => V(v.id, v.label, v.set || v))
   }
   const onPhoto = template.surface === 'photo'
-  const list = onPhoto ? [...COMMON.slice(0, 3), ...PHOTO_EXTRA, ...COMMON.slice(3)] : COMMON
+  let list = onPhoto ? [...COMMON.slice(0, 3), ...PHOTO_EXTRA, ...COMMON.slice(3)] : COMMON
+  // "Etiqueta con línea" cuelga la línea de la volanta: si la plantilla no
+  // tiene ese rol, la variante no hace nada (y en algunas hasta APAGA la
+  // regla de acento, o sea saca la línea que promete).
+  const tieneEtiqueta = (template.roles || []).includes('kicker')
+    || (template.defaults?.textBlocks || []).some((b) => b.style === 'kicker')
+  if (!tieneEtiqueta) list = list.filter((v) => v.id !== 'kickerline')
   return list
 }
 

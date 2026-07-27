@@ -174,6 +174,8 @@ export function toShareLink(project, mockup) {
   const json = JSON.stringify(light)
   const b64 = btoa(unescape(encodeURIComponent(json)))
   const base = location.origin + location.pathname
+  // los links muy largos los truncan WhatsApp y Slack: mejor decirlo
+  if (b64.length > 60000) return { tooLong: true, size: b64.length }
   return `${base}#p=${b64}`
 }
 
@@ -187,10 +189,17 @@ export function fromShareLink() {
   }
 }
 
+// Saca TODAS las fotos, no sólo la de fondo: las de los objetos (foto
+// suelta, pantalla del dispositivo, captura, recortes) también son data-URL
+// y hacían que el link pesara megas — se rompía al pegarlo y el aviso decía
+// "sin foto" igual.
 function stripPhotos(content) {
   if (!content) return content
   const c = { ...content }
   if (c.photo) c.photo = { note: 'foto no incluida en el link — usar archivo .magoya.json' }
+  if (Array.isArray(c.objects)) {
+    c.objects = c.objects.map((o) => (o.src && String(o.src).startsWith('data:') ? { ...o, src: null } : o))
+  }
   return c
 }
 

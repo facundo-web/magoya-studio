@@ -92,6 +92,15 @@ export default function App() {
     setElements(loadElements())
     setCustomTemplates(loadCustomTemplates())
     setShares(loadShares())
+    // ¿quedó una copia de emergencia de la última vez? (cierre de pestaña)
+    try {
+      const pend = localStorage.getItem('magoya_studio_pending_v1')
+      if (pend) {
+        const p = JSON.parse(pend)
+        dehydrate(p).then((liv) => setProjects(upsertProject(liv))).catch(() => {})
+        localStorage.removeItem('magoya_studio_pending_v1')
+      }
+    } catch {}
     // ¿link de revisión en la nube? (#r=<id>, con foto y comentarios)
     const rm = location.hash.match(/[#&]r=([\w-]+)/)
     if (rm) {
@@ -103,7 +112,7 @@ export default function App() {
     // ¿link liviano embebido?
     const shared = fromShareLink()
     if (shared?.preview) setPreview(shared)
-    else if (shared) openFromSerialized(shared)
+    else if (shared) openFromSerialized(shared, 'link')
   }, [])
 
   // Cuántos comentarios tiene cada pieza compartida (para el badge).
@@ -130,25 +139,49 @@ export default function App() {
   const format = FORMATS_BY_ID[formatId] || FORMATS_BY_ID[DEFAULT_FORMAT]
   const current = pieces[active] || null
 
+  // Guardar de verdad. Antes vivía dentro del setTimeout del efecto: al
+  // salir del editor React corría el cleanup, mataba el timer y el guardado
+  // no ocurría nunca. Todo lo hecho en los últimos 800 ms se perdía.
+  const guardar = async () => {
+    if (!projectId || !piecesRef.current.length) return
+    const liviano = await dehydrate(serialize()).catch(() => serialize())
+    const next = upsertProject(liviano)
+    setProjects(next)
+    if (next.saveOk === false) {
+      setSaveFail(true)
+      showToast('⚠ No se pudo guardar — mirá el aviso de abajo')
+    } else {
+      setSaveFail(false)
+      setDirty(false)   // sin esto el chip decía "Guardando…" para siempre
+      collectGarbage(next).catch(() => {})
+    }
+    usage().then(setEspacio).catch(() => {})
+  }
+  const guardarRef = useRef(guardar)
+  useEffect(() => { guardarRef.current = guardar })
+
   // autosave: guarda el proyecto en edición tras cada cambio (debounced)
   useEffect(() => {
     if (view !== 'editor' || !projectId || !pieces.length || !dirty) return
-    const t = setTimeout(async () => {
-      // las fotos van a IndexedDB; en localStorage queda sólo texto chico
-      const liviano = await dehydrate(serialize()).catch(() => serialize())
-      const next = upsertProject(liviano)
-      setProjects(next)
-      if (next.saveOk === false) {
-        setSaveFail(true)
-        showToast('⚠ No se pudo guardar — mirá el aviso de abajo')
-      } else {
-        setSaveFail(false)
-        collectGarbage(next).catch(() => {})
-      }
-      usage().then(setEspacio).catch(() => {})
-    }, 800)
-    return () => clearTimeout(t)
-  }, [dirty, pieces, formatId, carousel, view, projectId])
+    const t = setTimeout(() => guardarRef.current(), 800)
+    // al desmontar (salir del editor) se guarda YA, no se descarta
+    return () => { clearTimeout(t); guardarRef.current() }
+  }, [dirty, pieces, formatId, carousel, view, projectId, projectName])
+
+  // cerrar la pestaña o cambiar de app tampoco puede perder los últimos
+  // cambios: localStorage es síncrono, así que alcanza con escribir el
+  // proyecto sin dehidratar como copia de emergencia.
+  useEffect(() => {
+    const alSalir = () => {
+      if (!dirtyRef.current || !projectId) return
+      try { localStorage.setItem('magoya_studio_pending_v1', JSON.stringify(serialize())) } catch {}
+    }
+    window.addEventListener('pagehide', alSalir)
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') alSalir() })
+    return () => window.removeEventListener('pagehide', alSalir)
+  })
+  const dirtyRef = useRef(dirty)
+  useEffect(() => { dirtyRef.current = dirty }, [dirty])
 
   // ---- iniciar desde template ----
   function pickTemplate(template, chosenFormat) {
@@ -166,18 +199,29 @@ export default function App() {
   }
 
   // ---- abrir proyecto guardado / serializado ----
-  async function openFromSerialized(raw) {
+  async function openFromSerialized(raw, fuente = 'local') {
     // las fotos guardadas son referencias a IndexedDB: hay que traerlas
     const p = await hydrate(raw).catch(() => raw)
-    const ps = (p.pieces || []).map((pp) => ({
-      template: allById[pp.templateId],
-      content: pp.content || {},
-    })).filter((x) => x.template)
+    // Si falta la plantilla, la slide se sustituye por una en blanco
+    // conservando el contenido. Antes se descartaba EN SILENCIO y, como se
+    // reusaba el mismo id, el autosave destruía el original.
+    let faltantes = 0
+    const ps = (p.pieces || []).map((pp) => {
+      const t = allById[pp.templateId]
+      if (!t) faltantes++
+      return { template: t || BLANK_TEMPLATE, content: pp.content || {} }
+    })
     if (!ps.length) {
       showToast('No se pudo abrir el proyecto')
       return
     }
-    setProjectId(p.id || newProjectId())
+    if (faltantes) showToast(`⚠ ${faltantes} slide${faltantes > 1 ? 's usan' : ' usa'} una plantilla que no está en este navegador`)
+    else if (p.__fotosFaltantes) showToast(`⚠ ${p.__fotosFaltantes} foto${p.__fotosFaltantes > 1 ? 's' : ''} ya no está${p.__fotosFaltantes > 1 ? 'n' : ''} en este navegador`)
+    // Un link o un archivo abren una COPIA: reusar el id pisaba el proyecto
+    // local que tuviera ese mismo id (y el del link viene sin fotos).
+    const idExiste = p.id && loadProjects().some((x) => x.id === p.id)
+    const id = (fuente !== 'local' && idExiste) ? newProjectId() : (p.id || newProjectId())
+    setProjectId(id)
     namedByHand.current = true // el proyecto ya tiene su nombre elegido
     setProjectName(p.name || '')
     setFormatId(FORMATS_BY_ID[p.formatId] ? p.formatId : DEFAULT_FORMAT)
@@ -402,6 +446,10 @@ export default function App() {
   }
   async function share(mockup) {
     const link = toShareLink(serialize(), typeof mockup === 'string' ? mockup : undefined)
+    if (link && link.tooLong) {
+      showToast('⚠ La pieza es muy pesada para un link. Usá "Para que lo revisen", que sube la foto.')
+      return
+    }
     const ok = await copyToClipboard(link)
     if (ok) showToast('✓ Link de preview copiado — sin foto (para la foto, compartí para revisión)')
     else setLinkToCopy(link)
@@ -409,7 +457,7 @@ export default function App() {
   async function importFile(file) {
     try {
       const p = await importProjectFile(file)
-      openFromSerialized(p)
+      openFromSerialized(p, 'archivo')
       showToast('✓ Proyecto importado')
     } catch {
       showToast('⚠ Archivo inválido')
@@ -550,7 +598,7 @@ export default function App() {
           <label className="dk-toggle" style={{ color: 'var(--cream-300)' }}>
             <input type="checkbox" checked={!!preview.dark} onChange={(e) => setPreview({ ...preview, dark: e.target.checked })} /> Modo oscuro
           </label>
-          <button className="btn ghost-light" onClick={() => { const p = preview; setPreview(null); if (location.hash) location.hash = ''; openFromSerialized(p) }}>Editar esta pieza</button>
+          <button className="btn ghost-light" onClick={() => { const p = preview; setPreview(null); if (location.hash) location.hash = ''; openFromSerialized(p, 'link') }}>Editar esta pieza</button>
         </div>
         <div className="preview-stage">
           <div className="review-wrap"

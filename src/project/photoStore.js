@@ -87,9 +87,20 @@ export async function dehydrate(project) {
   return walk(project, putPhoto)
 }
 
-// versión guardada → proyecto usable (fotos de vuelta en memoria)
+// versión guardada → proyecto usable (fotos de vuelta en memoria).
+// Si un blob no está, se devuelve null en vez de dejar la referencia: con la
+// referencia adentro la app creía que la foto seguía puesta, dibujaba un
+// <image> roto sin avisar, y el próximo autosave la re-guardaba así.
 export async function hydrate(project) {
-  return walk(project, async (v) => (await getPhoto(v)) || v)
+  const faltan = []
+  const out = await walk(project, async (v) => {
+    if (!isRef(v)) return v
+    const real = await getPhoto(v)
+    if (!real) { faltan.push(v); return null }
+    return real
+  })
+  out.__fotosFaltantes = faltan.length
+  return out
 }
 
 // borra las fotos que ya no usa ningún proyecto guardado

@@ -348,7 +348,10 @@ button.obj-row { width: 100%; cursor: pointer; text-align: left; font: inherit; 
 .g-head-left .linklike { font-size: 12px; }
 .g-firsttime { grid-column: 1 / -1; font-size: 13px; color: var(--ui-fg-2); background: var(--ui-sunken); border: 1px solid var(--ui-line); border-radius: 10px; padding: 12px 16px; margin-top: 12px; }
 /* acciones del proyecto: ✕ solo en hover para evitar el misclick */
-.proj-acts { display: inline-flex; gap: 2px; opacity: 0; transition: opacity .12s; }
+.proj-acts { display: inline-flex; gap: 2px; opacity: 0; pointer-events: none; transition: opacity .12s; }
+.proj-card:hover .proj-acts, .proj-card:focus-within .proj-acts { pointer-events: auto; }
+/* en touch no hay hover: si quedan invisibles, se toca "eliminar" sin verlo */
+@media (hover: none) { .proj-acts { opacity: 1; pointer-events: auto; } }
 .proj-card:hover .proj-acts, .proj-card:focus-within .proj-acts { opacity: 1; }
 .proj-act, .tpl-del { width: 22px; height: 22px; min-height: 0; border: 0; background: var(--ui-line); color: var(--ui-fg-2); line-height: 1; padding: 0; }
 .proj-act:hover { background: var(--ui-selected-ink); color: #fff; }
@@ -600,26 +603,13 @@ button.obj-row { width: 100%; cursor: pointer; text-align: left; font: inherit; 
   .topbar .btn { padding: 7px 12px; font-size: 12px; }
   .crumbs { order: 3; width: 100%; }
 }
-/* breakpoint ÚNICO de colapso del editor (auditoría UX): 900px */
+/* El editor colapsa en UN solo breakpoint (860px, más abajo). Antes había
+   dos bloques definiendo layouts distintos a la vez y el de arriba ganaba
+   por especificidad, dejando el inspector recortado por el rail. */
 @media (max-width: 900px) {
-  html, body, #root { height: auto; }
-  .app { height: auto; min-height: 100vh; }
   .gallery.compact { height: auto; overflow: visible; padding: 14px 16px 24px; }
   .tgrid, .tgrid2 { overflow: visible; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
-  /* editor apilado: pieza arriba, rail de inserción abajo fijo,
-     inspector como bottom-sheet al seleccionar */
-  .editor { flex-direction: column; padding-bottom: 64px; }
-  .editor .sidebar, .editor .inspector { width: auto !important; }
-  .col-resize { display: none; }
-  .editor .stage { order: -1; }
-  .stage-canvas { padding: 14px; min-height: 42vh; }
-  .piece-frame svg { max-height: 46vh; }
-  .sidebar { border-right: 0; border-top: 1px solid var(--paper-200,#E6E1D8); overflow: visible; }
-  .stage-tools { position: sticky; top: 0; background: #E9E4DC; z-index: 5; }
   .dest, .palette-grid { grid-template-columns: 1fr; }
-  .insert-rail { position: fixed; bottom: 0; left: 0; right: 0; flex-direction: row; justify-content: space-around; width: auto; height: 58px; border-right: 0; border-top: 1px solid var(--paper-200,#E6E1D8); z-index: 55; padding: 4px 8px; }
-  .editor.has-sel .inspector { position: fixed; bottom: 58px; left: 0; right: 0; max-height: 45vh; overflow: auto; border-radius: 16px 16px 0 0; z-index: 60; box-shadow: 0 -12px 32px rgba(0,0,0,.22); border-top: 1px solid var(--paper-200,#E6E1D8); }
-  .editor:not(.has-sel) .inspector { display: none; }
 }
 @media (max-width: 520px) {
   .gallery.compact h1 { font-size: 20px; }
@@ -789,8 +779,10 @@ button.obj-row { width: 100%; cursor: pointer; text-align: left; font: inherit; 
   .stage { width: 100%; }
   /* la barra del lienzo se comprime: en el teléfono lo que importa es ver
      la pieza, compartirla y bajarla. El resto queda para la compu. */
-  .stage-tools { flex-wrap: nowrap; gap: 6px; padding: 8px 10px; overflow-x: auto; }
-  .stage-tools > span:first-child, .safe-toggle, .undo-group { display: none; }
+  /* Sin overflow: con overflow-x:auto el navegador también recorta en Y y
+     los menús de Descargar y Más quedaban en cero, invisibles. */
+  .stage-tools { flex-wrap: wrap; gap: 6px; padding: 8px 10px; }
+  .zoom-ctl, .safe-toggle, .undo-group, .fmt-dim { display: none; }
   .stage-tools .btn { flex: 0 0 auto; padding: 8px 11px; font-size: 13px; }
   .stage-canvas { padding: 10px; }
   .strip { overflow-x: auto; }
@@ -806,9 +798,12 @@ button.obj-row { width: 100%; cursor: pointer; text-align: left; font: inherit; 
     border-radius: 18px 18px 0 0; border: 1px solid var(--paper-200,#E6E1D8);
     box-shadow: 0 -18px 50px rgba(0,0,0,.16); padding: 8px 14px 18px;
     transform: translateY(102%); transition: transform .18s ease; }
+  /* las dos hojas se turnan: la que abriste manda. Antes .has-sel ganaba
+     por orden y el panel izquierdo no se abría nunca con algo seleccionado */
   .editor.sheet-open .sidebar { transform: none; }
-  .editor.has-sel .inspector { transform: none; }
-  .editor.has-sel .sidebar { transform: translateY(102%); }
+  .editor.has-sel:not(.sheet-open) .inspector { transform: none; }
+  .editor.has-sel:not(.sheet-open) .sidebar { transform: translateY(102%); }
+  .editor.sheet-open .inspector { transform: translateY(102%); }
   .sheet-close { display: block; margin: 0 auto 4px; background: none; border: 0;
     color: #8A9389; padding: 4px 18px; cursor: pointer; }
   .insp-empty { display: none; }
@@ -939,3 +934,10 @@ button.obj-row { width: 100%; cursor: pointer; text-align: left; font: inherit; 
 .mkc-num { font-size: 12px; color: var(--ui-fg-3); margin-left: 4px; }
 .mk-feed-stage.dark .mkc-arrow { color: #FAFAFA; }
 .mk-feed-stage.dark .mkc-dot { background: rgba(255,255,255,.25); }
+
+/* indicador de carrusel en la barra del lienzo */
+.mode-pill { display: inline-flex; align-items: center; gap: 7px; font-size: var(--fs-2); font-weight: 600;
+  color: var(--ui-fg-2); background: var(--ui-surface); border: 1px solid var(--ui-line);
+  padding: 6px 11px; border-radius: var(--r-pill); }
+.ictl-unit { font-size: var(--fs-2); color: var(--ui-fg-3); margin-left: 3px; }
+.ictl-numwrap { display: inline-flex; align-items: center; gap: 1px; }

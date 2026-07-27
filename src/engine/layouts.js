@@ -304,11 +304,6 @@ function drawChat(b, { template, content, format }) {
     b.gradientOverlay({ w: W, h: H, angle: grad.angle ?? g.angle, stops: g.stops, opacity: grad.opacity ?? 1 })
   }
 
-  // Objetos DETRÁS del panel. El chat ignoraba por completo lo que sumabas:
-  // el elemento aparecía en la lista y se podía seleccionar en el lienzo,
-  // pero la pieza no lo dibujaba nunca. Un no-op silencioso.
-  drawObjects(b, { objects: objects.filter((o) => !o.front), W, H, ref, accent, scheme })
-
   // panel del chat
   const px = W * 0.06, py = H * 0.055, pw = W * 0.88, ph = H * 0.89
   const R = ref * 0.045
@@ -324,6 +319,11 @@ function drawChat(b, { template, content, format }) {
   b.text({ x: avx + av / 2, y: avy + av * 0.24, lines: ['m'], px: av * 0.52, weight: 800, fill: '#0F5132', anchor: 'middle' })
   b.text({ x: avx + av + ref * 0.022, y: py + hh * 0.22, lines: [chatName], px: ref * 0.038, weight: 700, fill: '#FFFFFF' })
   b.text({ x: avx + av + ref * 0.022, y: py + hh * 0.56, lines: [chatStatus], px: ref * 0.026, weight: 500, fill: 'rgba(255,255,255,.82)' })
+
+  // Objetos "detrás": detrás de los MENSAJES, pero encima del panel. Si van
+  // antes del panel quedan 100% tapados (el panel es opaco y cubre casi toda
+  // la pieza): era el mismo bug de antes, sólo que más difícil de ver.
+  drawObjects(b, { objects: objects.filter((o) => !o.front), W, H, ref, accent, scheme })
 
   // mensajes (burbujas)
   let cy = py + hh + ref * 0.045
@@ -476,7 +476,7 @@ function drawShape(b, { o, W, H, ref, accent, scheme }) {
     b.path({ d: roundRect(cx - w / 2, cy - h / 2, w, h, h / 2), fill: solid ? color : 'none',
       stroke: solid ? null : color, sw: Math.max(2, ref * 0.006 * swMul), ...g, filterId: hardShadow })
     b.text({ x: cx, y: cy - px * 0.62, lines: [txt], px, weight: 800, tracking: 0.06,
-      fill: solid ? contrastOn(color) : color, anchor: 'middle', rotation: rot, rcx: cx, rcy: cy })
+      fill: solid ? contrastOn(color) : color, anchor: 'middle', opacity: op, rotation: rot, rcx: cx, rcy: cy })
     return
   }
   if (o.shape === 'bars') {
@@ -496,7 +496,7 @@ function drawShape(b, { o, W, H, ref, accent, scheme }) {
     const x0 = cx - w / 2, y0 = cy - h / 2
     const { line, last } = sparkline(w, h, vals)
     b.path({ d: line, stroke: color, sw: Math.max(3, ref * 0.01 * swMul), tx: x0, ty: y0, ...g, filterId: hardShadow })
-    b.rect({ x: x0 + last[0] - ref * 0.012, y: y0 + last[1] - ref * 0.012, w: ref * 0.024, h: ref * 0.024, rx: ref * 0.012, fill: color, opacity: op })
+    b.path({ d: roundRect(x0 + last[0] - ref * 0.012, y0 + last[1] - ref * 0.012, ref * 0.024, ref * 0.024, ref * 0.012), fill: color, ...g })
     return
   }
   if (o.shape === 'window') {
@@ -507,18 +507,23 @@ function drawShape(b, { o, W, H, ref, accent, scheme }) {
     const barH = Math.max(ref * 0.018, h * 0.1)
     const r = ref * 0.014
     const soft = o.shadow !== false ? b.filter({ kind: 'soft', r: ref * 0.02, dy: ref * 0.012, opacity: 0.32 }) : null
-    b.path({ d: roundRect(x0, y0, w, h, r), fill: o.fill || '#FFFFFF', rotation: rot, cx, cy, flipX, opacity: op, filterId: soft })
+    // el color elegido pinta el marco (antes las swatches no hacían nada)
+    const marco = o.fill || color || '#FFFFFF'
+    const cromo = contrastOn(marco) === '#0D0C0C' ? '#D8DBDE' : 'rgba(255,255,255,.35)'
+    b.path({ d: roundRect(x0, y0, w, h, r), fill: marco, rotation: rot, cx, cy, flipX, opacity: op, filterId: soft })
     b.framedImage({
       cx, cy: y0 + barH + (h - barH) / 2, w: w - ref * 0.006, h: h - barH - ref * 0.004,
       rotation: rot, flipX, href: o.src, natural: o.natural, focal: o.focal || { x: 0.5, y: 0.5 },
       radius: r * 0.5, zoom: o.zoom || 1, opacity: op,
     })
-    windowChrome(w, barH).forEach((c) => {
-      b.rect({ x: x0 + c.cx - c.r, y: y0 + c.cy - c.r, w: c.r * 2, h: c.r * 2, rx: c.r, fill: '#D8DBDE', opacity: op })
-    })
+    // 7 · el chrome también rota: antes el marco giraba y los puntitos no
+    const dCromo = windowChrome(w, barH).map((c) => roundRect(x0 + c.cx - c.r, y0 + c.cy - c.r, c.r * 2, c.r * 2, c.r)).join(' ')
+    b.path({ d: dCromo, fill: cromo, rotation: rot, cx, cy, flipX, opacity: op })
     if (o.text) {
       const px = barH * 0.5
-      b.text({ x: cx, y: y0 + (barH - px) / 2 - px * 0.05, lines: [String(o.text)], px, weight: 600, fill: '#8A9096', anchor: 'middle' })
+      b.text({ x: cx, y: y0 + (barH - px) / 2 - px * 0.05, lines: [String(o.text)], px, weight: 600,
+        fill: contrastOn(marco) === '#0D0C0C' ? '#8A9096' : 'rgba(255,255,255,.7)', anchor: 'middle',
+        opacity: op, rotation: rot, rcx: cx, rcy: cy })
     }
     return
   }
@@ -540,7 +545,7 @@ function drawShape(b, { o, W, H, ref, accent, scheme }) {
     const burbuja = o.fill || color || '#FFFFFF'
     b.path({ d: calloutPath(w, h, { r: w * 0.09 }), fill: burbuja, tx: x0, ty: y0, ...g, filterId: soft })
     if (lines.length) {
-      b.text({ x: x0 + padX, y: y0 + padY, lines, px, weight: 600, fill: contrastOn(burbuja), lineHeight: lh })
+      b.text({ x: x0 + padX, y: y0 + padY, lines, px, weight: 600, fill: contrastOn(burbuja), lineHeight: lh, opacity: op })
     }
     return
   }

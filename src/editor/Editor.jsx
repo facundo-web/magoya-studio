@@ -307,13 +307,14 @@ export default function Editor({
     const icon = ICONS_BY_ID[data.id]
     if (!icon) return
     if (icon.isShape) {
-      // `pos` no existe acá (venía copiado del drop): sin x/y explícitos esto
-      // tiraba ReferenceError y NINGUNA forma se podía agregar tocándola.
-      setObjects([...objects, enCascada(objects, { kind: 'shape', shape: icon.shape, tint: 'accent', x: 0.5, y: 0.42, scale: 0.34, rotation: 0, shadow: false, opacity: 1,
+      // Acá SÍ existe `pos` (viene del drop): la forma tiene que caer donde
+      // la soltaste, como cualquier otro elemento. Estaba hardcodeada al
+      // centro, y llamaba a closePicker(), que no existe en este scope.
+      setObjects([...objects, { kind: 'shape', shape: icon.shape, tint: 'accent', ...pos, scale: 0.34, rotation: 0, shadow: false, opacity: 1,
         ...(icon.shape === 'badge' ? { text: 'NUEVO' } : {}),
         ...(icon.shape === 'callout' ? { text: '¿Y si el dato ya lo tenías?', tint: '#FFFFFF', shadow: true } : {}),
-        ...(icon.shape === 'window' ? { scale: 0.62, ratio: 0.62, shadow: true, text: 'panel.magoya.com', front: true } : {}) })])
-      setSelObj(objects.length); closePicker(); return
+        ...(icon.shape === 'window' ? { scale: 0.62, ratio: 0.62, shadow: true, text: 'panel.magoya.com', front: true } : {}) }])
+      setSelObj(objects.length); return
     }
     if (icon.isDevice) {
       setObjects([...objects, { kind: 'device', deviceId: icon.id, ...pos, scale: 0.55, rotation: 0, shadow: true, opacity: 1, focal: { x: 0.5, y: 0.5 }, zoom: 1 }])
@@ -665,7 +666,7 @@ export default function Editor({
             {/* Oscurecer y desenfocar sólo tocan la FOTO de fondo. Mostrarlos
                 sin foto era ofrecer dos sliders que no hacen nada: los movías
                 y la pieza no cambiaba, sin ninguna explicación. */}
-            {content.photo?.src ? (
+            {content.photo?.src && (template.surface === 'photo' || (template.freeform && (content.bg || 'color') === 'photo')) ? (
               <>
                 <Ctl label="Oscurecer el fondo" value={Math.round((content.photoDim ?? 0) * 100)} min={0} max={70} onChange={(v) => set({ photoDim: v / 100 })} />
                 <Ctl label="Desenfocar el fondo" value={Math.round(content.photoBlur ?? 0)} min={0} max={30} onChange={(v) => set({ photoBlur: v })} />
@@ -886,7 +887,8 @@ export default function Editor({
         {selObj != null && objects[selObj] ? (
           <>
             <div className="insp-kicker">Propiedades del elemento</div>
-            <ObjectProps o={objects[selObj]} i={selObj} updateObject={updateObject} objRemove={objRemove} objBringFront={objBringFront} objSendBack={objSendBack} onToast={onToast} goToBg={() => setPanel('photos')} />
+            <ObjectProps o={objects[selObj]} i={selObj} updateObject={updateObject} objRemove={objRemove} objDuplicate={objDuplicate} objBringFront={objBringFront} objSendBack={objSendBack} onToast={onToast}
+              goToBg={() => { setSelObj(null); setPanel('photos'); setSheet(true) }} />
           </>
         ) : selText ? (
           <>
@@ -1248,12 +1250,22 @@ function ObjectsBody({ objects, setObjects, selObj, setSelObj, objRemove, onToas
 function Ctl({ label, value, min, max, step = 1, suffix = '', onChange }) {
   const pct = ((value - min) / (max - min)) * 100
   const clamp = (v) => Math.min(max, Math.max(min, v))
+  // borrar el número para reescribirlo no funcionaba: el input es controlado
+  // y al quedar vacío rebotaba al valor viejo. Se edita en local y se
+  // confirma al salir o con Enter.
+  const [txt, setTxt] = useState(null)
   return (
     <div className="ictl">
       <div className="ictl-top">
         <label>{label}</label>
-        <input className="ictl-num" type="number" min={min} max={max} step={step} value={Math.round(value)}
-          onChange={(e) => e.target.value !== '' && onChange(clamp(+e.target.value))} />
+        <span className="ictl-numwrap">
+          <input className="ictl-num" type="number" min={min} max={max} step={step}
+            value={txt ?? Math.round(value)}
+            onChange={(e) => { setTxt(e.target.value); if (e.target.value !== '') onChange(clamp(+e.target.value)) }}
+            onBlur={() => setTxt(null)}
+            onKeyDown={(e) => { if (e.key === 'Enter') { setTxt(null); e.currentTarget.blur() } }} />
+          {suffix && <span className="ictl-unit">{suffix}</span>}
+        </span>
       </div>
       <input className="rng" type="range" min={min} max={max} step={step} value={value}
         style={{ '--p': pct + '%' }} onChange={(e) => onChange(+e.target.value)} />
@@ -1370,7 +1382,7 @@ function PhotosBody({ objects, setObjects, setSelObj, elements = [], onAddElemen
 }
 
 /* ---------------- Object properties (panel derecho / inspector) ---------------- */
-function ObjectProps({ o, i, updateObject, objRemove, objBringFront, objSendBack, onToast, goToBg }) {
+function ObjectProps({ o, i, updateObject, objRemove, objDuplicate, objBringFront, objSendBack, onToast, goToBg }) {
   const objIcon = (o.kind === 'icon' || o.kind === 'device') ? ICONS_BY_ID[o.iconId || o.deviceId] : null
   const isMark = !!objIcon?.isMark
   const showTint = o.kind === 'icon' && (isMark || o.style === 'plain')
@@ -1557,11 +1569,18 @@ function ObjectProps({ o, i, updateObject, objRemove, objBringFront, objSendBack
           <button key={d} className={'chip' + ((o.rotation || 0) === d ? ' on' : '')} onClick={() => updateObject(i, { rotation: d })}>{d > 0 ? `+${d}°` : `${d}°`}</button>
         ))}
       </div>
-      <label>Reflejar</label>
-      <div className="chips" style={{ marginBottom: 10 }}>
-        <button className={'chip' + (o.flipX ? ' on' : '')} onClick={() => updateObject(i, { flipX: !o.flipX })} title="Espeja el elemento (útil para que una flecha apunte al otro lado)"><Icon n="flipH" size={14} /> Horizontal</button>
-        <button className="chip" onClick={() => updateObject(i, { rotation: ((o.rotation || 0) + 180) % 360 > 180 ? ((o.rotation || 0) + 180) - 360 : (o.rotation || 0) + 180 })} title="Gira 180°"><Icon n="flipV" size={14} /> Vertical</button>
-      </div>
+      {/* "Vertical" no reflejaba: rotaba 180°, que no es lo mismo. Ahora se
+          llama como lo que hace. Y en las formas simétricas (etiqueta,
+          destello) espejar no cambia un píxel, así que no se ofrece. */}
+      {!['badge', 'sparkle'].includes(o.shape) && (
+        <>
+          <label>Reflejar</label>
+          <div className="chips" style={{ marginBottom: 10 }}>
+            <button className={'chip' + (o.flipX ? ' on' : '')} onClick={() => updateObject(i, { flipX: !o.flipX })} title="Espeja el elemento (útil para que una flecha apunte al otro lado)"><Icon n="flipH" size={14} /> Espejar</button>
+            <button className="chip" onClick={() => updateObject(i, { rotation: ((o.rotation || 0) + 180) % 360 > 180 ? ((o.rotation || 0) + 180) - 360 : (o.rotation || 0) + 180 })} title="Gira media vuelta"><Icon n="flipV" size={14} /> Girar 180°</button>
+          </div>
+        </>
+      )}
       {/* la gente piensa en "cuánto se transparenta", no en "cuánta opacidad" */}
       <Ctl label="Transparencia" value={Math.round((1 - (o.opacity ?? 1)) * 100)} min={0} max={90} step={5} suffix="%"
         onChange={(v) => updateObject(i, { opacity: 1 - v / 100 }, 'op')} />

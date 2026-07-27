@@ -7,8 +7,8 @@
 // recolorearlos (blanco en tiles, color de marca en plano).
 // ============================================================
 
-import { WORDMARKS, MOTIF_ESTRATOS } from '../brand/brandKit.js'
-import { ICON_URLS } from '../brand/iconLibrary.js'
+import { WORDMARKS, MOTIF_ESTRATOS, ISOTIPOS } from '../brand/brandKit.js'
+import { ICON_URLS, DEVICES } from '../brand/iconLibrary.js'
 
 const cache = new Map() // url -> dataURL (assets simples)
 const iconText = new Map() // url -> raw svg text (para recolorear)
@@ -63,6 +63,12 @@ export function coloredIcon(url, color, strokeMul = 1) {
 export async function preloadBrandAssets() {
   const simple = new Set()
   Object.values(WORDMARKS).forEach((w) => w.url && simple.add(w.url))
+  // Los marcos de dispositivo y los isotipos TAMBIÉN tienen que quedar como
+  // data-URL: al rasterizar, un <svg> dentro de un <img> no carga ninguna
+  // referencia externa (ni del mismo origen). Sin esto el PNG salía con la
+  // foto de la pantalla pero SIN el marco del celular, y sin ningún error.
+  Object.values(ISOTIPOS).forEach((i) => i.url && simple.add(i.url))
+  DEVICES.forEach((d) => d.url && simple.add(d.url))
   if (MOTIF_ESTRATOS) simple.add(MOTIF_ESTRATOS)
 
   await Promise.all([
