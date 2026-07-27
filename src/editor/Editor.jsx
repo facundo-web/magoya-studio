@@ -216,7 +216,14 @@ export default function Editor({
   const [editing, setEditing] = useState(null) // edición de texto in-place
   const [showSafe, setShowSafe] = useState(false)
   const [panelW, setPanelW] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('magoya_panels_v1')) || { left: 300, right: 320 } } catch { return { left: 300, right: 320 } }
+    // Aye: "tenía corrido, está escondido eso, no estaba viendo". El ancho
+    // guardado podía dejar el panel casi cerrado y no había forma de saber
+    // que ahí había algo. Nunca por debajo de un ancho usable.
+    const MIN = 240
+    try {
+      const g = JSON.parse(localStorage.getItem('magoya_panels_v1')) || {}
+      return { left: Math.max(MIN, g.left || 300), right: Math.max(MIN, g.right || 320) }
+    } catch { return { left: 300, right: 320 } }
   })
   const startResize = (side, e) => {
     e.preventDefault()
@@ -224,7 +231,7 @@ export default function Editor({
     const startW = panelW[side]
     const move = (ev) => {
       const dx = ev.clientX - startX
-      const w = Math.max(220, Math.min(480, side === 'left' ? startW + dx : startW - dx))
+      const w = Math.max(240, Math.min(480, side === 'left' ? startW + dx : startW - dx))
       setPanelW((p) => ({ ...p, [side]: w }))
     }
     const up = () => {
@@ -615,7 +622,7 @@ export default function Editor({
           ['photos', 'photo', 'Fotos'],
           ['elements', 'sparkle', 'Elementos'],
           ['brand', 'brand', 'Marca'],
-          ['settings', 'settings', 'Efectos'],
+          ['settings', 'layers', 'Fondo'],
         ].map(([k, ico, label]) => (
           <button key={k} className={'rail-btn' + (panel === k ? ' on' : '')}
             onClick={() => { if (panel === k) setSheet((v) => !v); else { setPanel(k); setSheet(true) } }} title={label}>
@@ -709,12 +716,14 @@ export default function Editor({
 
         {panel === 'settings' && (
           <>
-            <div className="panel-title">Dónde se publica</div>
-            <p className="panel-help">Cambiá el tamaño según dónde publiques. La pieza se re-acomoda sola.</p>
-            <FormatBody format={format} onChangeFormat={onChangeFormat} />
-            <div className="panel-title" style={{ marginTop: 16 }}>Tono de la pieza</div>
+            {/* Aye buscó "el fondo" y estaba en un panel llamado Efectos.
+                El color es lo primero que se busca: va arriba de todo. */}
+            <div className="panel-title">Color de fondo</div>
+            <FondoBody content={content} template={template} set={set} />
+            <div className="panel-title" style={{ marginTop: 16 }}>Tono encima</div>
+            <p className="panel-help">Un velo de color sobre el fondo, para dar profundidad.</p>
             <GradientBody content={content} set={set} />
-            <div className="panel-title" style={{ marginTop: 16 }}>Efectos de la pieza</div>
+            <div className="panel-title" style={{ marginTop: 16 }}>Efectos</div>
             <Ctl label="Oscurecer los bordes" value={Math.round((content.vignette ?? 0) * 100)} min={0} max={80} onChange={(v) => set({ vignette: v / 100 })} />
             {/* Oscurecer y desenfocar sólo tocan la FOTO de fondo. Mostrarlos
                 sin foto era ofrecer dos sliders que no hacen nada: los movías
@@ -1611,6 +1620,29 @@ function objectName(o, icon) {
   return icon.label || 'Elemento'
 }
 
+// El color de fondo, donde la gente lo busca. En las piezas en blanco
+// también decide si el fondo es color o foto.
+function FondoBody({ content, template, set }) {
+  const scheme = content.scheme || template.defaults?.scheme || 'deep'
+  const esFoto = template.surface === 'photo' || (template.freeform && (content.bg || 'color') === 'photo')
+  if (esFoto) {
+    return (
+      <p className="panel-help">
+        Esta pieza usa una foto de fondo. Cambiala o sacala desde <b>Fotos</b>.
+      </p>
+    )
+  }
+  return (
+    <div className="swatches">
+      {Object.entries(COLOR_SCHEMES).map(([k, s2]) => (
+        <button key={k} className={'sw named' + (scheme === k ? ' on' : '')} onClick={() => set({ scheme: k })}>
+          <span className="sw-dot" style={{ background: s2.surface }} /><span className="sw-name">{s2.label}</span>
+        </button>
+      ))}
+    </div>
+  )
+}
+
 /* ---------------- Brand ---------------- */
 function BrandBody({ content, template, set, onlyColors = false, soloLogo = false }) {
   const scheme = content.scheme || template.defaults?.scheme || 'deep'
@@ -1642,13 +1674,6 @@ function BrandBody({ content, template, set, onlyColors = false, soloLogo = fals
   }
   return (
     <>
-      <div className="field"><label>Color de fondo</label>
-        <div className="swatches">
-          {Object.entries(COLOR_SCHEMES).map(([k, s]) => (
-            <button key={k} className={'sw named' + (scheme === k ? ' on' : '')} onClick={() => set({ scheme: k })}><span className="sw-dot" style={{ background: s.surface }} /><span className="sw-name">{s.label}</span></button>
-          ))}
-        </div>
-      </div>
       <div className="field"><label>Color de acento</label>
         <div className="swatches">
           {Object.entries(ACCENTS).map(([k, a]) => (
@@ -1797,7 +1822,11 @@ function TextProps({ eid, content, set, getText, setText }) {
         const max = MAXCHARS[role]
         if (!max) return null
         const n = String(val || '').length
-        return <div className={'charcount' + (n > max ? ' over' : '')}>{n}/{max} {n > max ? '· se va a achicar' : ''}</div>
+        const elegido = isTb ? block?.size : content.sizes?.[role]
+        // el aviso tiene que decir la verdad: si elegiste un tamaño a mano
+        // el texto NO se achica, baja de línea
+        const nota = n <= max ? '' : elegido ? '· más largo de lo recomendado' : '· va a entrar más chico'
+        return <div className={'charcount' + (n > max ? ' over' : '')}>{n}/{max} {nota}</div>
       })()}
       {/* F3 · reglas editoriales: avisa, no bloquea */}
       {(() => {

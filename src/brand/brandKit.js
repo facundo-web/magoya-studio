@@ -114,6 +114,23 @@ export const TRAMA = tramaSvg
 // ---------- DEGRADÉS (overlay sobre el fondo) ----------
 // stops: at 0..1, color, opacity. angle en grados (180 = de arriba a abajo).
 export const GRADIENTS = {
+  // Aye: "en tono de la pieza le faltaría un blanco, un beige" — sin claros
+  // todo terminaba quedando negro.
+  creamBottom: {
+    label: 'Crema abajo',
+    angle: 180,
+    stops: [{ at: 0, color: '#F6F1EB', opacity: 0 }, { at: 0.5, color: '#F6F1EB', opacity: 0 }, { at: 1, color: '#F6F1EB', opacity: 0.92 }],
+  },
+  creamTop: {
+    label: 'Crema arriba',
+    angle: 0,
+    stops: [{ at: 0, color: '#F6F1EB', opacity: 0.92 }, { at: 0.5, color: '#F6F1EB', opacity: 0 }, { at: 1, color: '#F6F1EB', opacity: 0 }],
+  },
+  whiteWash: {
+    label: 'Velo blanco',
+    angle: 135,
+    stops: [{ at: 0, color: '#FFFFFF', opacity: 0.72 }, { at: 1, color: '#FFFFFF', opacity: 0.12 }],
+  },
   scrimBottom: {
     label: 'Oscuro abajo',
     angle: 180,

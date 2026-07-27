@@ -61,10 +61,13 @@ export const PLACEHOLDERS = {
   step: 'Entendemos el ciclo agronómico',
 }
 
-// máximo recomendado por rol (se muestra como contador en el editor)
+// Largo recomendado por rol. Es una GUÍA, no un techo: pasarte no rompe
+// nada, sólo que el texto entra más chico. Los números de antes salían de
+// "la gente no lee tanto" y en la práctica no alcanzaban — Aye: "setenta es
+// muy poco para una placa que explique un toquecito".
 export const MAXCHARS = {
-  kicker: 18, title: 60, subtitle: 70, body: 140,
-  metric: 6, metricLabel: 44, quote: 120, author: 32, cta: 28, step: 52,
+  kicker: 28, title: 90, subtitle: 140, body: 260,
+  metric: 8, metricLabel: 60, quote: 200, author: 44, cta: 32, step: 80,
 }
 
 // K3 · en la galería, TODAS las plantillas con foto se veían como la misma

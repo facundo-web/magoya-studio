@@ -159,12 +159,14 @@ export function drawPiece(b, { template, content, format, sizeLock = null }) {
     const startPx = ref * st.sizeRel * (hand ? 1.9 : 1) * p.scale * manual
     const value = (st.upper && !hand) ? String(txt).toUpperCase() : String(txt)
     const maxLines = role === 'title' || role === 'quote' ? 4 : role === 'kicker' || role === 'cta' ? 1 : 3
-    // si elegiste un tamaño a mano, ese manda: el tamaño común del carrusel
-    // es para los que están en "Automático"
-    const fijo = !elegido && sizeLock && sizeLock[role]
+    // Si elegiste un tamaño a mano, ese MANDA. Antes el auto-ajuste lo
+    // deshacía apenas el texto era largo: "tamaño grande no me lo toma".
+    // Ahora el texto baja de línea en vez de achicarse; el único techo es
+    // que no se vaya de la pieza.
+    const fijo = elegido ? startPx : (sizeLock && sizeLock[role])
     const fit = fitText(value, {
       weight: hand ? 700 : st.weight, tracking: hand ? 0 : (st.tracking || 0),
-      maxWidth: maxTextW, maxHeight: fijo ? 1e6 : H * 0.5, startPx: fijo || startPx,
+      maxWidth: maxTextW, maxHeight: fijo ? H * 0.86 : H * 0.5, startPx: fijo || startPx,
       lineHeight: st.lineHeight || 1.15, maxLines: fijo ? 99 : maxLines,
     })
     blocks.push({ role, st, value, px: fit.px, lines: fit.lines, lineHeight: st.lineHeight || 1.15, hand, hl: opts.hl || null, eid: opts.eid || null })
