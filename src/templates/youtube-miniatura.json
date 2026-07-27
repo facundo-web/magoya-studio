@@ -1,0 +1,29 @@
+{
+  "id": "youtube-miniatura",
+  "name": "Miniatura de YouTube",
+  "purpose": "Titular enorme a la izquierda y la persona a la derecha. Para portada de video (1280×720).",
+  "category": "impacto",
+  "surface": "photo",
+  "split": "right",
+  "splitAt": 0.42,
+  "anchor": "center-left",
+  "motif": false,
+  "zocalo": false,
+  "roles": ["kicker", "title"],
+  "defaults": {
+    "scheme": "ink",
+    "accent": "lime",
+    "logo": "cream",
+    "hasPhoto": true,
+    "treatment": "color",
+    "density": "compact",
+    "scale": 1.28,
+    "rule": "none",
+    "kicker": "AI EN CAMPO",
+    "title": "Lo que tu suelo ya te está diciendo",
+    "objects": [
+      { "kind": "shape", "shape": "sparkle", "tint": "accent", "x": 0.52, "y": 0.16, "scale": 0.09, "rotation": 0, "shadow": false, "opacity": 1, "front": true },
+      { "kind": "shape", "shape": "sparkle", "tint": "accent", "x": 0.6, "y": 0.84, "scale": 0.06, "rotation": 0, "shadow": false, "opacity": 1, "front": true }
+    ]
+  }
+}

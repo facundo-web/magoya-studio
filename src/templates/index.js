@@ -24,15 +24,20 @@ import impApps from './impacto-apps.json'
 import impPregunta from './impacto-pregunta.json'
 import contraste from './contraste.json'
 import insight from './insight.json'
+// tanda que sale de las referencias que mandaron Aye e Inés (jul 2026)
+import fotoLateral from './foto-lateral.json'
+import ytMiniatura from './youtube-miniatura.json'
+import speakers from './speakers.json'
+import eventoTarjeta from './evento-tarjeta.json'
 
 // Orden por OBJETIVO de marketing (auditoría): primero lo que prueba y
 // educa; "en blanco" al final — arrancar en blanco es donde se rompe la marca.
 export const TEMPLATES = [
-  impCifra, impApps, impPantalla, impPregunta, // AI en campo · alto impacto
+  impCifra, impApps, impPantalla, impPregunta, ytMiniatura, // AI en campo · alto impacto
   casoCliente, dato, insight, cita, retrato,          // prueba social y resultados
-  metodo, contraste, techTitular, evento, bloqueColor,  // autoridad y anuncios
+  metodo, contraste, techTitular, evento, eventoTarjeta, speakers, bloqueColor, // autoridad y anuncios
   carruselPortada, carruselCierre, whatsapp, // carrusel
-  zocaloPlaca, fotoTitular, fotoCentrada,    // foto + texto
+  fotoLateral, zocaloPlaca, fotoTitular, fotoCentrada,    // foto + texto
   blank,                                      // último a propósito
 ]
 
@@ -96,11 +101,15 @@ export function placeholderContent(t) {
   ;(t.roles || []).forEach((r) => {
     if (c[r] === undefined || String(c[r]).trim() === '') c[r] = PLACEHOLDERS[r] ?? ''
   })
-  if (t.freeform) {
-    c.textBlocks = (d.textBlocks || []).map((b) => ({ style: b.style, text: PLACEHOLDERS[b.style] || 'Tu texto acá' }))
-  } else {
-    c.textBlocks = (d.textBlocks || []).map((b) => ({ ...b }))
-  }
+  // Los bloques de una pieza libre conservan lo que trae la plantilla —
+  // igual que los roles. Antes se tiraban y se ponía el placeholder
+  // genérico, así que en la galería el evento decía "Escribí tu título"
+  // y no se entendía de qué era la plantilla: "los textos no son
+  // representativos de lo que hay adentro".
+  c.textBlocks = (d.textBlocks || []).map((b) => ({
+    ...b,
+    text: String(b.text || '').trim() ? b.text : (PLACEHOLDERS[b.style] || 'Tu texto acá'),
+  }))
   c.objects = (d.objects || []).map((o) => ({ ...o }))
   if (d.messages) c.messages = d.messages.map((m) => ({ ...m }))
   if (d.steps) c.steps = [...d.steps]

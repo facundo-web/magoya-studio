@@ -25,7 +25,9 @@ function contrastOn(hex) {
 }
 
 // roles de texto en orden de stack
-const STACK_ORDER = ['kicker', 'title', 'subtitle', 'body', 'metric', 'metricLabel', 'quote', 'author']
+// `cta` faltaba: una plantilla clásica no podía tener botón, sólo las
+// libres. Va último porque es el cierre del stack.
+const STACK_ORDER = ['kicker', 'title', 'subtitle', 'body', 'metric', 'metricLabel', 'quote', 'author', 'cta']
 
 // ---- Bloque B: ejes de composición ----
 // densidad = cuánto aire respira el stack (gap entre bloques y ancho de línea)
@@ -112,7 +114,18 @@ export function drawPiece(b, { template, content, format, sizeLock = null }) {
   const { w: W, h: H } = format
   const safe = safeRect(format)
   const ref = Math.min(W, H)
-  const onPhoto = p.surface === 'photo'
+  // SPLIT: media pieza es foto y la otra media es color. Es la composición
+  // que más se repitió en las referencias que mandaron Aye e Inés (foto a
+  // un lado, texto al otro). Como el texto nunca cae encima de la imagen,
+  // se lee sin scrim ni degradé, y el color lo sigue mandando el esquema.
+  const split = template.split || null            // 'right' | 'left'
+  const splitW = split ? W * (template.splitAt || 0.46) : 0
+  const onPhoto = p.surface === 'photo' && !split
+  if (split) {
+    const pad = W * 0.055
+    if (split === 'right') safe.w = Math.max(ref * 0.2, (W - splitW - pad) - safe.x)
+    else { const nx = splitW + pad; safe.w = Math.max(ref * 0.2, safe.x + safe.w - nx); safe.x = nx }
+  }
   const dens = DENSITY[p.density] || DENSITY.normal
   // con placa opaca (banda/tarjeta) el texto vive sobre la superficie de
   // marca, no sobre la foto: el color tiene que seguir a la placa.
@@ -121,7 +134,15 @@ export function drawPiece(b, { template, content, format, sizeLock = null }) {
   const mutedColor = onPhoto && !opaquePlate ? 'rgba(255,255,255,.82)' : p.scheme.muted
 
   // ---- superficie ----
-  if (onPhoto) {
+  if (split) {
+    b.rect({ x: 0, y: 0, w: W, h: H, fill: p.scheme.surface })
+    b.imageCover({
+      x: split === 'right' ? W - splitW : 0, y: 0, w: splitW, h: H,
+      href: p.photo?.src, natural: p.photo?.natural, focal: p.photo?.focal,
+      grayscale: p.treatment === 'bw',
+      dim: p.photoDim, blur: p.photoBlur * (ref / 1000),
+    })
+  } else if (onPhoto) {
     b.imageCover({
       x: 0, y: 0, w: W, h: H,
       href: p.photo?.src, natural: p.photo?.natural, focal: p.photo?.focal,
@@ -490,6 +511,14 @@ function drawObjects(b, { objects, W, H, ref, accent, scheme }) {
           rotation, strength: o.glare ?? 1,
         })
       }
+      continue
+    }
+    // panel de foto vacío: una plantilla puede declararlo y se ve el
+    // esqueleto "acá va una foto" en vez de no dibujar nada
+    if (o.kind === 'image' && !o.src && o.frame) {
+      const fw = ref * (o.scale || 0.4)
+      const fh = fw * (o.ratio || 0.6)
+      b.imageCover({ x: cx - fw / 2, y: cy - fh / 2, w: fw, h: fh, href: null })
       continue
     }
     if (o.kind === 'image' && o.src) {

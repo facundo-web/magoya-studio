@@ -1,0 +1,25 @@
+{
+  "id": "evento-tarjeta",
+  "name": "Evento sobre foto",
+  "purpose": "Una tarjeta con la fecha encima de una foto de ambiente. Para invitar a algo presencial.",
+  "category": "post",
+  "surface": "photo",
+  "anchor": "center-center",
+  "motif": false,
+  "zocalo": false,
+  "roles": ["kicker", "title", "subtitle"],
+  "defaults": {
+    "scheme": "studio",
+    "accent": "emerald",
+    "logo": "black",
+    "hasPhoto": true,
+    "treatment": "color",
+    "plate": "card",
+    "density": "roomy",
+    "rule": "top",
+    "photoDim": 0.15,
+    "kicker": "JUEVES 18 · 11 H",
+    "title": "Desayuno AI en campo",
+    "subtitle": "Espacio Darwin · Buenos Aires\nCupos limitados, se confirma por mail."
+  }
+}

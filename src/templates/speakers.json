@@ -1,0 +1,34 @@
+{
+  "id": "speakers",
+  "name": "Quiénes hablan",
+  "purpose": "Dos retratos con su nombre y rol. Para presentar a los que dan el webinar.",
+  "category": "post",
+  "surface": "solid",
+  "anchor": "top-center",
+  "motif": false,
+  "freeform": true,
+  "roles": [],
+  "defaults": {
+    "scheme": "deep",
+    "accent": "emerald",
+    "logo": "cream",
+    "hasPhoto": false,
+    "bg": "color",
+    "showLogo": true,
+    "density": "compact",
+    "textBlocks": [
+      { "style": "kicker", "text": "QUIÉNES HABLAN" },
+      { "style": "title", "text": "Dos que lo hicieron, no dos que lo leyeron" },
+      { "style": "subtitle", "text": "Nombre Apellido\nRol · Magoya" },
+      { "style": "subtitle", "text": "Nombre Apellido\nRol · empresa" }
+    ],
+    "pos": {
+      "tb:2": { "x": 0.08, "y": 0.78 },
+      "tb:3": { "x": 0.54, "y": 0.78 }
+    },
+    "objects": [
+      { "kind": "image", "frame": true, "x": 0.28, "y": 0.53, "scale": 0.38, "ratio": 1.2, "radius": 0.1, "rotation": 0, "shadow": true, "opacity": 1 },
+      { "kind": "image", "frame": true, "x": 0.72, "y": 0.53, "scale": 0.38, "ratio": 1.2, "radius": 0.1, "rotation": 0, "shadow": true, "opacity": 1 }
+    ]
+  }
+}

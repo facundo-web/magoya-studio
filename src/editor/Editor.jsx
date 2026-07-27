@@ -1529,6 +1529,14 @@ function ObjectProps({ o, i, updateObject, objRemove, objDuplicate, objBringFron
           </div>
           {o.frame && (
             <>
+              {/* un panel de foto puede venir vacío desde la plantilla
+                  (ej: los dos retratos de "Quiénes hablan") */}
+              <div className={'dropzone' + (o.src ? ' has' : '')} onClick={() => devPhotoRef.current?.click()}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => { e.preventDefault(); e.dataTransfer.files[0] && onDevFile(e.dataTransfer.files[0]) }}>
+                {o.src ? '✓ Foto cargada — click para cambiarla' : 'Poné la foto acá (entra sola en el panel)'}
+              </div>
+              <input ref={devPhotoRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => e.target.files[0] && onDevFile(e.target.files[0])} />
               <Ctl label="Proporción" value={Math.round((o.ratio || 0.62) * 100)} min={30} max={180} suffix="%" onChange={(v) => updateObject(i, { ratio: v / 100 })} />
               <Ctl label="Esquinas redondeadas" value={Math.round((o.radius || 0) * 100)} min={0} max={30} suffix="%" onChange={(v) => updateObject(i, { radius: v / 100 })} />
               <Ctl label="Zoom de la imagen" value={Math.round((o.zoom || 1) * 100)} min={100} max={300} step={5} suffix="%" onChange={(v) => updateObject(i, { zoom: v / 100 })} />
