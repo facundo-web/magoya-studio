@@ -450,7 +450,7 @@ export default function Editor({
       left: r.left - fr.left - pad, top: r.top - fr.top - pad,
       width: r.width + pad * 2, height: r.height + pad * 2,
     })
-  }, [selText, content, format.id, panelW.left, panelW.right])
+  }, [selText, content, format.id, panelW.left, panelW.right, zoom])
   const startDrag = (e, i) => {
     e.stopPropagation()
     // Alt+click cicla hacia lo que está DEBAJO: si dos objetos se pisan,
@@ -1593,6 +1593,7 @@ function BrandBody({ content, template, set, onlyColors = false, soloLogo = fals
   const logo = content.logo || template.defaults?.logo || 'cream'
   // en las piezas en blanco con fondo de color, el color vive acá (los
   // colores son marca); antes estaba en un panel "Fondo" aparte
+  const mostrarLogo = content.showLogo !== undefined ? content.showLogo : template.defaults?.showLogo !== false
   if (soloLogo) return <LogoBody content={content} template={template} set={set} />
   if (onlyColors) {
     return (
@@ -1630,15 +1631,16 @@ function BrandBody({ content, template, set, onlyColors = false, soloLogo = fals
           ))}
         </div>
       </div>
+      {/* prender/apagar el logo estaba sólo en las piezas en blanco: en el
+          chat no había forma de ponerlo aunque la plantilla venga sin él */}
       <div className="field"><label>Logo Magoya</label>
-        <LogoSwatches content={content} template={template} set={set} logo={logo} />
+        <div className="chips" style={{ marginBottom: 8 }}>
+          <button className={'chip' + (mostrarLogo ? ' on' : '')} onClick={() => set({ showLogo: true })}>Con logo</button>
+          <button className={'chip' + (!mostrarLogo ? ' on' : '')} onClick={() => set({ showLogo: false })}>Sin logo</button>
+        </div>
+        {mostrarLogo && <LogoSwatches content={content} template={template} set={set} logo={logo} />}
       </div>
-      <div className="field" style={{ display: 'none' }}>
-        <select value={logo} onChange={(e) => set({ logo: e.target.value })}>
-          {Object.entries(WORDMARKS).map(([k, w]) => (<option key={k} value={k}>{w.label}</option>))}
-        </select>
-      </div>
-      <LogoPosition content={content} template={template} set={set} />
+      {mostrarLogo && <LogoPosition content={content} template={template} set={set} />}
     </>
   )
 }

@@ -289,12 +289,18 @@ function drawChat(b, { template, content, format }) {
   const d = template.defaults || {}
   const scheme = COLOR_SCHEMES[c.scheme || d.scheme || DEFAULT_SCHEME]
   const accent = (ACCENTS[c.accent || d.accent] || { value: scheme.accent }).value
+  const objects = c.objects || d.objects || []
   const messages = c.messages || d.messages || []
   const chatName = c.chatName ?? d.chatName ?? 'Magoya'
   const chatStatus = c.chatStatus ?? d.chatStatus ?? 'en línea'
 
   // fondo de marca
   b.rect({ x: 0, y: 0, w: W, h: H, fill: scheme.surface })
+
+  // Objetos DETRÁS del panel. El chat ignoraba por completo lo que sumabas:
+  // el elemento aparecía en la lista y se podía seleccionar en el lienzo,
+  // pero la pieza no lo dibujaba nunca. Un no-op silencioso.
+  drawObjects(b, { objects: objects.filter((o) => !o.front), W, H, ref, accent, scheme })
 
   // panel del chat
   const px = W * 0.06, py = H * 0.055, pw = W * 0.88, ph = H * 0.89
@@ -330,6 +336,17 @@ function drawChat(b, { template, content, format }) {
     b.text({ x: bx + padX, y: cy + padY, lines, px: fpx, weight: 500, fill: '#111111', lineHeight: lh })
     cy += th + ref * 0.022
     if (cy > py + ph - ref * 0.06) break
+  }
+
+  // objetos DELANTE del panel + logo, igual que en cualquier otra pieza
+  drawObjects(b, { objects: objects.filter((o) => o.front), W, H, ref, accent, scheme })
+  const mostrarLogo = c.showLogo !== undefined ? c.showLogo : d.showLogo !== false
+  if (mostrarLogo) {
+    const safe = safeRect(format)
+    drawLogo(b, {
+      p: { logo: c.logo || d.logo || 'cream', logoPos: c.logoPos || d.logoPos || 'left', logoScale: c.logoScale || d.logoScale || 1, plate: 'none' },
+      W, H, safe, ref, hAnchor: 'left', vAnchor: 'top', plateRect: null,
+    })
   }
 }
 
