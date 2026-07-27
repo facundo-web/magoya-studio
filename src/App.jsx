@@ -11,7 +11,7 @@ import {
   exportProjectFile, importProjectFile, toShareLink, fromShareLink,
   loadElements, addElement, deleteElement,
   loadCustomTemplates, buildTemplateFromPiece, saveCustomTemplate, deleteCustomTemplate,
-  loadShares, rememberShare, markShareSeen, forgetShare, copyToClipboard,
+  loadShares, rememberShare, markShareSeen, forgetShare, copyToClipboard, elementRefs,
 } from './project/store.js'
 import { dehydrate, hydrate, collectGarbage, usage } from './project/photoStore.js'
 
@@ -89,7 +89,7 @@ export default function App() {
 
   useEffect(() => {
     setProjects(loadProjects())
-    setElements(loadElements())
+    loadElements().then(setElements).catch(() => {})
     setCustomTemplates(loadCustomTemplates())
     setShares(loadShares())
     // ¿quedó una copia de emergencia de la última vez? (cierre de pestaña)
@@ -475,15 +475,17 @@ export default function App() {
     setUndoDelete({ kind: 'project', data: backup })
     showToast('Se eliminó «' + (backup?.name || 'el proyecto') + '»', true)
   }
-  function addCustomElement({ name, src }) {
-    const { el, saved } = addElement({ name, src })
-    setElements(loadElements())
-    if (!saved) showToast('⚠ Guardado local lleno — el elemento no quedó en la biblioteca')
+  async function addCustomElement({ name, src, kind }) {
+    // el `kind` se descartaba acá: las fotos subidas terminaban archivadas
+    // como logos y "Mis fotos" quedaba siempre vacío
+    const { el, saved } = await addElement({ name, src, kind })
+    loadElements().then(setElements).catch(() => {})
+    if (!saved) showToast('⚠ No se pudo guardar en tu biblioteca')
     return el
   }
-  function removeCustomElement(id) {
-    const backup = loadElements().find((e) => e.id === id)
-    setElements(deleteElement(id))
+  async function removeCustomElement(id) {
+    const backup = elements.find((e) => e.id === id)
+    setElements(await deleteElement(id))
     setUndoDelete({ kind: 'element', data: backup })
     showToast('Elemento eliminado de tu biblioteca', true)
   }
@@ -811,7 +813,7 @@ export default function App() {
                 const { kind, data } = undoDelete
                 if (data && kind === 'project') setProjects(upsertProject(data))
                 if (data && kind === 'template') { saveCustomTemplate(data); setCustomTemplates(loadCustomTemplates()) }
-                if (data && kind === 'element') { addElement({ name: data.name, src: data.src, kind: data.kind }); setElements(loadElements()) }
+                if (data && kind === 'element') { addElement({ name: data.name, src: data.src, kind: data.kind }).then(() => loadElements().then(setElements)) }
                 setUndoDelete(null)
               } else { undo() }
               setToastUndo(false); showToast('Listo, lo recuperamos')

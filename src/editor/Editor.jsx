@@ -1008,7 +1008,7 @@ function FotosBody({ content, template, set, inputRef, onPhotoFile, objects, set
     const src = await compressImage(file, destino === 'fondo' ? 2048 : OBJ_MAX)
     const nice = file.name.replace(/\.[^.]+$/, '')
     let elementId
-    if (onAddElement) elementId = onAddElement({ name: nice, src, kind: 'photo' })?.id
+    if (onAddElement) elementId = (await onAddElement({ name: nice, src, kind: 'photo' }))?.id
     usar(src, elementId, nice)
   }
 
@@ -1171,7 +1171,7 @@ function ObjectsBody({ objects, setObjects, selObj, setSelObj, objRemove, onToas
     const src = await compressImage(file, OBJ_MAX)
     let elementId
     const nice = file.name.replace(/\.[^.]+$/, '')
-    if (onAddElement) { const el = onAddElement({ name: nice, src }); elementId = el?.id }
+    if (onAddElement) { const el = await onAddElement({ name: nice, src }); elementId = el?.id }
     placeImage(src, elementId, nice)
   }
   const iconsInCat = cat === 'custom' ? [] : ALL_OBJECTS.filter((i) => i.category === cat)
@@ -1337,7 +1337,7 @@ function PhotosBody({ objects, setObjects, setSelObj, elements = [], onAddElemen
     const src = await compressImage(file, OBJ_MAX)
     const nice = file.name.replace(/\.[^.]+$/, '')
     let elementId
-    if (onAddElement) elementId = onAddElement({ name: nice, src, kind: 'photo' })?.id
+    if (onAddElement) elementId = (await onAddElement({ name: nice, src, kind: 'photo' }))?.id
     place(src, elementId, nice)
   }
   const useLib = async (url, label) => {

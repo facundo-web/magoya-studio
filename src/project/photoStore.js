@@ -104,8 +104,8 @@ export async function hydrate(project) {
 }
 
 // borra las fotos que ya no usa ningún proyecto guardado
-export async function collectGarbage(projects) {
-  const vivos = new Set()
+export async function collectGarbage(projects, refsExtra = []) {
+  const vivos = new Set(refsExtra)
   for (const p of projects) {
     for (const piece of p.pieces || []) {
       const c = piece.content || {}

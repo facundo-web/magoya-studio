@@ -49,11 +49,17 @@ export function newProjectId() {
 
 // ============================================================
 // BIBLIOTECA DE ELEMENTOS PROPIOS (logos / imágenes subidas)
-// Cualquiera puede sumar elementos; quedan guardados y reutilizables.
+//
+// Los BYTES van a IndexedDB, igual que las fotos de las piezas. Antes se
+// guardaban como data-URL dentro de localStorage: era lo que más rápido
+// llenaba la cuota de ~5 MB del sitio, y una vez llena ya no se podía
+// guardar NINGÚN proyecto. En localStorage queda sólo {id, name, kind, ref}.
 // ============================================================
+import { putPhoto, getPhoto, isRef } from './photoStore.js'
+
 const ELEMENTS_KEY = 'magoya_studio_elements_v1'
 
-export function loadElements() {
+function metaElements() {
   try {
     return JSON.parse(localStorage.getItem(ELEMENTS_KEY) || '[]')
   } catch {
@@ -61,23 +67,65 @@ export function loadElements() {
   }
 }
 
-// kind: 'photo' (fotos subidas) | 'element' (logos, PNG recortados, gráficos)
-export function addElement({ name, src, kind = 'element' }) {
-  const el = { id: newProjectId().replace('p_', 'el_'), name: name || 'Elemento', src, kind }
-  const list = [el, ...loadElements()]
-  try {
-    localStorage.setItem(ELEMENTS_KEY, JSON.stringify(list))
-  } catch (e) {
-    console.warn('[elements] no se pudo guardar (¿lleno?)', e)
-    return { el, saved: false }
+// Devuelve los elementos listos para usar (con el src real).
+// Migra de paso lo que haya quedado en localStorage de la versión anterior.
+export async function loadElements() {
+  const meta = metaElements()
+  let migro = false
+  const out = []
+  for (const e of meta) {
+    if (e.src && !isRef(e.src)) {
+      // versión vieja: los bytes estaban acá. Se mudan a IndexedDB.
+      try {
+        const ref = await putPhoto(e.src)
+        out.push({ ...e, src: e.src, ref })
+        migro = true
+        continue
+      } catch { out.push(e); continue }
+    }
+    const ref = e.ref || e.src
+    const real = await getPhoto(ref)
+    if (real) out.push({ ...e, ref, src: real })
+    // si el blob no está, el elemento no se lista (y no se finge que existe)
   }
-  return { el, saved: true }
+  if (migro) guardarMeta(out)
+  return out
 }
 
-export function deleteElement(id) {
-  const list = loadElements().filter((e) => e.id !== id)
-  localStorage.setItem(ELEMENTS_KEY, JSON.stringify(list))
-  return list
+function guardarMeta(list) {
+  const meta = list.map(({ id, name, kind, ref }) => ({ id, name, kind, ref }))
+  try {
+    localStorage.setItem(ELEMENTS_KEY, JSON.stringify(meta))
+    return true
+  } catch (e) {
+    console.warn('[elements] no se pudo guardar el índice', e)
+    return false
+  }
+}
+
+// kind: 'photo' (fotos subidas) | 'element' (logos, PNG recortados, gráficos)
+export async function addElement({ name, src, kind = 'element' }) {
+  const el = { id: newProjectId().replace('p_', 'el_'), name: name || 'Elemento', src, kind }
+  try {
+    el.ref = await putPhoto(src)
+  } catch (e) {
+    console.warn('[elements] IndexedDB no disponible', e)
+    return { el, saved: false }
+  }
+  const actuales = metaElements()
+  const saved = guardarMeta([{ ...el }, ...actuales])
+  return { el, saved }
+}
+
+export async function deleteElement(id) {
+  const meta = metaElements().filter((e) => e.id !== id)
+  guardarMeta(meta)
+  return loadElements()
+}
+
+// las refs vivas de la biblioteca, para que el recolector no las borre
+export function elementRefs() {
+  return metaElements().map((e) => e.ref).filter(Boolean)
 }
 
 // ============================================================

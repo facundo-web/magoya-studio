@@ -57,8 +57,20 @@ export async function buildFontFaceCss() {
   return _fontFaceCss
 }
 
+// Safari en iPad/iPhone tiene un techo de ~16,7 megapíxeles por canvas. Al
+// pasarlo NO siempre tira error: puede devolver un canvas vacío y un PNG en
+// blanco perfectamente descargable. Un 16:9 a @3x son 18,7 MP, así que se
+// llegaba de verdad. Se baja la escala lo justo para entrar.
+const MAX_MP = 16e6
+function escalaSegura(w, h, scale) {
+  const mp = w * scale * h * scale
+  if (mp <= MAX_MP) return scale
+  return Math.max(1, Math.floor((scale * Math.sqrt(MAX_MP / mp)) * 100) / 100)
+}
+
 // SVG string → Blob PNG/JPG a escala
 export function rasterize(svg, { w, h, scale = 2, type = 'image/png', quality = 0.95 }) {
+  scale = escalaSegura(w, h, scale)
   return new Promise((resolve, reject) => {
     const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' })
     const url = URL.createObjectURL(blob)
