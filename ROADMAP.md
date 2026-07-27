@@ -314,3 +314,57 @@ Repaso final contra el código. Quedaban cuatro y ya están:
 
 `verdicts` (share_id, author, verdict ok|changes, created_at) con RLS de
 lectura e inserción anónimas, igual que `comments`.
+
+---
+
+## BLOQUE L — La sesión de uso con Aye e Inés (27 jul)
+
+La primera vez que dos personas que **no diseñan** usaron la herramienta
+delante mío. El diagnóstico de fondo lo dijeron ellas dos, casi igual:
+
+> Aye: "siento que voy a tardar un montón… me cuesta sentir que tengo que
+> tomar todas las decisiones de esto."
+> Inés: "si ya está ahí, obvio que lo uso. Pero a mí no se me ocurre ponerlo."
+
+No les falta la herramienta: les falta **la pieza ya encarada**. Todo lo de
+abajo sale de ahí.
+
+### ✅ Hecho y verificado
+
+| # | Qué | La frase que lo pidió |
+|---|---|---|
+| L1 | **"Cambiar diseño" cambia el diseño.** `applyDesign()` separa DISEÑO (lo pone la plantilla) de COPY (se conserva), con cadena de roles parecidos | "¿ahí cambiaste? — falló" |
+| L2 | **"Usar en todas"**: el diseño de esta slide pasa al resto sin tocar textos | "quiero combinar diseños y no es muy claro cómo" |
+| L3 | **Color del texto** (6 roles de marca), arriba del marcador | "me parecía que era un embole, entonces por eso lo resalté" |
+| L4 | La tira del carrusel en dos grupos: sumar slides / esta slide | "desde plantilla y cambiar diseño no se entiende" |
+| L5 | **Arrastrar los bloques de texto** (`content.pos`), con "Volver a su lugar" | "lo quería acá arriba, pero no me dejaba" |
+| L6 | **Carruseles armados**: portada + internos + cierre, mismo diseño en todos | "una portada, tres internos y un cierre" (Inés, textual) |
+| L7 | **Puntitos** paramétricos: cuántos y cuál está lleno | "no les puse para que edites cuánta cantidad querés" |
+| L8 | **Gemini** con tile blanco y glifo de color | "no hay violeta así… violeta el cosito, no el fondo" |
+
+(Antes, en el Loop 10: tamaño grande que sí se toma, MAXCHARS al doble,
+"Efectos" pasa a llamarse **Fondo**, tonos claros, panel lateral que no se
+puede esconder del todo.)
+
+### Pendiente
+
+1. **Más plantillas, con la decoración ya puesta.** Es *el* pedido. Del set
+   de referencias que mandaron: split vertical (foto a un lado, texto al
+   otro), placa de speakers con dos retratos, tarjeta de evento sobre foto,
+   celular con notificaciones, cuenta regresiva con numeral gigante,
+   miniatura de YouTube (Inés la nombró como su caso concreto).
+2. **La forma "ventana"** quedó mal — "este sería como si fuera una ventana
+   de algo… le falta mejora".
+3. **El logo se ve flojo** — "este logo me parece que queda como muy por
+   debajo".
+4. **Más variación de color** en el conjunto de la pieza.
+5. **El viewport de la home**: "no se ven todos los elementos bien, quedó
+   todo como muy grande, y los textos no son representativos".
+6. **Foto: blanco y negro / desenfoque por foto**, no sólo por plantilla.
+7. **Fondo en una plantilla que no lo trae**: "debería poder permitirte una
+   vez que lo estás editando".
+
+### Fuera de alcance por ahora (decidido con Facu)
+
+Usuarios, roles, permisos y notificaciones de feedback: "sería como otro
+level". El link de revisión actual se queda como está hasta la Fase 3.
