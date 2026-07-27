@@ -14,6 +14,8 @@ import { getAsset, coloredIcon } from './assets.js'
 import { fitText, measure, wrapText } from './textLayout.js'
 import { arrowPath, handArrowPath, sparklePath, calloutPath, barsRects, sparkline, windowChrome } from './shapes.js'
 
+const clamp01 = (v) => Math.max(0, Math.min(1, Number(v) || 0))
+
 // texto oscuro o claro según luminancia del fondo
 function contrastOn(hex) {
   const h = (hex || '#000').replace('#', '')
@@ -74,6 +76,9 @@ export function resolvePiece(template, content) {
     treatment: c.treatment || d.treatment || 'bw',
     photo: c.photo || null,
     gradient: c.gradient !== undefined ? c.gradient : d.gradient || null,
+    // posición libre por bloque de texto (eid → {x,y} relativo 0..1).
+    // Los que no están acá van en el stack, como siempre.
+    pos: c.pos || d.pos || null,
     objects: c.objects || d.objects || [],
     steps: c.steps || d.steps || [],
     sizes: c.sizes || d.sizes || null,
@@ -184,13 +189,21 @@ export function drawPiece(b, { template, content, format, sizeLock = null }) {
     if (String(st || '').trim()) pushBlock('step', `${String(idx + 1).padStart(2, '0')}  ${st}`, { eid: `step:${idx}` })
   })
 
+  // ---- bloques sueltos: los que la persona movió a mano ----
+  // "el CTA está acá abajo y yo lo quería acá arriba, pero no me dejaba".
+  // Un bloque con posición propia sale del stack y se dibuja donde lo
+  // soltaste; el resto sigue apilándose como siempre.
+  const posLibres = p.pos || {}
+  const sueltos = blocks.filter((bl) => bl.eid && posLibres[bl.eid])
+  const enStack = blocks.filter((bl) => !(bl.eid && posLibres[bl.eid]))
+
   // altura total del stack (con gaps proporcionales a la densidad)
   const gap = ref * 0.022 * dens.gap
   let stackH = 0
   let stackW = 0
-  blocks.forEach((bl, i) => {
+  enStack.forEach((bl, i) => {
     stackH += bl.lines.length * bl.px * bl.lineHeight
-    if (i < blocks.length - 1) stackH += gap
+    if (i < enStack.length - 1) stackH += gap
     const wgt = bl.hand ? 700 : bl.st.weight
     const trk = bl.hand ? 0 : (bl.st.tracking || 0)
     bl.lines.forEach((ln) => { stackW = Math.max(stackW, measure(ln, { px: bl.px, weight: wgt, tracking: trk })) })
@@ -208,7 +221,9 @@ export function drawPiece(b, { template, content, format, sizeLock = null }) {
   // ---- PLACA: qué hay detrás del texto (eje `plate` del Bloque B) ----
   const ruleH = Math.max(3, ref * 0.006)
   let plateRect = null // si hay placa opaca, el logo entra ADENTRO (B4)
-  if (p.plate === 'band') {
+  // si moviste TODOS los bloques a mano no queda stack: la placa dibujaría
+  // una tarjeta vacía de alto cero
+  if (!enStack.length) { /* sin stack no hay placa */ } else if (p.plate === 'band') {
     // banda de ancho completo que baja hasta el borde (el clásico zócalo)
     const pad = ref * 0.045
     const by = cursorY - pad
@@ -236,8 +251,8 @@ export function drawPiece(b, { template, content, format, sizeLock = null }) {
   // ---- objetos DETRÁS del texto (profundidad) ----
   drawObjects(b, { objects: (p.objects || []).filter((o) => !o.front), W, H, ref, accent: p.accent, scheme: p.scheme })
 
-  // dibujar bloques
-  for (const bl of blocks) {
+  // dibujar un bloque en (x, y). Devuelve cuánto ocupó en alto.
+  const pintarBloque = (bl, textX, cursorY, textAnchor) => {
     const isKicker = bl.role === 'kicker'
     const isCta = bl.role === 'cta'
     const isAccentRole = bl.role === 'metric'
@@ -291,7 +306,16 @@ export function drawPiece(b, { template, content, format, sizeLock = null }) {
       const lw = Math.min(ref * 0.16, Math.max(0, safe.x + safe.w - lx))
       if (lw > ref * 0.02) b.rect({ x: lx, y: cursorY + bl.px * 0.5, w: lw, h: Math.max(2, ref * 0.004), fill: p.accent })
     }
-    cursorY += bl.lines.length * lineH + gap + (isCta ? bl.px * 0.5 : 0)
+    return bl.lines.length * lineH + gap + (isCta ? bl.px * 0.5 : 0)
+  }
+
+  // el stack, como siempre
+  for (const bl of enStack) cursorY += pintarBloque(bl, textX, cursorY, textAnchor)
+  // y los que están sueltos, cada uno donde lo dejaron. Se dibujan al
+  // final para que queden por encima de la placa y del stack.
+  for (const bl of sueltos) {
+    const pt = posLibres[bl.eid]
+    pintarBloque(bl, clamp01(pt.x) * W, clamp01(pt.y) * H, pt.anchor === 'middle' ? 'middle' : 'start')
   }
 
   // ---- logo ----

@@ -494,6 +494,14 @@ export default function Editor({
   }
 
   const onSelectText = (eid) => { setSelText(eid); setSelObj(null) }
+  // posición libre de un bloque de texto. Arrastrar es un solo gesto, así
+  // que Deshacer vuelve al lugar de antes de arrastrar, no píxel por píxel.
+  const moverTexto = (eid, pt) => set({ pos: { ...(content.pos || {}), [eid]: pt } }, 'movetext:' + eid)
+  const volverAlStack = (eid) => {
+    const pos = { ...(content.pos || {}) }
+    delete pos[eid]
+    set({ pos: Object.keys(pos).length ? pos : undefined })
+  }
   const [guides, setGuides] = useState({ v: false, h: false })
   // Un texto seleccionado no se veía seleccionado EN LA PIEZA: cambiaba el
   // panel de la derecha y en el lienzo no pasaba nada, así que no sabías si
@@ -534,12 +542,21 @@ export default function Editor({
     try { e.currentTarget.setPointerCapture(e.pointerId) } catch {}
   }
   const onFrameMove = (e) => {
-    if (textDragRef.current) {
-      const d = Math.hypot(e.clientX - textDragRef.current.x, e.clientY - textDragRef.current.y)
-      if (d > 12) {
-        textDragRef.current = null
-        setPanel(template.freeform ? 'text' : 'style'); setSheet(true)
-        onToast('Los textos se ubican con la posición del bloque, no arrastrando')
+    // Arrastrar un texto lo saca del stack y lo deja donde lo soltás.
+    // "el CTA está acá abajo y yo lo quería acá arriba, pero no me
+    // dejaba" — antes esto sólo mostraba un aviso de que no se podía.
+    const td = textDragRef.current
+    if (td) {
+      const d = Math.hypot(e.clientX - td.x, e.clientY - td.y)
+      if (d > 6 || td.moved) {
+        td.moved = true
+        const g = posFromEvent(e)
+        let x = g.x - td.dx, y = g.y - td.dy
+        const snapV = Math.abs(x + td.wRel / 2 - 0.5) < 0.02
+        if (snapV) x = 0.5 - td.wRel / 2
+        setGuides({ v: snapV, h: false })
+        moverTexto(td.eid, { x, y })
+        return
       }
     }
     if (dragRef.current.i == null) return
@@ -559,9 +576,18 @@ export default function Editor({
       const eid = t.getAttribute('data-eid')
       // segundo tap/click sobre el texto ya seleccionado → editar (touch-friendly)
       if (selText === eid) { openTextEditor(t) } else { setSelText(eid); setSelObj(null) }
-      // el primer reflejo de cualquiera es arrastrar el título; los textos
-      // se ubican con el bloque, así que lo decimos en vez de no hacer nada
-      textDragRef.current = { x: e.clientX, y: e.clientY }
+      // el primer reflejo de cualquiera es arrastrar el texto. Se guarda
+      // dónde lo agarraste DENTRO del bloque para que no salte al soltar.
+      const fr = frameRef.current.getBoundingClientRect()
+      const r = t.getBoundingClientRect()
+      const g = posFromEvent(e)
+      textDragRef.current = {
+        x: e.clientX, y: e.clientY, eid, moved: false,
+        dx: g.x - (r.left - fr.left) / fr.width,
+        dy: g.y - (r.top - fr.top) / fr.height,
+        wRel: r.width / fr.width,
+      }
+      try { e.currentTarget.setPointerCapture(e.pointerId) } catch {}
       return
     }
     // cualquier click que no caiga sobre un objeto o un texto DESELECCIONA:
@@ -869,6 +895,9 @@ export default function Editor({
             {selObj != null && objects[selObj] && (
               <div className="drag-hint">Arrastrá para ubicar el objeto</div>
             )}
+            {selObj == null && selText && (
+              <div className="drag-hint">Arrastrá para moverlo · doble clic para escribir</div>
+            )}
           </div>
         </div>
 
@@ -964,7 +993,7 @@ export default function Editor({
         ) : selText ? (
           <>
             <div className="insp-kicker">Propiedades del texto</div>
-            <TextProps eid={selText} content={content} set={set} getText={getText} setText={setText} />
+            <TextProps eid={selText} content={content} set={set} getText={getText} setText={setText} onVolverAlStack={volverAlStack} />
           </>
         ) : (
           <div className="insp-empty">
@@ -1816,7 +1845,7 @@ function LogoBody({ content, template, set }) {
 }
 
 /* ---------------- Text properties (panel derecho / inspector) ---------------- */
-function TextProps({ eid, content, set, getText, setText }) {
+function TextProps({ eid, content, set, getText, setText, onVolverAlStack }) {
   const isTb = eid.startsWith('tb:')
   const idx = isTb ? +eid.slice(3) : -1
   const block = isTb ? (content.textBlocks || [])[idx] : null
@@ -1847,6 +1876,13 @@ function TextProps({ eid, content, set, getText, setText }) {
       })()}
       {/* "no me deja elegir el tamaño de la tipografía" — ahora sí, con
           Automático como default (el que entra solo) */}
+      {/* si lo moviste a mano, la forma de volver atrás tiene que estar acá */}
+      {content.pos?.[eid] && (
+        <div className="hint" style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'space-between' }}>
+          <span>Lo moviste a mano.</span>
+          <button className="btn" onClick={() => onVolverAlStack && onVolverAlStack(eid)}>Volver a su lugar</button>
+        </div>
+      )}
       <label>Tamaño</label>
       <div className="chips" style={{ marginBottom: 10 }}>
         {[[null, 'Automático'], [0.75, 'Chico'], [1, 'Normal'], [1.3, 'Grande'], [1.7, 'Enorme']].map(([v, l]) => {
