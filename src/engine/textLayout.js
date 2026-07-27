@@ -15,27 +15,30 @@ function ctx() {
   return _ctx
 }
 
-export function setFont({ px, weight = 400 }) {
-  ctx().font = `${weight} ${px}px ${FONT_FAMILY}, system-ui, sans-serif`
+// `family` existe porque la volanta manuscrita se DIBUJA en Caveat pero se
+// medía en Manrope, que es bastante más ancha: el texto entraba de sobra y
+// aun así se bajaba de tamaño o se partía de más.
+export function setFont({ px, weight = 400, family }) {
+  ctx().font = `${weight} ${px}px ${family || FONT_FAMILY}, system-ui, sans-serif`
 }
 
 // ancho de un string aplicando tracking (letter-spacing) manual
-export function measure(text, { px, weight, tracking = 0 }) {
-  setFont({ px, weight })
+export function measure(text, { px, weight, tracking = 0, family }) {
+  setFont({ px, weight, family })
   const base = ctx().measureText(text).width
   const spacing = tracking * px * Math.max(0, text.length - 1)
   return base + spacing
 }
 
 // parte un texto en líneas que entran en maxWidth
-export function wrapText(text, { px, weight, tracking = 0, maxWidth }) {
+export function wrapText(text, { px, weight, tracking = 0, maxWidth, family }) {
   const words = String(text).split(/\s+/).filter(Boolean)
   if (!words.length) return ['']
   const lines = []
   let line = words[0]
   for (let i = 1; i < words.length; i++) {
     const test = line + ' ' + words[i]
-    if (measure(test, { px, weight, tracking }) <= maxWidth) {
+    if (measure(test, { px, weight, tracking, family }) <= maxWidth) {
       line = test
     } else {
       lines.push(line)
@@ -48,16 +51,22 @@ export function wrapText(text, { px, weight, tracking = 0, maxWidth }) {
 
 // auto-encaja un texto en un box: baja el tamaño hasta que entra en
 // maxWidth (con wrap) y maxLines. Devuelve { px, lines }.
-export function fitText(text, { weight, tracking = 0, maxWidth, maxHeight, startPx, lineHeight = 1.15, maxLines = 6, minPx = 8 }) {
+export function fitText(text, { weight, tracking = 0, maxWidth, maxHeight, startPx, lineHeight = 1.15, maxLines = 6, minPx = 8, family }) {
   let px = startPx
   while (px > minPx) {
-    const lines = wrapText(text, { px, weight, tracking, maxWidth })
+    const lines = wrapText(text, { px, weight, tracking, maxWidth, family })
     const height = lines.length * px * lineHeight
     if (lines.length <= maxLines && height <= maxHeight) {
-      return { px, lines }
+      return { px, lines, cortado: false }
     }
     px = Math.floor(px * 0.94)
   }
-  const lines = wrapText(text, { px, weight, tracking, maxWidth }).slice(0, maxLines)
-  return { px, lines }
+  // Ni al mínimo entra: hay que recortar. Antes desaparecían líneas enteras
+  // sin ninguna señal — mirabas la pieza y faltaba el final de la frase.
+  // Los puntos suspensivos son la única forma de que se vea que se cortó.
+  const todas = wrapText(text, { px, weight, tracking, maxWidth, family })
+  if (todas.length <= maxLines) return { px, lines: todas, cortado: false }
+  const lines = todas.slice(0, maxLines)
+  lines[lines.length - 1] = String(lines[lines.length - 1]).replace(/[\s.,;:]+$/, '') + '…'
+  return { px, lines, cortado: true }
 }

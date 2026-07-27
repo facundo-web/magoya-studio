@@ -74,6 +74,42 @@ export const COLOR_SCHEMES = {
     onAccent: PALETTE.ink900,
     muted: PALETTE.gray600,
   },
+  // Con cuatro fondos (verde profundo, negro, crema, blanco) el feed
+  // terminaba todo oscuro: "sí, también nos quedó todo negro" / "que
+  // tenga más variación de colores". Estos cuatro son de la misma paleta,
+  // sólo que ponen al frente lo que antes era sólo acento.
+  emerald: {
+    label: 'Verde digital',
+    surface: PALETTE.emerald500,
+    onSurface: PALETTE.green950,
+    accent: PALETTE.green950,
+    onAccent: PALETTE.emerald500,
+    muted: '#0A5C31',
+  },
+  forest: {
+    label: 'Verde medio',
+    surface: PALETTE.green800,
+    onSurface: PALETTE.cream50,
+    accent: PALETTE.lime300,
+    onAccent: PALETTE.green950,
+    muted: '#9DB3A4',
+  },
+  lime: {
+    label: 'Lime',
+    surface: PALETTE.lime300,
+    onSurface: PALETTE.green950,
+    accent: PALETTE.green900,
+    onAccent: PALETTE.lime300,
+    muted: '#5E7238',
+  },
+  sand: {
+    label: 'Arena',
+    surface: PALETTE.cream300,
+    onSurface: PALETTE.green950,
+    accent: PALETTE.green900,
+    onAccent: PALETTE.cream50,
+    muted: '#6E6153',
+  },
 }
 export const DEFAULT_SCHEME = 'deep'
 
@@ -82,6 +118,7 @@ export const ACCENTS = {
   emerald: { label: 'Verde digital', value: PALETTE.emerald500 },
   lime: { label: 'Lime marcador', value: PALETTE.lime300 },
   deep: { label: 'Verde profundo', value: PALETTE.green900 },
+  cream: { label: 'Crema', value: PALETTE.cream100 },
   ink: { label: 'Negro', value: PALETTE.ink900 },
 }
 

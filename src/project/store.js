@@ -24,14 +24,36 @@ export function saveProjects(list) {
   }
 }
 
-export function upsertProject(project) {
+// La misma pieza abierta en DOS PESTAÑAS: cada autosave reescribe la lista
+// entera de localStorage, así que la última en guardar pisaba a la otra sin
+// que nadie se enterara. Ahora cada proyecto lleva un contador `rev` y quien
+// guarda dice con qué `rev` lo cargó: si en el medio cambió por fuera, NO se
+// pisa y se devuelve `conflict`. No hay merge automático — mentir mezclando
+// dos versiones es peor que avisar.
+export function projectRev(id) {
+  const p = loadProjects().find((x) => x.id === id)
+  return p?.rev || 0
+}
+
+export function upsertProject(project, { baseRev } = {}) {
   const list = loadProjects()
   const i = list.findIndex((p) => p.id === project.id)
-  if (i >= 0) list[i] = project
-  else list.unshift(project)
+  const prev = i >= 0 ? list[i] : null
+  if (prev && baseRev !== undefined && (prev.rev || 0) !== baseRev) {
+    const out = loadProjects()
+    out.saveOk = false
+    out.conflict = true          // cambió en otra pestaña: no escribimos nada
+    out.rev = prev.rev || 0
+    return out
+  }
+  const saved = { ...project, rev: (prev?.rev || 0) + 1, updatedAt: new Date().toISOString() }
+  if (i >= 0) list[i] = saved
+  else list.unshift(saved)
   const ok = saveProjects(list)
   const out = ok ? list : loadProjects()
   out.saveOk = ok // el caller mira esto: si es false, el guardado FALLÓ
+  out.conflict = false
+  out.rev = ok ? saved.rev : (prev?.rev || 0)
   return out
 }
 
@@ -270,11 +292,15 @@ function writeShares(list) {
   try { localStorage.setItem(SHARES_KEY, JSON.stringify(list)); return true } catch { return false }
 }
 
+// Devuelve la lista con `saveOk`: si localStorage no aceptó la escritura, el
+// link queda sólo en memoria y se pierde al recargar. El caller tiene que
+// poder decirlo en vez de prometer "lo tenés en Inicio › Compartidas".
 export function rememberShare({ id, name, formatId }) {
-  const list = loadShares().filter((s) => s.id !== id)
-  list.unshift({ id, name: name || 'Sin título', formatId, at: new Date().toISOString(), seen: 0 })
-  writeShares(list.slice(0, 30))
-  return list
+  const previa = loadShares().filter((s) => s.id !== id)
+  const list = [{ id, name: name || 'Sin título', formatId, at: new Date().toISOString(), seen: 0 }, ...previa].slice(0, 30)
+  const out = [...list]
+  out.saveOk = writeShares(list)
+  return out
 }
 
 export function markShareSeen(id, count) {

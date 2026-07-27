@@ -118,6 +118,15 @@ function slugify(s) {
   )
 }
 
+// El botón de exportar vive en el editor, que no conoce el nombre del
+// proyecto: el ZIP salía siempre como "carrusel.zip" y tres carruseles en la
+// carpeta de descargas eran carrusel.zip, carrusel(1).zip, carrusel(2).zip.
+// App.jsx registra acá el nombre de la pieza abierta.
+let _projectName = ''
+export function setProjectExportName(name) {
+  _projectName = String(name || '').trim()
+}
+
 // export de UNA pieza
 export async function exportPiece({ template, content, format, kind = 'png', scale = 2, sizeLock = null }) {
   const name = slugify((content && content.title) || template.name) + '-' + format.id
@@ -137,9 +146,10 @@ export async function exportPiece({ template, content, format, kind = 'png', sca
 // export de carrusel: varias slides (cada una {template,content}) mismo formato
 // onProgress(hechas, total): un ZIP de 8 slides @3x tarda bastante y el
 // aviso se iba a los 2 s — parecía colgado y la gente recargaba la página.
-export async function exportCarousel({ slides, format, kind = 'zip', scale = 2, name = 'carrusel', onProgress, sizeLock = null }) {
+export async function exportCarousel({ slides, format, kind = 'zip', scale = 2, name, onProgress, sizeLock = null }) {
   const fontFaceCss = await buildFontFaceCss()
-  const base = slugify(name)
+  // nombre explícito → nombre del proyecto abierto → título de la portada
+  const base = slugify(name || _projectName || slides?.[0]?.content?.title || 'carrusel')
   if (kind === 'pdf') {
     const { jsPDF } = await import('jspdf')
     const orientation = format.w >= format.h ? 'landscape' : 'portrait'

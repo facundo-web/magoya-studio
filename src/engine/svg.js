@@ -162,10 +162,11 @@ export function createBuilder() {
       )
     },
     // imagen de asset (logo/motivo), fit contain
-    asset({ x, y, w, h, href, opacity = 1 }) {
+    asset({ x, y, w, h, href, opacity = 1, filterId = null }) {
       if (!href) return
+      const f = filterId ? ` filter="url(#${filterId})"` : ''
       body.push(
-        `<image href="${href}" x="${n(x)}" y="${n(y)}" width="${n(w)}" height="${n(h)}" preserveAspectRatio="xMidYMid meet" opacity="${opacity}"/>`
+        `<image href="${href}" x="${n(x)}" y="${n(y)}" width="${n(w)}" height="${n(h)}" preserveAspectRatio="xMidYMid meet" opacity="${opacity}"${f}/>`
       )
     },
     // degradé overlay a pantalla completa (por encima del fondo)

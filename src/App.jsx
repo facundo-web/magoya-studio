@@ -7,9 +7,10 @@ import { createShare, loadShare, listComments, addComment, countComments, setVer
 import { TEMPLATES, TEMPLATES_BY_ID, BLANK_TEMPLATE, placeholderContent, applyDesign } from './templates/index.js'
 import { buildCarousel } from './templates/carousels.js'
 import { tamanoComun } from './engine/layouts.js'
-import { FORMATS_BY_ID, CAROUSEL_FORMATS } from './formats/registry.js'
+import { FORMATS_BY_ID, CAROUSEL_FORMATS, isKnownFormat, formatLabel } from './formats/registry.js'
+import { setProjectExportName } from './engine/export.js'
 import {
-  loadProjects, upsertProject, deleteProject, newProjectId,
+  loadProjects, upsertProject, deleteProject, newProjectId, projectRev,
   exportProjectFile, importProjectFile, toShareLink, fromShareLink,
   loadElements, addElement, deleteElement,
   loadCustomTemplates, buildTemplateFromPiece, saveCustomTemplate, deleteCustomTemplate,
@@ -47,6 +48,7 @@ export default function App() {
   const [pvSlide, setPvSlide] = useState(0)
   const [miVoto, setMiVoto] = useState(null)
   const [staleBuild, setStaleBuild] = useState(false) // salió una versión nueva
+  const [conflicto, setConflicto] = useState(false)   // la pieza cambió en otra pestaña
 
   // Cuando se despliega una versión, los archivos con hash viejo dejan de
   // existir. Si tenías la pestaña abierta, todo lo que carga bajo demanda
@@ -71,6 +73,13 @@ export default function App() {
     if (preview?.shareId) listComments(preview.shareId).then(setComments).catch(() => {})
   }, [preview?.shareId])
 
+  // Un link compartido puede traer un formato que ya sacamos del registro:
+  // se dibujaba con las proporciones del default sin decir nada.
+  useEffect(() => {
+    if (!preview?.formatId || isKnownFormat(preview.formatId)) return
+    showToast(`⚠ El formato «${preview.formatId}» ya no existe — se muestra como ${formatLabel(DEFAULT_FORMAT)}`)
+  }, [preview?.formatId])
+
   const allTemplates = [...TEMPLATES, ...customTemplates]
   const allById = Object.fromEntries(allTemplates.map((t) => [t.id, t]))
 
@@ -89,6 +98,12 @@ export default function App() {
   const [active, setActive] = useState(0)
   const [carousel, setCarousel] = useState(false)
   const [dirty, setDirty] = useState(false)
+
+  // El ZIP/PDF del carrusel se baja con el nombre de la pieza. El botón vive
+  // en el editor, que no conoce el proyecto: se lo pasamos al motor.
+  // (Va DESPUÉS de declarar projectName: en el array de dependencias se lee
+  // durante el render, y arriba de la declaración eso revienta el componente.)
+  useEffect(() => { setProjectExportName(projectName) }, [projectName])
 
   useEffect(() => {
     setProjects(loadProjects())
@@ -154,23 +169,46 @@ export default function App() {
   // botón: 2,2 s no alcanzaba. Y al vencer se limpia la acción, si no el
   // aviso siguiente heredaba un "Deshacer" de algo borrado hace rato.
   const [toastUndo, setToastUndo] = useState(false)
+  // `conAccion` puede ser true (el "Deshacer" de siempre) o {label, run}
+  // para un aviso con su propio botón (ej: "Recargar" del choque de pestañas).
+  const [toastAct, setToastAct] = useState(null)
   const showToast = (msg, conAccion = false) => {
+    const propia = conAccion && typeof conAccion === 'object' ? conAccion : null
     setToast(msg)
-    setToastUndo(conAccion)
+    setToastUndo(!!conAccion && !propia)
+    setToastAct(propia)
     clearTimeout(window.__mt)
-    window.__mt = setTimeout(() => { setToast(null); setToastUndo(false); setUndoDelete(null) }, conAccion ? 9000 : 2400)
+    window.__mt = setTimeout(() => { setToast(null); setToastUndo(false); setToastAct(null); setUndoDelete(null) }, conAccion ? 9000 : 2400)
   }
 
   const format = FORMATS_BY_ID[formatId] || FORMATS_BY_ID[DEFAULT_FORMAT]
   const current = pieces[active] || null
+
+  // `rev` del proyecto tal como lo tenemos cargado en ESTA pestaña. Si en
+  // localStorage hay otro, alguien lo guardó por fuera desde que abrimos.
+  const revRef = useRef(0)
+  const conflictoRef = useRef(false)
+  useEffect(() => { conflictoRef.current = conflicto }, [conflicto])
 
   // Guardar de verdad. Antes vivía dentro del setTimeout del efecto: al
   // salir del editor React corría el cleanup, mataba el timer y el guardado
   // no ocurría nunca. Todo lo hecho en los últimos 800 ms se perdía.
   const guardar = async () => {
     if (!projectId || !piecesRef.current.length) return
+    // ya avisamos del choque: seguir intentando sólo repite el aviso
+    if (conflictoRef.current) return
     const liviano = await dehydrate(serialize()).catch(() => serialize())
-    const next = upsertProject(liviano)
+    const next = upsertProject(liviano, { baseRev: revRef.current })
+    if (next.conflict) {
+      conflictoRef.current = true
+      setConflicto(true)
+      setProjects(next)
+      showToast('⚠ Esta pieza se modificó en otra pestaña — no la pisamos',
+        { label: 'Recargar', run: () => location.reload() })
+      return
+    }
+    // quedamos parados en la versión que acaba de quedar guardada
+    if (typeof next.rev === 'number') revRef.current = next.rev
     setProjects(next)
     if (next.saveOk === false) {
       setSaveFail(true)
@@ -199,6 +237,9 @@ export default function App() {
   useEffect(() => {
     const alSalir = () => {
       if (!dirtyRef.current || !projectId) return
+      // si la pieza cambió en otra pestaña, la copia de emergencia se
+      // restauraría al arrancar y pisaría igual lo que hizo la otra
+      if (conflictoRef.current) return
       try { localStorage.setItem('magoya_studio_pending_v1', JSON.stringify(serialize())) } catch {}
     }
     window.addEventListener('pagehide', alSalir)
@@ -211,6 +252,7 @@ export default function App() {
   // ---- iniciar desde template ----
   function pickTemplate(template, chosenFormat) {
     setProjectId(newProjectId())
+    revRef.current = 0; conflictoRef.current = false; setConflicto(false)
     namedByHand.current = false
     setProjectName(template.defaults?.title || template.name)
     setFormatId(chosenFormat?.id || galleryFormatId || DEFAULT_FORMAT)
@@ -240,16 +282,29 @@ export default function App() {
       showToast('No se pudo abrir el proyecto')
       return
     }
-    if (faltantes) showToast(`⚠ ${faltantes} slide${faltantes > 1 ? 's usan' : ' usa'} una plantilla que no está en este navegador`)
-    else if (p.__fotosFaltantes) showToast(`⚠ ${p.__fotosFaltantes} foto${p.__fotosFaltantes > 1 ? 's' : ''} ya no está${p.__fotosFaltantes > 1 ? 'n' : ''} en este navegador`)
+    // Un formatId que ya no existe en el registro caía al default EN SILENCIO:
+    // la pieza se abría con otras proporciones y nadie sabía por qué.
+    const fmtOk = isKnownFormat(p.formatId)
+    const avisos = []
+    if (p.formatId && !fmtOk) avisos.push(`⚠ El formato «${p.formatId}» ya no existe — se abrió como ${formatLabel(DEFAULT_FORMAT)}`)
+    if (faltantes) avisos.push(`⚠ ${faltantes} slide${faltantes > 1 ? 's usan' : ' usa'} una plantilla que no está en este navegador`)
+    else if (p.__fotosFaltantes) avisos.push(`⚠ ${p.__fotosFaltantes} foto${p.__fotosFaltantes > 1 ? 's' : ''} ya no está${p.__fotosFaltantes > 1 ? 'n' : ''} en este navegador`)
+    if (avisos.length) showToast(avisos.join(' · '))
     // Un link o un archivo abren una COPIA: reusar el id pisaba el proyecto
     // local que tuviera ese mismo id (y el del link viene sin fotos).
     const idExiste = p.id && loadProjects().some((x) => x.id === p.id)
     const id = (fuente !== 'local' && idExiste) ? newProjectId() : (p.id || newProjectId())
     setProjectId(id)
+    // Desde qué versión venimos: la del objeto que ABRIMOS, no la que hay
+    // ahora en localStorage. Si otra pestaña guardó mientras mirábamos la
+    // home, la lista en pantalla ya es vieja: tomar la rev fresca nos dejaría
+    // pisar ese trabajo sin darnos cuenta. Con id nuevo (copia de un link o
+    // archivo) no hay nada que pisar.
+    revRef.current = id === p.id ? (p.rev || 0) : projectRev(id)
+    conflictoRef.current = false; setConflicto(false)
     namedByHand.current = true // el proyecto ya tiene su nombre elegido
     setProjectName(p.name || '')
-    setFormatId(FORMATS_BY_ID[p.formatId] ? p.formatId : DEFAULT_FORMAT)
+    setFormatId(fmtOk ? p.formatId : DEFAULT_FORMAT)
     resetHistory()
     piecesRef.current = ps
     setPieces(ps)
@@ -396,6 +451,7 @@ export default function App() {
   function startBlank(fmt) {
     const f = fmt || FORMATS_BY_ID[galleryFormatId] || FORMATS_BY_ID[DEFAULT_FORMAT]
     setProjectId(newProjectId())
+    revRef.current = 0; conflictoRef.current = false; setConflicto(false)
     namedByHand.current = false
     setProjectName('Pieza nueva')
     setFormatId(f.id)
@@ -411,6 +467,7 @@ export default function App() {
     const blank = () => ({ template: BLANK_TEMPLATE, content: freshContent(BLANK_TEMPLATE) })
     const slides = preset ? buildCarousel(preset) : [blank(), blank(), blank()]
     setProjectId(newProjectId())
+    revRef.current = 0; conflictoRef.current = false; setConflicto(false)
     namedByHand.current = false
     setProjectName(preset ? preset.name : 'Carrusel')
     setFormatId(format.id)
@@ -568,11 +625,17 @@ export default function App() {
       const id = await createShare(payload)
       const link = location.origin + location.pathname + '#r=' + id
       // D4 · lo guardamos: si perdés el link, no perdés el feedback
-      setShares(rememberShare({ id, name: projectName || 'Sin título', formatId }))
+      const lista = rememberShare({ id, name: projectName || 'Sin título', formatId })
+      setShares(lista)
       // el portapapeles puede fallar (pestaña sin foco): la pieza YA se subió,
       // así que en ese caso mostramos el link en vez de mentir con un error.
       const ok = await copyToClipboard(link)
-      if (ok) showToast('✓ Link de revisión copiado — lo tenés en Inicio › Compartidas')
+      // si la lista de compartidas no se pudo guardar, prometer
+      // "lo tenés en Inicio › Compartidas" es mentira: al recargar no está.
+      if (lista.saveOk === false) {
+        setLinkToCopy(link)
+        showToast('⚠ Se subió, pero no se pudo anotar en Compartidas — guardate el link')
+      } else if (ok) showToast('✓ Link de revisión copiado — lo tenés en Inicio › Compartidas')
       else setLinkToCopy(link)
     } catch (e) {
       console.error(e)
@@ -735,9 +798,13 @@ export default function App() {
         <div className="spacer" />
         {view === 'editor' && (
           <>
-            <span className={'save-status' + (saveFail ? ' fail' : '')} title={saveFail ? 'No se pudo guardar: el navegador está lleno' : 'Tu trabajo se guarda solo'}>
-              {saveFail ? '⚠ No se pudo guardar' : dirty ? '• Guardando…' : '✓ Guardado'}
+            <span className={'save-status' + (saveFail || conflicto ? ' fail' : '')}
+              title={conflicto ? 'La misma pieza se guardó desde otra pestaña. Para no pisar ese trabajo dejamos de guardar acá: bajá esta versión o recargá para quedarte con la otra.'
+                : saveFail ? 'No se pudo guardar: el navegador está lleno' : 'Tu trabajo se guarda solo'}>
+              {conflicto ? '⚠ Cambió en otra pestaña' : saveFail ? '⚠ No se pudo guardar' : dirty ? '• Guardando…' : '✓ Guardado'}
             </span>
+            {conflicto && <button className="btn ghost-light" onClick={() => exportProjectFile(serialize())}>Bajar esta versión</button>}
+            {conflicto && <button className="btn ghost-light" onClick={() => location.reload()}>Recargar</button>}
             {saveFail && <button className="btn ghost-light" onClick={() => exportProjectFile(serialize())}>Descargar ahora</button>}
             <button className="btn ghost-light" onClick={() => setView('gallery')}>‹ Volver al inicio</button>
           </>
@@ -851,10 +918,14 @@ export default function App() {
       {toast && (
         <div className="toast">
           {toast}
+          {/* aviso con su propio botón (ej: "Recargar" del choque de pestañas) */}
+          {toastAct && (
+            <button className="toast-act" onClick={() => { const r = toastAct.run; setToastAct(null); r && r() }}>{toastAct.label}</button>
+          )}
           {/* Una sola regla: TODO lo que se borra ofrece Deshacer acá mismo.
               Si no hay nada guardado aparte (un objeto, una slide), el botón
               usa el historial normal. */}
-          {(undoDelete || toastUndo) && (
+          {!toastAct && (undoDelete || toastUndo) && (
             <button className="toast-act" onClick={() => {
               if (undoDelete) {
                 const { kind, data } = undoDelete

@@ -16,6 +16,29 @@ import { arrowPath, handArrowPath, sparklePath, calloutPath, barsRects, sparklin
 
 const clamp01 = (v) => Math.max(0, Math.min(1, Number(v) || 0))
 
+// luminancia relativa, para poder decidir contrastes sin adivinar
+function lum(hex) {
+  const h = String(hex || '#000').replace('#', '')
+  if (h.length < 6) return 0
+  const c = [0, 2, 4].map((i) => {
+    const v = parseInt(h.slice(i, i + 2), 16) / 255
+    return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4
+  })
+  return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
+}
+function ratio(a, b) {
+  const l1 = lum(a), l2 = lum(b)
+  return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05)
+}
+
+// El acento lo trae la plantilla, pero sobre los fondos verdes nuevos un
+// acento verde desaparece (verde digital sobre verde digital). Si no se
+// despega del fondo, gana el que el esquema define para sí mismo.
+function acentoLegible(clave, scheme) {
+  const pedido = (ACCENTS[clave] || { value: scheme.accent }).value
+  return ratio(pedido, scheme.surface) >= 1.6 ? pedido : scheme.accent
+}
+
 // texto oscuro o claro según luminancia del fondo
 function contrastOn(hex) {
   const h = (hex || '#000').replace('#', '')
@@ -48,7 +71,7 @@ export function resolvePiece(template, content) {
   const d = template.defaults || {}
   const c = content || {}
   const scheme = COLOR_SCHEMES[c.scheme || d.scheme || DEFAULT_SCHEME]
-  const accent = (ACCENTS[c.accent || d.accent] || { value: scheme.accent }).value
+  const accent = acentoLegible(c.accent || d.accent, scheme)
   const freeform = !!template.freeform
   // El fondo lo decide el usuario en CUALQUIER plantilla, no sólo en las
   // libres: "el estilo ese no tiene foto, es con fondo… pero debería poder
@@ -193,10 +216,11 @@ export function drawPiece(b, { template, content, format, sizeLock = null }) {
     // Ahora el texto baja de línea en vez de achicarse; el único techo es
     // que no se vaya de la pieza.
     const fijo = elegido ? startPx : (sizeLock && sizeLock[role])
+    const family = hand ? FONT_HAND_STACK : undefined
     const fit = fitText(value, {
       weight: hand ? 700 : st.weight, tracking: hand ? 0 : (st.tracking || 0),
       maxWidth: maxTextW, maxHeight: fijo ? H * 0.86 : H * 0.5, startPx: fijo || startPx,
-      lineHeight: st.lineHeight || 1.15, maxLines: fijo ? 99 : maxLines,
+      lineHeight: st.lineHeight || 1.15, maxLines: fijo ? 99 : maxLines, family,
     })
     blocks.push({ role, st, value, px: fit.px, lines: fit.lines, lineHeight: st.lineHeight || 1.15, hand, hl: opts.hl || null, color: opts.color || null, eid: opts.eid || null })
   }
@@ -230,7 +254,8 @@ export function drawPiece(b, { template, content, format, sizeLock = null }) {
     if (i < enStack.length - 1) stackH += gap
     const wgt = bl.hand ? 700 : bl.st.weight
     const trk = bl.hand ? 0 : (bl.st.tracking || 0)
-    bl.lines.forEach((ln) => { stackW = Math.max(stackW, measure(ln, { px: bl.px, weight: wgt, tracking: trk })) })
+    const fam = bl.hand ? FONT_HAND_STACK : undefined
+    bl.lines.forEach((ln) => { stackW = Math.max(stackW, measure(ln, { px: bl.px, weight: wgt, tracking: trk, family: fam })) })
   })
 
   // posición del stack según ancla
@@ -292,7 +317,7 @@ export function drawPiece(b, { template, content, format, sizeLock = null }) {
       const padX = bl.px * (isCta ? 0.7 : 0.24)
       const padY = bl.px * (isCta ? 0.42 : 0.14)
       bl.lines.forEach((ln, li) => {
-        const w = measure(ln, { px: bl.px, weight, tracking })
+        const w = measure(ln, { px: bl.px, weight, tracking, family: bl.hand ? FONT_HAND_STACK : undefined })
         const baseline = cursorY + bl.px * 0.8 + li * lineH
         const glyphTop = baseline - bl.px * CAP
         const rh = bl.px * CAP + bl.px * 0.14 + padY * 2 // cap + descendente + aire
@@ -325,7 +350,7 @@ export function drawPiece(b, { template, content, format, sizeLock = null }) {
     // B4 · lockup "volanta con línea": la regla sale AL LADO de la volanta,
     // no arriba del stack. Sube mucho el nivel editorial y no mueve el texto.
     if (isKicker && p.rule === 'side' && textAnchor !== 'middle') {
-      const kw = measure(bl.lines[0] || '', { px: bl.px, weight, tracking })
+      const kw = measure(bl.lines[0] || '', { px: bl.px, weight, tracking, family: bl.hand ? FONT_HAND_STACK : undefined })
       const lx = textX + kw + bl.px * 0.7
       const lw = Math.min(ref * 0.16, Math.max(0, safe.x + safe.w - lx))
       if (lw > ref * 0.02) b.rect({ x: lx, y: cursorY + bl.px * 0.5, w: lw, h: Math.max(2, ref * 0.004), fill: p.accent })
@@ -402,7 +427,7 @@ function drawChat(b, { template, content, format }) {
   const c = content || {}
   const d = template.defaults || {}
   const scheme = COLOR_SCHEMES[c.scheme || d.scheme || DEFAULT_SCHEME]
-  const accent = (ACCENTS[c.accent || d.accent] || { value: scheme.accent }).value
+  const accent = acentoLegible(c.accent || d.accent, scheme)
   const objects = c.objects || d.objects || []
   const messages = c.messages || d.messages || []
   const chatName = c.chatName ?? d.chatName ?? 'Magoya'
@@ -726,9 +751,16 @@ function drawLogo(b, { p, W, H, safe, ref, hAnchor, vAnchor, plateRect }) {
   const wm = WORDMARKS[p.logo] || WORDMARKS.cream
   const logoUrl = getAsset(wm.url)
   if (!logoUrl) return
-  const lw = ref * 0.2 * (p.logoScale || 1)
+  // "este logo me parece que queda como muy por debajo": a 0.2 el wordmark
+  // no sostenía la pieza, quedaba como un pie de página.
+  const lw = ref * 0.24 * (p.logoScale || 1)
   const lh = lw / WORDMARK_RATIO
   const onRight = p.logoPos === 'right'
+  // sobre una foto sin placa, el logo se comía el fondo y desaparecía: una
+  // sombra suave lo despega sin ensuciar la marca
+  const sombra = p.surface === 'photo' && !(plateRect && p.plate === 'band')
+    ? b.filter({ kind: 'soft', r: ref * 0.014, dy: ref * 0.004, opacity: 0.45 })
+    : null
   // B4 · con banda, el logo va ADENTRO de la placa, del lado libre (hoy
   // flotaba aparte y la pieza se leía como dos cosas pegadas). Sólo si el
   // texto no llega hasta ahí: nunca se pisan.
@@ -740,5 +772,5 @@ function drawLogo(b, { p, W, H, safe, ref, hAnchor, vAnchor, plateRect }) {
   // vertical: opuesto al stack de texto; horizontal: elegido por el usuario
   const lx = onRight ? W - safe.x - lw : safe.x
   const ly = vAnchor === 'top' ? safe.y + safe.h - lh : safe.y
-  b.asset({ x: lx, y: ly, w: lw, h: lh, href: logoUrl })
+  b.asset({ x: lx, y: ly, w: lw, h: lh, href: logoUrl, filterId: sombra })
 }

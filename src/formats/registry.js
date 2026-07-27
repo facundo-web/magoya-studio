@@ -51,6 +51,19 @@ export const FORMATS = [
 
 export const FORMATS_BY_ID = Object.fromEntries(FORMATS.map((f) => [f.id, f]))
 
+// ¿Existe todavía este formato? Un proyecto guardado (o un link compartido)
+// puede traer un id que sacamos del registro: sin esto la app caía al formato
+// por defecto en silencio y la pieza se veía con otras proporciones.
+export function isKnownFormat(id) {
+  return !!(id && FORMATS_BY_ID[id])
+}
+
+// Nombre legible para poder DECIR a qué formato se cambió.
+export function formatLabel(id) {
+  const f = FORMATS_BY_ID[id]
+  return f ? `${f.network} · ${f.label}` : String(id || '')
+}
+
 // Agrupados por red para el selector
 export function formatsByNetwork() {
   const out = {}

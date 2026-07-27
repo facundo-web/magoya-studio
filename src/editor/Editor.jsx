@@ -856,7 +856,9 @@ export default function Editor({
                   onMouseEnter={() => setHoverObj(i)} onMouseLeave={() => setHoverObj(null)}
                   onPointerDown={(e) => startDrag(e, i)}>
                   {selObj === i && ['nw', 'ne', 'sw', 'se'].map((c) => (
-                    <span key={c} className={'rs-handle ' + c} onPointerDown={(e) => startHandleResize(e, i, c)} />
+                    <span key={c} className={'rs-handle ' + c} role="button" tabIndex={-1}
+                      aria-label={{ nw: 'Redimensionar desde arriba a la izquierda', ne: 'Redimensionar desde arriba a la derecha', sw: 'Redimensionar desde abajo a la izquierda', se: 'Redimensionar desde abajo a la derecha' }[c]}
+                      onPointerDown={(e) => startHandleResize(e, i, c)} />
                   ))}
                   {selObj === i && (
                     <span className="rot-handle" title="Girar · con Shift salta de 15 en 15"
@@ -1233,9 +1235,20 @@ function GradientBody({ content, set }) {
         ))}
       </div>
       {on && (
-        <div className="field" style={{ marginTop: 10 }}><label>Intensidad</label>
-          <input className="range" type="range" min="0.2" max="1" step="0.05" value={g.opacity ?? 1}
-            onChange={(e) => set({ gradient: { ...g, opacity: +e.target.value } })} /></div>
+        <>
+          <div className="field" style={{ marginTop: 10 }}><label>Intensidad</label>
+            <input className="range" type="range" min="0.2" max="1" step="0.05" value={g.opacity ?? 1}
+              onChange={(e) => set({ gradient: { ...g, opacity: +e.target.value } })} /></div>
+          {/* el motor ya giraba el degradé; no había de dónde agarrarlo */}
+          <div className="field"><label>Desde dónde cae</label>
+            <div className="chips">
+              {[[null, 'Como viene'], [180, 'Arriba'], [0, 'Abajo'], [90, 'Izquierda'], [270, 'Derecha']].map(([v, l]) => (
+                <button key={l} className={'chip' + ((g.angle ?? null) === v ? ' on' : '')}
+                  onClick={() => set({ gradient: { ...g, angle: v === null ? undefined : v } })}>{l}</button>
+              ))}
+            </div>
+          </div>
+        </>
       )}
     </>
   )
@@ -1436,6 +1449,43 @@ function StepsBody({ content, template, set }) {
 }
 
 
+// Los seis puntos de posición decían todos "Ubicar acá": con lector de
+// pantalla (o con el tooltip) eran seis botones idénticos.
+function nombrePos(x, y) {
+  const v = y < 0.34 ? 'arriba' : y > 0.66 ? 'abajo' : 'al centro'
+  const h = x < 0.34 ? 'a la izquierda' : x > 0.66 ? 'a la derecha' : ''
+  return [v, h].filter(Boolean).join(' ')
+}
+
+/* Valores del gráfico. Se edita como TEXTO y recién al salir se traduce a
+   números: antes cada tecla se parseaba en vivo, así que borrar un dígito
+   dejaba el campo en 0 y una letra suelta hundía la barra a cero. */
+function ValoresInput({ valores, onChange }) {
+  const [txt, setTxt] = useState(valores.join(', '))
+  const [tocado, setTocado] = useState(false)
+  useEffect(() => { if (!tocado) setTxt(valores.join(', ')) }, [valores, tocado])
+  const parsear = (s) => s.split(',').map((v) => v.trim())
+    .filter((v) => v !== '' && Number.isFinite(Number(v)))
+    .map(Number).filter((v) => v >= 0)
+  const confirmar = () => {
+    setTocado(false)
+    const nums = parsear(txt)
+    if (nums.length >= 2) { onChange(nums); setTxt(nums.join(', ')) }
+    else setTxt(valores.join(', '))   // no se entendió: se deja lo que había
+  }
+  const invalido = tocado && parsear(txt).length < 2
+  return (
+    <div className="field">
+      <label>Valores (separados por coma)</label>
+      <input type="text" value={txt} inputMode="numeric"
+        onChange={(e) => { setTocado(true); setTxt(e.target.value) }}
+        onBlur={confirmar}
+        onKeyDown={(e) => { if (e.key === 'Enter') { e.currentTarget.blur() } }} />
+      {invalido && <div className="hint">Van al menos dos números, separados por coma. Ej: 3, 5, 4, 9</div>}
+    </div>
+  )
+}
+
 /* ---------------- Object properties (panel derecho / inspector) ---------------- */
 function ObjectProps({ o, i, updateObject, objRemove, objDuplicate, objBringFront, objSendBack, onToast, goToBg }) {
   const objIcon = (o.kind === 'icon' || o.kind === 'device') ? ICONS_BY_ID[o.iconId || o.deviceId] : null
@@ -1487,6 +1537,10 @@ function ObjectProps({ o, i, updateObject, objRemove, objDuplicate, objBringFron
               <Pad2D x={o.focal?.x ?? 0.5} y={o.focal?.y ?? 0.5} onChange={(f) => updateObject(i, { focal: f })} />
             </>
           )}
+          {/* el reflejo de pantalla es lo que saca al celular de "ícono",
+              pero a veces tapa la captura. Ya era regulable en el motor. */}
+          <Ctl label="Reflejo de la pantalla" value={Math.round((o.glare ?? 1) * 100)} min={0} max={100} step={5} suffix="%"
+            onChange={(v) => updateObject(i, { glare: v / 100 }, 'glare')} />
         </>
       )}
       {o.kind === 'icon' && !isMark && (
@@ -1565,6 +1619,22 @@ function ObjectProps({ o, i, updateObject, objRemove, objDuplicate, objBringFron
           </div>
         </>
       )}
+      {/* logo con tile: el fondo del cuadradito ya se podía cambiar en el
+          motor (`tileColor`) y no había swatch. Sirve para que un logo de
+          marca no rompa una pieza donde su color no entra. */}
+      {o.kind === 'icon' && !isMark && o.style !== 'plain' && (
+        <>
+          <label>Fondo del cuadradito</label>
+          <div className="swatches" style={{ marginBottom: 8 }}>
+            <button className={'sw' + (!o.tileColor ? ' on' : '')} title="El de la marca"
+              style={{ background: objIcon?.color || '#0D0C0C' }} onClick={() => updateObject(i, { tileColor: undefined })} />
+            {TINTS.filter((t) => t.value !== 'accent').map((t) => (
+              <button key={t.k} className={'sw' + (o.tileColor === t.value ? ' on' : '')} title={t.label}
+                style={{ background: t.sw }} onClick={() => updateObject(i, { tileColor: t.value })} />
+            ))}
+          </div>
+        </>
+      )}
       {o.kind === 'shape' && (
         <>
           {o.shape === 'window' && (
@@ -1582,16 +1652,29 @@ function ObjectProps({ o, i, updateObject, objRemove, objDuplicate, objBringFron
               </div>
               <input ref={devPhotoRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => e.target.files[0] && onDevFile(e.target.files[0])} />
               <Ctl label="Proporción" value={Math.round((o.ratio || 0.62) * 100)} min={40} max={120} suffix="%" onChange={(v) => updateObject(i, { ratio: v / 100 }, 'ratio')} />
+              {/* la captura ya se podía acercar y reencuadrar; no había control */}
+              {o.src && (
+                <>
+                  <Ctl label="Zoom de la captura" value={Math.round((o.zoom || 1) * 100)} min={100} max={300} step={5} suffix="%" onChange={(v) => updateObject(i, { zoom: v / 100 }, 'zoom')} />
+                  <label>Encuadre (arrastrá el punto)</label>
+                  <Pad2D x={o.focal?.x ?? 0.5} y={o.focal?.y ?? 0.5} onChange={(f) => updateObject(i, { focal: f })} />
+                </>
+              )}
             </>
           )}
           {(o.shape === 'badge' || o.shape === 'callout' || o.shape === 'window') && (
             <div className="field"><label>{o.shape === 'window' ? 'Barra de la ventana' : 'Texto'}</label>
               <input type="text" value={o.text || ''} onChange={(e) => updateObject(i, { text: e.target.value })} /></div>
           )}
+          {/* la etiqueta ya sabía dibujarse en contorno; faltaba el control */}
+          {o.shape === 'badge' && (
+            <div className="chips" style={{ marginBottom: 8 }}>
+              <button className={'chip' + (o.style !== 'outline' ? ' on' : '')} onClick={() => updateObject(i, { style: 'solid' })}>Rellena</button>
+              <button className={'chip' + (o.style === 'outline' ? ' on' : '')} onClick={() => updateObject(i, { style: 'outline' })}>Sólo contorno</button>
+            </div>
+          )}
           {(o.shape === 'bars' || o.shape === 'sparkline') && (
-            <div className="field"><label>Valores (separados por coma)</label>
-              <input type="text" value={(o.values || [3, 5, 4, 7, 9]).join(', ')}
-                onChange={(e) => updateObject(i, { values: e.target.value.split(',').map((v) => +v.trim() || 0).filter((v) => v >= 0) })} /></div>
+            <ValoresInput valores={o.values || [3, 5, 4, 7, 9]} onChange={(vals) => updateObject(i, { values: vals })} />
           )}
           {o.shape === 'dots' && (
             <>
@@ -1634,7 +1717,9 @@ function ObjectProps({ o, i, updateObject, objRemove, objDuplicate, objBringFron
       <label>Posición</label>
       <div className="posgrid">
         {POS_GRID.map(([px, py], k) => (
-          <button key={k} className={'posdot' + (Math.abs((o.x ?? 0.5) - px) < 0.02 && Math.abs((o.y ?? 0.5) - py) < 0.02 ? ' on' : '')} onClick={() => updateObject(i, { x: px, y: py })} title="Ubicar acá" />
+          <button key={k} className={'posdot' + (Math.abs((o.x ?? 0.5) - px) < 0.02 && Math.abs((o.y ?? 0.5) - py) < 0.02 ? ' on' : '')}
+            onClick={() => updateObject(i, { x: px, y: py })}
+            title={`Ubicar ${nombrePos(px, py)}`} aria-label={`Ubicar ${nombrePos(px, py)}`} />
         ))}
       </div>
       <Ctl label="Tamaño" value={Math.round((o.scale ?? 0.3) * 100)} min={5} max={120} suffix="%" onChange={(v) => updateObject(i, { scale: v / 100 }, 'scale')} />
