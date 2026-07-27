@@ -662,8 +662,17 @@ export default function Editor({
             <GradientBody content={content} set={set} />
             <div className="panel-title" style={{ marginTop: 16 }}>Efectos de la pieza</div>
             <Ctl label="Oscurecer los bordes" value={Math.round((content.vignette ?? 0) * 100)} min={0} max={80} onChange={(v) => set({ vignette: v / 100 })} />
-            <Ctl label="Oscurecer el fondo" value={Math.round((content.photoDim ?? 0) * 100)} min={0} max={70} onChange={(v) => set({ photoDim: v / 100 })} />
-            <Ctl label="Desenfocar el fondo" value={Math.round(content.photoBlur ?? 0)} min={0} max={30} onChange={(v) => set({ photoBlur: v })} />
+            {/* Oscurecer y desenfocar sólo tocan la FOTO de fondo. Mostrarlos
+                sin foto era ofrecer dos sliders que no hacen nada: los movías
+                y la pieza no cambiaba, sin ninguna explicación. */}
+            {content.photo?.src ? (
+              <>
+                <Ctl label="Oscurecer el fondo" value={Math.round((content.photoDim ?? 0) * 100)} min={0} max={70} onChange={(v) => set({ photoDim: v / 100 })} />
+                <Ctl label="Desenfocar el fondo" value={Math.round(content.photoBlur ?? 0)} min={0} max={30} onChange={(v) => set({ photoBlur: v })} />
+              </>
+            ) : (
+              <div className="hint">Oscurecer y desenfocar necesitan una foto de fondo. Ponela en <b>Fotos</b>.</div>
+            )}
           </>
         )}
       </div>

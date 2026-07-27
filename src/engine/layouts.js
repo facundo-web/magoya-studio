@@ -297,6 +297,13 @@ function drawChat(b, { template, content, format }) {
   // fondo de marca
   b.rect({ x: 0, y: 0, w: W, h: H, fill: scheme.surface })
 
+  // degradé y viñeta son de la PIEZA, no de la foto: el chat también los usa
+  const grad = c.gradient !== undefined ? c.gradient : d.gradient || null
+  if (grad && grad.preset && GRADIENTS[grad.preset]) {
+    const g = GRADIENTS[grad.preset]
+    b.gradientOverlay({ w: W, h: H, angle: grad.angle ?? g.angle, stops: g.stops, opacity: grad.opacity ?? 1 })
+  }
+
   // Objetos DETRÁS del panel. El chat ignoraba por completo lo que sumabas:
   // el elemento aparecía en la lista y se podía seleccionar en el lienzo,
   // pero la pieza no lo dibujaba nunca. Un no-op silencioso.
@@ -340,6 +347,8 @@ function drawChat(b, { template, content, format }) {
 
   // objetos DELANTE del panel + logo, igual que en cualquier otra pieza
   drawObjects(b, { objects: objects.filter((o) => o.front), W, H, ref, accent, scheme })
+  const vig = c.vignette ?? d.vignette ?? 0
+  if (vig > 0) b.vignette({ w: W, h: H, strength: vig })
   const mostrarLogo = c.showLogo !== undefined ? c.showLogo : d.showLogo !== false
   if (mostrarLogo) {
     const safe = safeRect(format)
