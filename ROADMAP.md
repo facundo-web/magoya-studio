@@ -371,13 +371,36 @@ puede esconder del todo.)
 - Un acento verde sobre los fondos verdes nuevos era invisible. `acentoLegible()`
   mide contraste real y cae al del esquema.
 
+| L21 | Forma **panel**, chat teñido por el esquema, pivote de rotación en fotos con marco, criterio único de sombra | roadmap anterior |
+| L22 | **Cambiar diseño ya no come texto**: lo que no entra queda guardado y vuelve | QA |
+| L23 | Una URL ya no se va de la pieza (`wrapText` parte palabras) · se respetan los saltos de línea | QA |
+| L24 | "Quiénes hablan" salía rota de fábrica: rótulo cortado, rótulos pisándose, título sobre los retratos | QA |
+| L25 | La notebook nunca mostró la foto en su pantalla | agente del motor |
+
 ### Pendiente
 
-1. **Una forma "panel"**: un rectángulo de color rotable, sin texto ni
-   cromo de ventana. Lo pidió el collage y no existe.
-2. **Chat**: apenas responde al color de fondo elegido.
-3. **El aviso de "achicamos la foto"** se perdió en alguna refactorización.
-4. **Fotos rotadas dentro de un marco** pueden desplazarse del encuadre.
+1. **En una plantilla que no es "libre" no se puede agregar un texto.** En
+   "Cita / testimonial" no existe "+ Agregar texto"; en "Slide en blanco" sí.
+2. **El PNG se baja con el título de la slide y el ZIP con el nombre del
+   proyecto.** Dos criterios para lo mismo.
+3. **"Misceláneas" tiene un solo elemento.** Una categoría con un ítem se lee
+   como que algo falló al cargar.
+4. **El carrusel armado no arranca parejo**: la portada es el esqueleto gris
+   de foto y las otras cuatro ya tienen color.
+5. **Un objeto imagen sin marco se dibuja en caja cuadrada** aunque la foto
+   sea 3:2 — no se deforma, pero los handles no abrazan lo que se ve.
+6. Cosmético: la volanta de "Carrusel · portada" es la única en minúscula;
+   el chat sobre "Verde digital" pierde la referencia a WhatsApp.
+
+### Cubierto por el barrido (anda)
+
+Las 26 plantillas abren y dibujan sin solapes ni texto fuera del lienzo.
+Cambio de formato en cuadrado, 9:16 y 1280×720. Los 3 carruseles armados.
+Agregar, arrastrar, redimensionar, rotar, duplicar y borrar objetos y textos;
+deshacer y rehacer revierten el paso justo. Foto de fondo, encuadre, B&N,
+desenfoque y oscurecer. Export PNG (3240×3240, PNG válido) y ZIP. Guardar y
+volver conserva formato, slides, textos, foto, objetos y nombre. En 375×812
+no hay scroll horizontal y los seis paneles abren.
 
 ### Fuera de alcance por ahora (decidido con Facu)
 
