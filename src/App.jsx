@@ -39,6 +39,7 @@ export default function App() {
   const [shares, setShares] = useState([])       // D4 · links de revisión propios
   const [shareCounts, setShareCounts] = useState({})
   const [shareVerdicts, setShareVerdicts] = useState({})   // K2 · aprobada / pide cambios
+  const [thumbs, setThumbs] = useState({})   // portadas hidratadas para la home
   const [linkToCopy, setLinkToCopy] = useState(null) // fallback si el portapapeles falla
   const [tplName, setTplName] = useState(null)       // C4 · nombre al guardar plantilla
   const [pvSlide, setPvSlide] = useState(0)
@@ -114,6 +115,28 @@ export default function App() {
     if (shared?.preview) setPreview(shared)
     else if (shared) openFromSerialized(shared, 'link')
   }, [])
+
+  // La home dibuja el proyecto TAL COMO ESTÁ GUARDADO, o sea con la
+  // referencia a IndexedDB en vez de la foto: las miniaturas de las piezas
+  // con foto salían vacías. Se hidrata sólo la primera slide, que es lo
+  // único que se ve en la miniatura.
+  useEffect(() => {
+    if (view !== 'gallery' || !projects.length) return
+    let vivo = true
+    ;(async () => {
+      const nuevos = {}
+      for (const p of projects) {
+        if (!p.pieces?.[0] || thumbs[p.id]) continue
+        if (!JSON.stringify(p.pieces[0]).includes('"idb:')) continue
+        try {
+          const h = await hydrate({ pieces: [p.pieces[0]] })
+          nuevos[p.id] = h.pieces[0].content
+        } catch {}
+      }
+      if (vivo && Object.keys(nuevos).length) setThumbs((t) => ({ ...t, ...nuevos }))
+    })()
+    return () => { vivo = false }
+  }, [view, projects])
 
   // Cuántos comentarios tiene cada pieza compartida (para el badge).
   // Se recuenta también al VOLVER de una revisión: si no, el badge se queda
@@ -712,6 +735,7 @@ export default function App() {
           onOpenProject={openFromSerialized}
           onDeleteProject={removeProject}
           onDuplicateProject={duplicateProject}
+          thumbs={thumbs}
           onImport={importFile}
           shares={shares}
           shareCounts={shareCounts}

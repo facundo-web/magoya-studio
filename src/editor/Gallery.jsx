@@ -17,7 +17,7 @@ const FILTERS = [
 export default function Gallery({
   galleryFormat, setGalleryFormat, templates = TEMPLATES, onDeleteTemplate,
   onPick, onStartCarousel, onStartBlank, projects, onOpenProject, onImport, onDeleteProject, onDuplicateProject,
-  shares = [], shareCounts = {}, shareVerdicts = {}, onOpenShare, onCopyShare, onForgetShare,
+  shares = [], shareCounts = {}, shareVerdicts = {}, onOpenShare, onCopyShare, onForgetShare, thumbs = {},
 }) {
   const fileRef = useRef(null)
   const [filter, setFilter] = React.useState('all')
@@ -96,7 +96,7 @@ export default function Gallery({
               return (
                 <div key={p.id} className="proj-card">
                   <button className="proj-thumb" onClick={() => onOpenProject(p)} title={p.name || 'Seguir editando'}>
-                    {t && <PiecePreview template={t} content={pc.content} format={pf} />}
+                    {t && <PiecePreview template={t} content={thumbs[p.id] || pc.content} format={pf} />}
                   </button>
                   <div className="proj-meta">
                     <span className="proj-name" title={p.name}>{p.name || 'Sin título'}</span>

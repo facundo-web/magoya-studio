@@ -483,11 +483,18 @@ function drawShape(b, { o, W, H, ref, accent, scheme }) {
     const vals = o.values || [3, 5, 4, 7, 9]
     const w = size, h = size * 0.62
     const x0 = cx - w / 2, y0 = cy - h / 2
-    // las barras tampoco giraban: se agrupan en un path para poder rotarlas
-    const dBarras = barsRects(w, h, vals).map((r) => roundRect(x0 + r.x, y0 + r.y, r.w, r.h, r.rx)).join(' ')
-    const ultima = barsRects(w, h, vals)[vals.length - 1]
-    b.path({ d: dBarras, fill: scheme?.muted || color, opacity: 0.45 * op, ...g })
-    if (ultima) b.path({ d: roundRect(x0 + ultima.x, y0 + ultima.y, ultima.w, ultima.h, ultima.rx), fill: color, opacity: op, ...g })
+    // Tres cosas estaban mal acá y me las comí en el barrido anterior porque
+    // comparaba strings de SVG: el filtro de sombra se CREA aunque no se
+    // aplique, así que el string cambiaba y el test daba verde.
+    //   1. ninguna de las dos capas llevaba filterId → la sombra no se veía
+    //   2. el color pintaba sólo la última barra (el resto usaba el gris del
+    //      esquema, así que el swatch parecía no hacer nada)
+    //   3. `...g` iba DESPUÉS de opacity y lo pisaba → el atenuado se perdía
+    const rects = barsRects(w, h, vals)
+    const dResto = rects.slice(0, -1).map((r) => roundRect(x0 + r.x, y0 + r.y, r.w, r.h, r.rx)).join(' ')
+    const ultima = rects[rects.length - 1]
+    if (dResto) b.path({ d: dResto, fill: color, ...g, opacity: 0.42 * op, filterId: hardShadow })
+    if (ultima) b.path({ d: roundRect(x0 + ultima.x, y0 + ultima.y, ultima.w, ultima.h, ultima.rx), fill: color, ...g, opacity: op, filterId: hardShadow })
     return
   }
   if (o.shape === 'sparkline') {
