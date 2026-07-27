@@ -4,7 +4,7 @@ import Editor from './editor/Editor.jsx'
 import BrandKit from './editor/BrandKit.jsx'
 import MockupPreview from './editor/MockupPreview.jsx'
 import { createShare, loadShare, listComments, addComment, countComments, setVerdict, getVerdicts } from './lib/supabase.js'
-import { TEMPLATES, TEMPLATES_BY_ID, BLANK_TEMPLATE, placeholderContent } from './templates/index.js'
+import { TEMPLATES, TEMPLATES_BY_ID, BLANK_TEMPLATE, placeholderContent, applyDesign } from './templates/index.js'
 import { tamanoComun } from './engine/layouts.js'
 import { FORMATS_BY_ID, CAROUSEL_FORMATS } from './formats/registry.js'
 import {
@@ -449,9 +449,27 @@ export default function App() {
     setActive(to)
   }
   function changeSlideTemplate(template) {
-    // cambia el diseño de la slide activa, conservando el contenido (textos/foto/marca)
-    mutatePieces((ps) => ps.map((p, i) => (i === active ? { template, content: p.content } : p)))
-    showToast('Diseño de la slide cambiado')
+    // Cambia el DISEÑO y conserva lo escrito. Antes se pasaba el content
+    // entero y el diseño viejo le ganaba a la plantilla nueva: elegías otro
+    // diseño y no cambiaba nada visible (lo vimos con Aye en vivo).
+    mutatePieces((ps) => ps.map((p, i) => (
+      i === active ? { template, content: applyDesign(template, p.content, { plantillaVieja: p.template }) } : p
+    )))
+    showToast('Listo: mismo texto, diseño nuevo')
+  }
+  // "quiero combinar diseños y no es muy claro cómo hacerlo" (Aye).
+  // Combinar = que las slides se parezcan entre sí. Esto toma la slide en
+  // la que estás y le pasa SU diseño al resto, sin tocarles el texto.
+  function applyDesignToAll() {
+    const src = pieces[active]
+    if (!src || pieces.length < 2) return
+    mutatePieces((ps) => ps.map((p, i) => (
+      i === active ? p : {
+        template: src.template,
+        content: applyDesign(src.template, p.content, { disenoDe: src.content, plantillaVieja: p.template }),
+      }
+    )))
+    showToast(`Diseño aplicado a las otras ${pieces.length - 1} slides — los textos quedaron`, true)
   }
   function deleteSlide(i) {
     if (pieces.length <= 1) { showToast('Es la única slide: no se puede borrar'); return }
@@ -764,6 +782,7 @@ export default function App() {
           onConvertToCarousel={convertToCarousel}
           onBackToSingle={backToSingle}
           onChangeSlideTemplate={changeSlideTemplate}
+          onApplyDesignToAll={applyDesignToAll}
           onDeleteSlide={deleteSlide}
           onToast={showToast}
           templates={allTemplates}

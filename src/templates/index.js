@@ -107,6 +107,114 @@ export function placeholderContent(t) {
   return c
 }
 
+// ============================================================
+// CAMBIAR EL DISEÑO SIN PERDER LO ESCRITO
+//
+// Aye eligió otro diseño para su slide y no pasó nada visible: "¿ahí
+// cambiaste? — falló". No era la UI: `content` arrastra TODAS las
+// decisiones de diseño (colores, fondo, degradé, logo, ejes) y en el
+// motor el contenido siempre le gana a los defaults de la plantilla.
+// O sea que cambiar de plantilla cambiaba el esqueleto y nada más.
+//
+// Acá se parte en dos lo que antes era una bolsa sola:
+//   DISEÑO  → lo pone la plantilla nueva (o la slide que copiás)
+//   COPY    → lo que escribió la persona, se conserva siempre
+// ============================================================
+
+// lo que es DISEÑO: si cambiás de plantilla, esto lo decide la plantilla
+const DESIGN_KEYS = [
+  'scheme', 'accent', 'logo', 'showLogo', 'logoPos', 'logoScale',
+  'bg', 'hasPhoto', 'treatment', 'gradient', 'photoDim', 'photoBlur', 'vignette',
+  'plate', 'anchor', 'density', 'scale', 'rule', 'sizes',
+]
+
+// lo que es COPY: sobrevive al cambio de diseño
+const COPY_ROLES = ['kicker', 'title', 'subtitle', 'body', 'metric', 'metricLabel', 'quote', 'author', 'cta', 'step']
+
+// Si el rol exacto no existe en la plantilla nueva, se busca el más
+// parecido: nadie espera perder el titular porque el diseño nuevo lo
+// llame "cita". Se consume de a uno para no duplicar el mismo texto en
+// dos lugares.
+const PARECIDOS = {
+  kicker: ['kicker', 'author'],
+  title: ['title', 'quote', 'subtitle', 'body'],
+  quote: ['quote', 'title', 'body'],
+  metric: ['metric'],
+  metricLabel: ['metricLabel', 'subtitle', 'kicker'],
+  subtitle: ['subtitle', 'body', 'metricLabel'],
+  body: ['body', 'subtitle', 'quote'],
+  author: ['author', 'kicker'],
+  cta: ['cta'],
+  step: ['step'],
+}
+// orden en que se reparte el copy (lo más importante primero)
+const REPARTO = ['kicker', 'title', 'quote', 'metric', 'metricLabel', 'subtitle', 'body', 'author', 'cta', 'step']
+
+// identidad floja de un objeto, para saber cuáles puso la persona y
+// cuáles venían con la plantilla vieja (esos se van con ella)
+const claveObj = (o) => JSON.stringify([o.kind, o.iconId, o.shape, o.src ? 1 : 0])
+
+/**
+ * Devuelve el content de una pieza con el DISEÑO de `nuevo` y el COPY de
+ * `copyDe`.
+ * @param nuevo          plantilla destino
+ * @param copyDe         content actual (de ahí salen los textos y la foto)
+ * @param o.disenoDe     content del que copiar el diseño (default: los de la plantilla)
+ * @param o.plantillaVieja  para no arrastrar los objetos que traía puestos
+ */
+export function applyDesign(nuevo, copyDe = {}, o = {}) {
+  const base = placeholderContent(nuevo)
+  // si el diseño se copia de otra slide (y no de la plantilla pelada),
+  // esa slide manda: puede tener el acento o el fondo ya tocados a mano
+  if (o.disenoDe) DESIGN_KEYS.forEach((k) => { if (o.disenoDe[k] !== undefined) base[k] = o.disenoDe[k] })
+
+  // ---- juntar todo el copy que había, venga de roles o de bloques ----
+  const bolsa = {}
+  COPY_ROLES.forEach((r) => {
+    const v = copyDe[r]
+    if (v !== undefined && v !== null && String(v).trim() !== '') bolsa[r] = v
+  })
+  ;(copyDe.textBlocks || []).forEach((b) => {
+    const k = b.style || 'title'
+    if (bolsa[k] === undefined && String(b.text || '').trim() !== '') bolsa[k] = b.text
+  })
+  const tomar = (rol) => {
+    for (const k of (PARECIDOS[rol] || [rol])) {
+      if (bolsa[k] !== undefined) { const v = bolsa[k]; delete bolsa[k]; return v }
+    }
+    return undefined
+  }
+
+  if (nuevo.freeform) {
+    // en las piezas libres los bloques SON de la persona: se pasan tal
+    // cual, con su tamaño, resaltado y color.
+    const suyos = (copyDe.textBlocks || []).filter((b) => String(b.text || '').trim() !== '')
+    base.textBlocks = suyos.length
+      ? suyos.map((b) => ({ ...b }))
+      : REPARTO.filter((r) => bolsa[r] !== undefined).map((r) => ({ style: r, text: bolsa[r] }))
+  } else {
+    const declarados = nuevo.roles || []
+    REPARTO.filter((r) => declarados.includes(r)).forEach((r) => {
+      const v = tomar(r)
+      if (v !== undefined) base[r] = v
+    })
+  }
+
+  // la foto es de la persona, no del diseño
+  if (copyDe.photo) base.photo = copyDe.photo
+  // el chat y los pasos también son copy
+  if (copyDe.messages && (nuevo.category === 'chat' || nuevo.defaults?.messages)) base.messages = copyDe.messages.map((m) => ({ ...m }))
+  if (copyDe.steps && (nuevo.defaults?.steps || (nuevo.roles || []).includes('step'))) base.steps = [...copyDe.steps]
+
+  // los objetos que sumó la persona se quedan; los que traía la plantilla
+  // vieja se van con ella (estaban compuestos para ESE diseño)
+  const traidos = new Set((o.plantillaVieja?.defaults?.objects || []).map(claveObj))
+  const mios = (copyDe.objects || []).filter((ob) => !traidos.has(claveObj(ob)))
+  base.objects = [...(base.objects || []), ...mios]
+
+  return base
+}
+
 // categorías para agrupar/filtrar en la galería
 export const CATEGORIES = {
   libre: 'En blanco',

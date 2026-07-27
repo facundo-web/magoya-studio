@@ -7,7 +7,7 @@ import { checkCopy, checkPiece } from '../lib/copyCheck.js'
 import MockupPreview, { MOCKUPS } from './MockupPreview.jsx'
 import Icon from '../ui/Icon.jsx'
 import { FORMATS_BY_ID, formatsByNetwork, CAROUSEL_FORMATS } from '../formats/registry.js'
-import { COLOR_SCHEMES, ACCENTS, WORDMARKS, GRADIENTS, HIGHLIGHTS } from '../brand/brandKit.js'
+import { COLOR_SCHEMES, ACCENTS, WORDMARKS, GRADIENTS, HIGHLIGHTS, TEXT_COLORS } from '../brand/brandKit.js'
 import { ALL_OBJECTS, ICONS_BY_ID, ICON_CATEGORIES } from '../brand/iconLibrary.js'
 import { PHOTOS } from '../brand/photoLibrary.js'
 
@@ -205,7 +205,7 @@ function VariantsBody({ template, content, format, variants, active, set }) {
 
 export default function Editor({
   template, format, content, slides, activeSlide,
-  onChangeContent, onChangeFormat, onSelectSlide, onAddSlide, onDuplicateSlide, onReorderSlides, onConvertToCarousel, onBackToSingle, onChangeSlideTemplate, onDeleteSlide, onToast,
+  onChangeContent, onChangeFormat, onSelectSlide, onAddSlide, onDuplicateSlide, onReorderSlides, onConvertToCarousel, onBackToSingle, onChangeSlideTemplate, onApplyDesignToAll, onDeleteSlide, onToast,
   elements = [], onAddElement, onDeleteElement,
   templates = TEMPLATES, onSaveTemplate, onShare, onShareReview, onExportFile, onUndo, onRedo, canUndo, canRedo,
 }) {
@@ -884,10 +884,20 @@ export default function Editor({
                 <span className="sn">{i + 1}</span>
               </button>
             ))}
-            <button className="add" onClick={() => onAddSlide()} title="Agregar slide en blanco (componer con bloques)">+</button>
-            {onDuplicateSlide && <button className="btn" style={{ marginLeft: 8 }} onClick={onDuplicateSlide} title="Duplica esta slide para continuar la historia (ej: el chat que sigue)"><Icon n="copy" size={15} /> Duplicar slide</button>}
-            <button className="btn" onClick={() => setChooser('add')}>Desde plantilla</button>
-            <button className="btn" onClick={() => setChooser('change')}>Cambiar diseño</button>
+            <button className="add" onClick={() => onAddSlide()} title="Slide en blanco, para componer con bloques">+</button>
+            {/* "desde plantilla y cambiar diseño no se entiende": una fila
+                agrega slides, la otra actúa sobre la slide en la que estás */}
+            <span className="strip-group">
+              <button className="btn" onClick={() => setChooser('add')} title="Elegís un diseño y se suma como slide nueva">Sumar slide…</button>
+              {onDuplicateSlide && <button className="btn" onClick={onDuplicateSlide} title="Copia esta slide con todo: sirve para continuar la historia"><Icon n="copy" size={15} /> Duplicar</button>}
+            </span>
+            <span className="strip-group">
+              <button className="btn" onClick={() => setChooser('change')} title="Otro diseño para esta misma slide. El texto que escribiste se conserva.">Cambiar el diseño…</button>
+              {slides.length > 1 && onApplyDesignToAll && (
+                <button className="btn" onClick={onApplyDesignToAll}
+                  title="Le pasa el diseño de esta slide a todas las demás, sin tocarles el texto. Para que el carrusel combine.">Usar en todas</button>
+              )}
+            </span>
             <label className="safe-toggle" title="Que el título y el texto midan igual en todas las slides, aunque una tenga más letras">
               <input type="checkbox" checked={mismoTamano} onChange={(e) => set({ mismoTamano: e.target.checked })} /> Mismo tamaño de texto
             </label>
@@ -1857,6 +1867,15 @@ function TextProps({ eid, content, set, getText, setText }) {
           </select>
           {block.style !== 'cta' && (
             <>
+              {/* El color va ANTES del marcador a propósito: cuando lo único
+                  que había era el marcador, la salida para destacar algo
+                  terminaba siendo resaltar la pieza entera. */}
+              <label>Color del texto</label>
+              <div className="chips">
+                {Object.entries(TEXT_COLORS).map(([k, tc]) => (
+                  <button key={k} className={'chip' + ((block.color || 'auto') === k ? ' on' : '')} onClick={() => updateBlock({ color: k })}>{tc.label}</button>
+                ))}
+              </div>
               <label>Resaltado (marcador)</label>
               <div className="chips">
                 {Object.entries(HIGHLIGHTS).map(([k, hl]) => (

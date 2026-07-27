@@ -8,7 +8,7 @@
 // ============================================================
 
 import { safeRect } from '../formats/registry.js'
-import { COLOR_SCHEMES, DEFAULT_SCHEME, ACCENTS, TEXT_STYLES, WORDMARKS, WORDMARK_RATIO, MOTIF_ESTRATOS, GRADIENTS, FONT_HAND_STACK, HIGHLIGHTS } from '../brand/brandKit.js'
+import { COLOR_SCHEMES, DEFAULT_SCHEME, ACCENTS, TEXT_STYLES, WORDMARKS, WORDMARK_RATIO, MOTIF_ESTRATOS, GRADIENTS, FONT_HAND_STACK, HIGHLIGHTS, TEXT_COLORS } from '../brand/brandKit.js'
 import { ICONS_BY_ID } from '../brand/iconLibrary.js'
 import { getAsset, coloredIcon } from './assets.js'
 import { fitText, measure, wrapText } from './textLayout.js'
@@ -169,7 +169,7 @@ export function drawPiece(b, { template, content, format, sizeLock = null }) {
       maxWidth: maxTextW, maxHeight: fijo ? H * 0.86 : H * 0.5, startPx: fijo || startPx,
       lineHeight: st.lineHeight || 1.15, maxLines: fijo ? 99 : maxLines,
     })
-    blocks.push({ role, st, value, px: fit.px, lines: fit.lines, lineHeight: st.lineHeight || 1.15, hand, hl: opts.hl || null, eid: opts.eid || null })
+    blocks.push({ role, st, value, px: fit.px, lines: fit.lines, lineHeight: st.lineHeight || 1.15, hand, hl: opts.hl || null, color: opts.color || null, eid: opts.eid || null })
   }
   // roles de la plantilla (piezas clásicas)
   for (const role of STACK_ORDER) {
@@ -177,7 +177,7 @@ export function drawPiece(b, { template, content, format, sizeLock = null }) {
   }
   // bloques de texto sumados por el usuario (freeform / componentes)
   p.textBlocks.forEach((tb, idx) => {
-    pushBlock(tb.style || 'title', tb.text, { hl: (HIGHLIGHTS[tb.highlight] || {}).value, eid: `tb:${idx}`, size: tb.size })
+    pushBlock(tb.style || 'title', tb.text, { hl: (HIGHLIGHTS[tb.highlight] || {}).value, color: tb.color, eid: `tb:${idx}`, size: tb.size })
   })
   // pasos numerados (plantilla "método")
   ;(p.steps || []).forEach((st, idx) => {
@@ -263,11 +263,19 @@ export function drawPiece(b, { template, content, format, sizeLock = null }) {
       })
     }
 
-    const fill = isCta ? contrastOn(p.accent)
+    // el color elegido a mano gana; si no, lo decide el rol
+    const elegidoColor = bl.color && bl.color !== 'auto' ? (
+      bl.color === 'accent' ? p.accent
+        : bl.color === 'strong' ? textColor
+        : bl.color === 'muted' ? mutedColor
+        : (TEXT_COLORS[bl.color] || {}).value || null
+    ) : null
+    const fill = elegidoColor
+      || (isCta ? contrastOn(p.accent)
       : bl.hl ? contrastOn(bl.hl)
       : isKicker || isAccentRole ? p.accent
       : bl.role === 'author' || bl.role === 'subtitle' || bl.role === 'metricLabel' ? mutedColor
-      : textColor
+      : textColor)
     b.text({
       x: textX, y: cursorY, lines: bl.lines, px: bl.px,
       weight, fill, anchor: textAnchor,

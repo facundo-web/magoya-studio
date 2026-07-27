@@ -242,6 +242,8 @@ button.obj-row { width: 100%; cursor: pointer; text-align: left; font: inherit; 
 .strip .slide-thumb { border: 2px solid transparent; border-radius: 8px; overflow: hidden; flex: none; width: 64px; height: 64px; background: var(--ui-thumb); }
 .strip .slide-thumb.on { border-color: var(--emerald-500); }
 .strip .slide-thumb svg { width: 100%; height: 100%; }
+/* las acciones del carrusel en dos grupos: "sumar slides" y "esta slide" */
+.strip-group { display: flex; gap: 6px; flex: none; padding-left: 10px; margin-left: 4px; border-left: 1px solid rgba(0,0,0,.09); }
 .strip .add { width: 64px; height: 64px; border-radius: 8px; border: 1.5px dashed var(--gray-400); background: #fff; font-size: 22px; color: #8A9389; flex: none; }
 
 /* ---------- Gallery: pasos + selector de destino ---------- */

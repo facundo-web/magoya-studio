@@ -181,6 +181,21 @@ export const TEXT_STYLES = {
 }
 
 // colores de resaltado (marcador detrás del texto, estilo "YouTube")
+// Color del texto. No es un selector libre: son los roles de la marca, y
+// se resuelven contra el esquema de la pieza para que el contraste no
+// dependa del criterio de cada uno.
+// Existe porque sin esto la única forma de destacar algo era el marcador:
+// Aye resaltó una pieza entera en lime — "me parecía que era un embole,
+// entonces por eso lo resalté".
+export const TEXT_COLORS = {
+  auto: { label: 'Automático' },
+  accent: { label: 'Acento' },
+  strong: { label: 'Alto contraste' },
+  muted: { label: 'Suave' },
+  cream: { label: 'Crema', value: PALETTE.cream50 },
+  ink: { label: 'Negro', value: PALETTE.ink900 },
+}
+
 export const HIGHLIGHTS = {
   none: { label: 'Sin resaltado', value: null },
   lime: { label: 'Lime', value: PALETTE.lime300 },
