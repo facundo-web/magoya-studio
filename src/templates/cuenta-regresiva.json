@@ -1,0 +1,33 @@
+{
+  "id": "cuenta-regresiva",
+  "name": "Cuenta regresiva",
+  "purpose": "Un número gigante con los días que faltan. Para avisar que se viene el webinar o que cierra la inscripción.",
+  "category": "post",
+  "surface": "solid",
+  "anchor": "center-center",
+  "motif": false,
+  "freeform": true,
+  "roles": [],
+  "defaults": {
+    "scheme": "emerald",
+    "accent": "deep",
+    "logo": "deep",
+    "hasPhoto": false,
+    "bg": "color",
+    "showLogo": true,
+    "rule": "top",
+    "density": "normal",
+    "textBlocks": [
+      { "style": "kicker", "text": "WEBINAR AI EN CAMPO" },
+      { "style": "metric", "text": "7", "size": 2.4 },
+      { "style": "metricLabel", "text": "días para el webinar de mapas de rinde" },
+      { "style": "cta", "text": "Reservá tu lugar en magoya.com" }
+    ],
+    "objects": [
+      { "kind": "icon", "iconId": "agro:reloj-campana", "style": "plain", "tint": "#133825", "x": 0.855, "y": 0.155, "scale": 0.14, "rotation": 0, "shadow": false, "opacity": 1 },
+      { "kind": "shape", "shape": "sparkle", "tint": "accent", "x": 0.13, "y": 0.33, "scale": 0.075, "rotation": 0, "shadow": false, "opacity": 1 },
+      { "kind": "shape", "shape": "sparkle", "tint": "accent", "x": 0.82, "y": 0.36, "scale": 0.035, "rotation": 0, "shadow": false, "opacity": 1 },
+      { "kind": "shape", "shape": "sparkle", "tint": "accent", "x": 0.88, "y": 0.62, "scale": 0.055, "rotation": 0, "shadow": false, "opacity": 1 }
+    ]
+  }
+}

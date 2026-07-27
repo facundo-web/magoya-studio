@@ -342,19 +342,25 @@ export default function App() {
   const piecesRef = useRef(pieces)          // siempre el estado actual
   const fmtRef = useRef(formatId)
   const carRef = useRef(carousel)
-  const snapshot = () => ({ pieces: piecesRef.current, formatId: fmtRef.current, carousel: carRef.current })
+  const activeRef = useRef(active)
+  // El paso de historial guarda tambien EN QUE SLIDE estabas: si deshacés
+  // el borrado de una slide, tiene que volver a aparecer y quedar elegida,
+  // no dejarte parado en otra.
+  const snapshot = () => ({ pieces: piecesRef.current, formatId: fmtRef.current, carousel: carRef.current, active: activeRef.current })
   const restore = (snap) => {
     if (!snap) return
     piecesRef.current = snap.pieces; setPieces(snap.pieces)
     fmtRef.current = snap.formatId; setFormatId(snap.formatId)
     carRef.current = snap.carousel; setCarousel(snap.carousel)
-    setActive((a) => Math.min(a, snap.pieces.length - 1))
+    const destino = typeof snap.active === 'number' ? snap.active : 0
+    setActive(Math.max(0, Math.min(destino, snap.pieces.length - 1)))
   }
   const gestureRef = useRef(null)           // { tag, antes } del gesto abierto
   const idleRef = useRef(null)
   useEffect(() => { piecesRef.current = pieces }, [pieces])
   useEffect(() => { fmtRef.current = formatId }, [formatId])
   useEffect(() => { carRef.current = carousel }, [carousel])
+  useEffect(() => { activeRef.current = active }, [active])
 
   // Abrir otra pieza tiene que empezar con el historial en cero: si no,
   // ⌘Z te inyecta las slides del proyecto anterior en el que estás.

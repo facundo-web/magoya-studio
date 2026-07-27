@@ -123,6 +123,10 @@ export function resolvePiece(template, content) {
       metricLabel: pick(c.metricLabel, d.metricLabel),
       quote: pick(c.quote, d.quote),
       author: pick(c.author, d.author),
+      // faltaba: sumé `cta` a STACK_ORDER pero no acá, así que una
+      // plantilla clásica que declarara `cta` lo perdía sin decir nada
+      // (le pasaba a "Foto al costado").
+      cta: pick(c.cta, d.cta),
     },
   }
 }
@@ -546,7 +550,10 @@ function drawObjects(b, { objects, W, H, ref, accent, scheme }) {
     if (o.kind === 'image' && !o.src && o.frame) {
       const fw = ref * (o.scale || 0.4)
       const fh = fw * (o.ratio || 0.6)
-      b.imageCover({ x: cx - fw / 2, y: cy - fh / 2, w: fw, h: fh, href: null })
+      b.imageCover({
+        x: cx - fw / 2, y: cy - fh / 2, w: fw, h: fh, href: null,
+        rotation, radius: (o.radius || 0) * Math.min(fw, fh),
+      })
       continue
     }
     if (o.kind === 'image' && o.src) {
@@ -703,7 +710,7 @@ function drawShape(b, { o, W, H, ref, accent, scheme }) {
         fill: tinta, anchor: 'start', lineHeight: 1.35, opacity: op, rotation: rot, rcx: cx, rcy: cy,
       })
     } else {
-      b.imageCover({ x: bx, y: by, w: bw, h: bh, href: null })
+      b.imageCover({ x: bx, y: by, w: bw, h: bh, href: null, rotation: rot })
     }
     // 7 · el chrome también rota: antes el marco giraba y los puntitos no
     const dCromo = windowChrome(w, barH).map((c) => roundRect(x0 + c.cx - c.r, y0 + c.cy - c.r, c.r * 2, c.r * 2, c.r)).join(' ')

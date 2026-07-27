@@ -121,16 +121,23 @@ export function createBuilder() {
       body.push(`<rect x="${n(x)}" y="${n(y)}" width="${n(w)}" height="${n(h)}" fill="url(#${gid})"/>`)
     },
     // imagen con cover + focal point + B&N opcional
-    imageCover({ x, y, w, h, href, natural, focal = { x: 0.5, y: 0.5 }, grayscale = false, dim = 0, blur = 0 }) {
+    imageCover({ x, y, w, h, href, natural, focal = { x: 0.5, y: 0.5 }, grayscale = false, dim = 0, blur = 0, rotation = 0, radius = 0 }) {
       if (!href) {
-        // esqueleto estático (acá va una foto): fondo neutro + pictograma
-        this.rect({ x, y, w, h, fill: '#DAD5CC' })
+        // Esqueleto estático (acá va una foto): fondo neutro + pictograma.
+        // Rota y se redondea como el panel real: si no, una plantilla con
+        // paneles inclinados se veía derecha hasta que cargabas las fotos.
         const s = Math.min(w, h)
         const cx = x + w / 2, cy = y + h / 2
-        // sol + montañas (glifo universal de imagen)
-        body.push(`<circle cx="${n(cx - s * 0.1)}" cy="${n(cy - s * 0.12)}" r="${n(s * 0.055)}" fill="#B9B3A6"/>`)
-        body.push(`<path d="M ${n(cx - s * 0.22)} ${n(cy + s * 0.14)} L ${n(cx - s * 0.06)} ${n(cy - s * 0.03)} L ${n(cx + s * 0.05)} ${n(cy + 0.07 * s)} L ${n(cx + s * 0.13)} ${n(cy - s * 0.01)} L ${n(cx + s * 0.22)} ${n(cy + s * 0.14)} Z" fill="#B9B3A6"/>`)
-        body.push(`<rect x="${n(cx - s * 0.26)}" y="${n(cy - s * 0.2)}" width="${n(s * 0.52)}" height="${n(s * 0.38)}" rx="${n(s * 0.03)}" fill="none" stroke="#B9B3A6" stroke-width="${n(Math.max(2, s * 0.012))}"/>`)
+        const g = rotation ? `<g transform="rotate(${n(rotation)} ${n(cx)} ${n(cy)})">` : '<g>'
+        body.push(
+          g +
+          `<rect x="${n(x)}" y="${n(y)}" width="${n(w)}" height="${n(h)}" rx="${n(radius)}" fill="#DAD5CC"/>` +
+          // sol + montañas (glifo universal de imagen)
+          `<circle cx="${n(cx - s * 0.1)}" cy="${n(cy - s * 0.12)}" r="${n(s * 0.055)}" fill="#B9B3A6"/>` +
+          `<path d="M ${n(cx - s * 0.22)} ${n(cy + s * 0.14)} L ${n(cx - s * 0.06)} ${n(cy - s * 0.03)} L ${n(cx + s * 0.05)} ${n(cy + 0.07 * s)} L ${n(cx + s * 0.13)} ${n(cy - s * 0.01)} L ${n(cx + s * 0.22)} ${n(cy + s * 0.14)} Z" fill="#B9B3A6"/>` +
+          `<rect x="${n(cx - s * 0.26)}" y="${n(cy - s * 0.2)}" width="${n(s * 0.52)}" height="${n(s * 0.38)}" rx="${n(s * 0.03)}" fill="none" stroke="#B9B3A6" stroke-width="${n(Math.max(2, s * 0.012))}"/>` +
+          '</g>'
+        )
         return
       }
       const clipId = id('clip')

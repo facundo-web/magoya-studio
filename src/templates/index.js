@@ -29,13 +29,20 @@ import fotoLateral from './foto-lateral.json'
 import ytMiniatura from './youtube-miniatura.json'
 import speakers from './speakers.json'
 import eventoTarjeta from './evento-tarjeta.json'
+// tanda de referencias de Canva que trajo marketing (jul 2026): la
+// decoración ya viene puesta, ellas sólo cambian texto y fotos
+import celularNotif from './celular-notificaciones.json'
+import cuentaRegresiva from './cuenta-regresiva.json'
+import collageStickers from './collage-stickers.json'
+import fechaMarcada from './fecha-marcada.json'
 
 // Orden por OBJETIVO de marketing (auditoría): primero lo que prueba y
 // educa; "en blanco" al final — arrancar en blanco es donde se rompe la marca.
 export const TEMPLATES = [
-  impCifra, impApps, impPantalla, impPregunta, ytMiniatura, // AI en campo · alto impacto
+  impCifra, impApps, impPantalla, impPregunta, ytMiniatura, celularNotif, // AI en campo · alto impacto
   casoCliente, dato, insight, cita, retrato,          // prueba social y resultados
-  metodo, contraste, techTitular, evento, eventoTarjeta, speakers, bloqueColor, // autoridad y anuncios
+  metodo, contraste, techTitular, evento, eventoTarjeta, speakers,
+  cuentaRegresiva, fechaMarcada, collageStickers, bloqueColor, // autoridad y anuncios
   carruselPortada, carruselCierre, whatsapp, // carrusel
   fotoLateral, zocaloPlaca, fotoTitular, fotoCentrada,    // foto + texto
   blank,                                      // último a propósito
