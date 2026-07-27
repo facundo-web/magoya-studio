@@ -427,7 +427,8 @@ function drawObjects(b, { objects, W, H, ref, accent, scheme }) {
     const tint = o.tint === 'accent' ? accent : (o.tint || null)
     if (o.style === 'plain') {
       // trazos y marcas: sin tile, sin sombra y con grosor de trazo ajustable
-      b.object({ cx, cy, size, rotation, flipX, href: coloredIcon(icon.url, tint || icon.color, o.sw || 1), tile: false, shadow: icon.isMark ? false : shadow, opacity })
+      // antes: shadow forzada a false en los trazos → el toggle no hacía nada
+      b.object({ cx, cy, size, rotation, flipX, href: coloredIcon(icon.url, tint || icon.color, o.sw || 1), tile: false, shadow, opacity })
     } else {
       // tile app-icon: squircle color de marca + glifo blanco
       b.object({ cx, cy, size, rotation, flipX, href: coloredIcon(icon.url, '#FFFFFF'), tile: true, tileColor: o.tileColor || icon.color, shadow, opacity })
@@ -455,13 +456,13 @@ function drawShape(b, { o, W, H, ref, accent, scheme }) {
     } else {
       const { body, head } = handArrowPath(w, h)
       const sw = Math.max(3, ref * 0.012 * swMul)
-      b.path({ d: body, stroke: color, sw, tx, ty, ...g })
-      b.path({ d: head, stroke: color, sw, tx, ty, ...g })
+      b.path({ d: body, stroke: color, sw, tx, ty, ...g, filterId: hardShadow })
+      b.path({ d: head, stroke: color, sw, tx, ty, ...g, filterId: hardShadow })
     }
     return
   }
   if (o.shape === 'sparkle') {
-    b.path({ d: sparklePath(size / 2), fill: color, tx: cx, ty: cy, ...g })
+    b.path({ d: sparklePath(size / 2), fill: color, tx: cx, ty: cy, ...g, filterId: hardShadow })
     return
   }
   if (o.shape === 'badge') {
@@ -470,20 +471,23 @@ function drawShape(b, { o, W, H, ref, accent, scheme }) {
     const w = measure(txt, { px, weight: 800, tracking: 0.06 }) + px * 1.5
     const h = px * 2
     const solid = o.style !== 'outline'
-    if (solid) b.rect({ x: cx - w / 2, y: cy - h / 2, w, h, rx: h / 2, fill: color, opacity: op })
-    else b.path({ d: roundRect(cx - w / 2, cy - h / 2, w, h, h / 2), stroke: color, sw: Math.max(2, ref * 0.006 * swMul), opacity: op })
+    // la etiqueta ignoraba rotación y reflejo: los controles estaban y no
+    // hacían nada. Se dibuja como path para poder girarla entera.
+    b.path({ d: roundRect(cx - w / 2, cy - h / 2, w, h, h / 2), fill: solid ? color : 'none',
+      stroke: solid ? null : color, sw: Math.max(2, ref * 0.006 * swMul), ...g, filterId: hardShadow })
     b.text({ x: cx, y: cy - px * 0.62, lines: [txt], px, weight: 800, tracking: 0.06,
-      fill: solid ? contrastOn(color) : color, anchor: 'middle' })
+      fill: solid ? contrastOn(color) : color, anchor: 'middle', rotation: rot, rcx: cx, rcy: cy })
     return
   }
   if (o.shape === 'bars') {
     const vals = o.values || [3, 5, 4, 7, 9]
     const w = size, h = size * 0.62
     const x0 = cx - w / 2, y0 = cy - h / 2
-    barsRects(w, h, vals).forEach((r, i) => {
-      b.rect({ x: x0 + r.x, y: y0 + r.y, w: r.w, h: r.h, rx: r.rx,
-        fill: i === vals.length - 1 ? color : (scheme?.muted || color), opacity: (i === vals.length - 1 ? 1 : 0.45) * op })
-    })
+    // las barras tampoco giraban: se agrupan en un path para poder rotarlas
+    const dBarras = barsRects(w, h, vals).map((r) => roundRect(x0 + r.x, y0 + r.y, r.w, r.h, r.rx)).join(' ')
+    const ultima = barsRects(w, h, vals)[vals.length - 1]
+    b.path({ d: dBarras, fill: scheme?.muted || color, opacity: 0.45 * op, ...g })
+    if (ultima) b.path({ d: roundRect(x0 + ultima.x, y0 + ultima.y, ultima.w, ultima.h, ultima.rx), fill: color, opacity: op, ...g })
     return
   }
   if (o.shape === 'sparkline') {
@@ -491,7 +495,7 @@ function drawShape(b, { o, W, H, ref, accent, scheme }) {
     const w = size, h = size * 0.5
     const x0 = cx - w / 2, y0 = cy - h / 2
     const { line, last } = sparkline(w, h, vals)
-    b.path({ d: line, stroke: color, sw: Math.max(3, ref * 0.01 * swMul), tx: x0, ty: y0, ...g })
+    b.path({ d: line, stroke: color, sw: Math.max(3, ref * 0.01 * swMul), tx: x0, ty: y0, ...g, filterId: hardShadow })
     b.rect({ x: x0 + last[0] - ref * 0.012, y: y0 + last[1] - ref * 0.012, w: ref * 0.024, h: ref * 0.024, rx: ref * 0.012, fill: color, opacity: op })
     return
   }
@@ -531,9 +535,12 @@ function drawShape(b, { o, W, H, ref, accent, scheme }) {
     const h = Math.max(w * 0.42, lines.length * px * lh + padY * 2 - px * (lh - 1) * 0.5)
     const x0 = cx - w / 2, y0 = cy - h / 2
     const soft = o.shadow ? b.filter({ kind: 'soft', r: ref * 0.012, dy: ref * 0.008, opacity: 0.28 }) : null
-    b.path({ d: calloutPath(w, h, { r: w * 0.09 }), fill: o.fill || '#FFFFFF', tx: x0, ty: y0, ...g, filterId: soft })
+    // el color elegido pinta la burbuja (antes se ignoraba y siempre salía
+    // blanca) y el texto se adapta para que se lea
+    const burbuja = o.fill || color || '#FFFFFF'
+    b.path({ d: calloutPath(w, h, { r: w * 0.09 }), fill: burbuja, tx: x0, ty: y0, ...g, filterId: soft })
     if (lines.length) {
-      b.text({ x: x0 + padX, y: y0 + padY, lines, px, weight: 600, fill: '#0D0C0C', lineHeight: lh })
+      b.text({ x: x0 + padX, y: y0 + padY, lines, px, weight: 600, fill: contrastOn(burbuja), lineHeight: lh })
     }
     return
   }

@@ -286,7 +286,7 @@ export function createBuilder() {
       )
     },
     // texto multilínea con tracking
-    text({ x, y, lines, px, weight = 400, fill, anchor = 'start', tracking = 0, lineHeight = 1.15, fontFamily = FONT_STACK, eid = null, stroke = null, strokeW = null, filterId = null }) {
+    text({ x, y, lines, px, weight = 400, fill, anchor = 'start', tracking = 0, lineHeight = 1.15, fontFamily = FONT_STACK, eid = null, stroke = null, strokeW = null, filterId = null, rotation = 0, rcx = 0, rcy = 0 }) {
       const ls = tracking * px
       const tspans = lines
         .map((ln, i) => `<tspan x="${n(x)}" dy="${i === 0 ? 0 : n(px * lineHeight)}">${esc(ln)}</tspan>`)
@@ -295,8 +295,10 @@ export function createBuilder() {
       // stroke: paint-order evita que el borde se coma el glifo
       const stAttr = stroke ? ` paint-order="stroke fill" stroke="${stroke}" stroke-width="${n(strokeW ?? px * 0.09)}" stroke-linejoin="round"` : ''
       const fAttr = filterId ? ` filter="url(#${filterId})"` : ''
+      // rotación opcional: la usa la etiqueta, que gira entera con su fondo
+      const rAttr = rotation ? ` transform="rotate(${n(rotation)} ${n(rcx)} ${n(rcy)})"` : ''
       body.push(
-        `<text${eidAttr} x="${n(x)}" y="${n(y + px * 0.8)}" font-family="${fontFamily}" font-size="${n(px)}" font-weight="${weight}" letter-spacing="${n(ls)}" fill="${fill}" text-anchor="${anchor}"${stAttr}${fAttr} style="white-space:pre">${tspans}</text>`
+        `<text${eidAttr} x="${n(x)}" y="${n(y + px * 0.8)}" font-family="${fontFamily}" font-size="${n(px)}" font-weight="${weight}" letter-spacing="${n(ls)}" fill="${fill}" text-anchor="${anchor}"${stAttr}${fAttr}${rAttr} style="white-space:pre">${tspans}</text>`
       )
     },
   }
