@@ -50,9 +50,12 @@ export function resolvePiece(template, content) {
   const scheme = COLOR_SCHEMES[c.scheme || d.scheme || DEFAULT_SCHEME]
   const accent = (ACCENTS[c.accent || d.accent] || { value: scheme.accent }).value
   const freeform = !!template.freeform
-  // en freeform el fondo lo decide el usuario (color/foto)
-  const bg = c.bg || d.bg || 'color'
-  const surface = freeform ? (bg === 'photo' ? 'photo' : 'solid') : (template.surface || (d.hasPhoto ? 'photo' : 'solid'))
+  // El fondo lo decide el usuario en CUALQUIER plantilla, no sólo en las
+  // libres: "el estilo ese no tiene foto, es con fondo… pero debería poder
+  // permitirte una vez que lo estás editando".
+  const bg = c.bg || d.bg || null
+  const propia = template.surface || (d.hasPhoto ? 'photo' : 'solid')
+  const surface = bg === 'photo' ? 'photo' : bg === 'color' ? 'solid' : (freeform ? 'solid' : propia)
   const onPhoto = surface === 'photo'
   return {
     scheme,
@@ -654,11 +657,29 @@ function drawShape(b, { o, W, H, ref, accent, scheme }) {
     const marco = o.fill || color || '#FFFFFF'
     const cromo = contrastOn(marco) === '#0D0C0C' ? '#D8DBDE' : 'rgba(255,255,255,.35)'
     b.path({ d: roundRect(x0, y0, w, h, r), fill: marco, rotation: rot, cx, cy, flipX, opacity: op, filterId: soft })
-    b.framedImage({
-      cx, cy: y0 + barH + (h - barH) / 2, w: w - ref * 0.006, h: h - barH - ref * 0.004,
-      rotation: rot, flipX, href: o.src, natural: o.natural, focal: o.focal || { x: 0.5, y: 0.5 },
-      radius: r * 0.5, zoom: o.zoom || 1, opacity: op,
-    })
+    // cuerpo de la ventana: una captura, un texto, o el esqueleto de
+    // "acá va la captura". Antes, sin foto, quedaba una caja de color
+    // vacía con tres puntitos: "este quedó mal, le falta mejora".
+    const bx = x0 + ref * 0.003, by = y0 + barH
+    const bw = w - ref * 0.006, bh = h - barH - ref * 0.004
+    if (o.src) {
+      b.framedImage({
+        cx, cy: by + bh / 2, w: bw, h: bh,
+        rotation: rot, flipX, href: o.src, natural: o.natural, focal: o.focal || { x: 0.5, y: 0.5 },
+        radius: r * 0.5, zoom: o.zoom || 1, opacity: op,
+      })
+    } else if (String(o.body || '').trim()) {
+      // ventana con texto adentro, como una nota o un aviso del sistema
+      const px = Math.max(ref * 0.018, bh * 0.13)
+      const tinta = contrastOn(marco)
+      const lineas = wrapText(String(o.body), { px, weight: 500, maxWidth: bw - px * 1.6 }).slice(0, 8)
+      b.text({
+        x: bx + px * 0.8, y: by + px * 0.7, lines: lineas, px, weight: 500,
+        fill: tinta, anchor: 'start', lineHeight: 1.35, opacity: op, rotation: rot, rcx: cx, rcy: cy,
+      })
+    } else {
+      b.imageCover({ x: bx, y: by, w: bw, h: bh, href: null })
+    }
     // 7 · el chrome también rota: antes el marco giraba y los puntitos no
     const dCromo = windowChrome(w, barH).map((c) => roundRect(x0 + c.cx - c.r, y0 + c.cy - c.r, c.r * 2, c.r * 2, c.r)).join(' ')
     b.path({ d: dCromo, fill: cromo, rotation: rot, cx, cy, flipX, opacity: op })

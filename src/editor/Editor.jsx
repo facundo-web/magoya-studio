@@ -369,7 +369,7 @@ export default function Editor({
       setObjects([...objects, { kind: 'shape', shape: icon.shape, tint: 'accent', ...pos, scale: 0.34, rotation: 0, shadow: false, opacity: 1,
         ...(icon.shape === 'badge' ? { text: 'NUEVO' } : {}),
         ...(icon.shape === 'callout' ? { text: '¿Y si el dato ya lo tenías?', tint: '#FFFFFF', shadow: true } : {}),
-        ...(icon.shape === 'window' ? { scale: 0.62, ratio: 0.62, shadow: true, text: 'panel.magoya.com', front: true } : {}) }])
+        ...(icon.shape === 'window' ? { scale: 0.62, ratio: 0.62, shadow: true, text: 'panel.magoya.com', tint: '#FFFFFF', front: true } : {}) }])
       setSelObj(objects.length); return
     }
     if (icon.isDevice) {
@@ -633,7 +633,9 @@ export default function Editor({
   // inspector editara el objeto del MISMO índice en la slide nueva.
   useEffect(() => { setSelObj(null); setSelText(null); setEditing(null) }, [activeSlide, template.id])
 
-  const needsPhoto = template.surface === 'photo' && !content.photo?.src
+  // sólo reclama la foto si la pieza HOY es de foto: si sacaste la foto de
+  // fondo a propósito (bg: 'color') no tiene que seguir pidiéndola
+  const needsPhoto = template.surface === 'photo' && (content.bg || 'photo') !== 'color' && !content.photo?.src
   // Bloque B — variantes: misma plantilla, otra composición
   const variants = React.useMemo(() => variantsFor(template), [template])
   const activeVar = activeVariantId(template, content)
@@ -1089,8 +1091,9 @@ function LogoSwatches({ content, template, set, logo }) {
    pregunta se hace al elegir la foto, con el default correcto según la
    plantilla. */
 function FotosBody({ content, template, set, inputRef, onPhotoFile, objects, setObjects, setSelObj, elements, onAddElement, onDeleteElement, onToast }) {
-  const admiteFondo = template.surface === 'photo' || template.freeform
-  const [destino, setDestino] = useState(admiteFondo ? 'fondo' : 'encima')
+  // toda plantilla admite foto de fondo (el motor la promueve con bg)
+  const admiteFondo = true
+  const [destino, setDestino] = useState('fondo')
   const misFotos = (elements || []).filter((e) => e.kind === 'photo')
 
   const ponerFondo = async (src) => {
@@ -1169,6 +1172,12 @@ function FotosBody({ content, template, set, inputRef, onPhotoFile, objects, set
               <button className={'chip' + (content.treatment === 'color' ? ' on' : '')} onClick={() => set({ treatment: 'color' })}>Color</button>
             </div>
           </div>
+          {/* "le faltaría también esto de si querés que sea en blanco y
+              negro, o querés que sea más blureada" */}
+          <Ctl label="Desenfoque" value={Math.round(content.photoBlur ?? 0)} min={0} max={24} suffix="px"
+            onChange={(v) => set({ photoBlur: v }, 'blur')} />
+          <Ctl label="Oscurecer" value={Math.round((content.photoDim ?? 0) * 100)} min={0} max={80} suffix="%"
+            onChange={(v) => set({ photoDim: v / 100 }, 'dim')} />
           <label>Encuadre (arrastrá el punto)</label>
           <Pad2D x={content.photo.focal?.x ?? 0.5} y={content.photo.focal?.y ?? 0.5}
             onChange={(f) => set({ photo: { ...content.photo, focal: f } })} />
@@ -1255,7 +1264,7 @@ function ObjectsBody({ objects, setObjects, selObj, setSelObj, objRemove, onToas
       setObjects([...objects, enCascada(objects, { kind: 'shape', shape: icon.shape, tint: 'accent', x: 0.5, y: 0.42, scale: 0.34, rotation: 0, shadow: false, opacity: 1,
         ...(icon.shape === 'badge' ? { text: 'NUEVO' } : {}),
         ...(icon.shape === 'callout' ? { text: '¿Y si el dato ya lo tenías?', tint: '#FFFFFF', shadow: true } : {}),
-        ...(icon.shape === 'window' ? { scale: 0.62, ratio: 0.62, shadow: true, text: 'panel.magoya.com', front: true } : {}) })])
+        ...(icon.shape === 'window' ? { scale: 0.62, ratio: 0.62, shadow: true, text: 'panel.magoya.com', tint: '#FFFFFF', front: true } : {}) })])
       setSelObj(objects.length); closePicker(); return
     }
     if (icon.isDevice) {
@@ -1560,6 +1569,11 @@ function ObjectProps({ o, i, updateObject, objRemove, objDuplicate, objBringFron
         <>
           {o.shape === 'window' && (
             <>
+              {/* "supuestamente vos acá podés ponerle texto… te lo pone
+                  dentro de la cajita, como una ventana de Windows" */}
+              <div className="field"><label>Texto adentro</label>
+                <textarea rows={3} value={o.body || ''} placeholder="Dejalo vacío si vas a poner una captura"
+                  onChange={(e) => updateObject(i, { body: e.target.value })} /></div>
               <label>Captura</label>
               <div className={'dropzone' + (o.src ? ' has' : '')} onClick={() => devPhotoRef.current?.click()}
                 onDragOver={(e) => e.preventDefault()}
@@ -1680,11 +1694,14 @@ function objectName(o, icon) {
 // también decide si el fondo es color o foto.
 function FondoBody({ content, template, set }) {
   const scheme = content.scheme || template.defaults?.scheme || 'deep'
-  const esFoto = template.surface === 'photo' || (template.freeform && (content.bg || 'color') === 'photo')
+  // el fondo efectivo: `bg` manda sobre lo que trae la plantilla
+  const bg = content.bg || template.defaults?.bg || null
+  const propia = template.surface === 'photo' || template.defaults?.hasPhoto
+  const esFoto = bg === 'photo' || (bg !== 'color' && !template.freeform && propia)
   if (esFoto) {
     return (
       <p className="panel-help">
-        Esta pieza usa una foto de fondo. Cambiala o sacala desde <b>Fotos</b>.
+        Esta pieza usa una foto de fondo. Cambiala, ajustala o sacala desde <b>Fotos</b>.
       </p>
     )
   }
