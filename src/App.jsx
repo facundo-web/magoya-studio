@@ -5,6 +5,7 @@ import BrandKit from './editor/BrandKit.jsx'
 import MockupPreview from './editor/MockupPreview.jsx'
 import { createShare, loadShare, listComments, addComment, countComments, setVerdict, getVerdicts } from './lib/supabase.js'
 import { TEMPLATES, TEMPLATES_BY_ID, BLANK_TEMPLATE, placeholderContent, applyDesign } from './templates/index.js'
+import { buildCarousel } from './templates/carousels.js'
 import { tamanoComun } from './engine/layouts.js'
 import { FORMATS_BY_ID, CAROUSEL_FORMATS } from './formats/registry.js'
 import {
@@ -403,16 +404,19 @@ export default function App() {
     setPieces([{ template: BLANK_TEMPLATE, content: freshContent(BLANK_TEMPLATE) }])
     setActive(0); setCarousel(false); setDirty(false); setView('editor')
   }
-  function startBlankCarousel(fmt) {
+  // `preset` = carrusel armado (portada + internos + cierre). Sin preset,
+  // las tres slides en blanco de siempre.
+  function startBlankCarousel(fmt, preset) {
     const format = fmt && CAROUSEL_FORMATS.includes(fmt.id) ? fmt : FORMATS_BY_ID['li-carousel']
     const blank = () => ({ template: BLANK_TEMPLATE, content: freshContent(BLANK_TEMPLATE) })
+    const slides = preset ? buildCarousel(preset) : [blank(), blank(), blank()]
     setProjectId(newProjectId())
     namedByHand.current = false
-    setProjectName('Carrusel')
+    setProjectName(preset ? preset.name : 'Carrusel')
     setFormatId(format.id)
     resetHistory()
-    piecesRef.current = [blank(), blank(), blank()]
-    setPieces([blank(), blank(), blank()])
+    piecesRef.current = slides
+    setPieces(slides)
     setActive(0)
     setCarousel(true)
     setDirty(false)

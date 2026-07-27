@@ -1,5 +1,6 @@
 import React, { useRef } from 'react'
 import { TEMPLATES, demoContent } from '../templates/index.js'
+import { CAROUSELS, buildCarousel } from '../templates/carousels.js'
 import { FORMATS_BY_ID, formatsByNetwork } from '../formats/registry.js'
 import PiecePreview from './PiecePreview.jsx'
 import Icon from '../ui/Icon.jsx'
@@ -25,6 +26,7 @@ export default function Gallery({
   // tenías 19 proyectos, 11 no había forma de abrirlos desde la app.
   const [verTodos, setVerTodos] = React.useState(false)
   const [verTodasShares, setVerTodasShares] = React.useState(false)
+  const [carruseles, setCarruseles] = React.useState(false)
   const fmt = galleryFormat
   const groups = formatsByNetwork()
   const byId = Object.fromEntries(templates.map((t) => [t.id, t]))
@@ -65,10 +67,10 @@ export default function Gallery({
           <span className="sc-t">Empezar en blanco</span>
           <span className="sc-s">Armá la tuya desde cero</span>
         </button>
-        <button className="start-card" onClick={() => onStartCarousel(fmt)}>
+        <button className="start-card" onClick={() => setCarruseles(true)}>
           <span className="sc-ico"><Icon n="grid" size={24} /></span>
           <span className="sc-t">Carrusel</span>
-          <span className="sc-s">Varias slides que cuentan algo</span>
+          <span className="sc-s">Portada, internos y cierre, ya armados</span>
         </button>
         <button className="start-card" onClick={() => document.querySelector('.h3-templates')?.scrollIntoView({ behavior: 'smooth' })}>
           <span className="sc-ico"><Icon n="layers" size={24} /></span>
@@ -76,6 +78,44 @@ export default function Gallery({
           <span className="sc-s">{visible.length} diseños ya resueltos</span>
         </button>
       </div>
+
+      {/* Elegir la ESTRUCTURA del carrusel, no las slides una por una.
+          "Una portada, tres internos y un cierre" — Inés, textual. */}
+      {carruseles && (
+        <div className="mk-modal-ov" onClick={() => setCarruseles(false)}>
+          <div className="carr-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="share-head">
+              <strong>¿Qué carrusel vas a armar?</strong>
+              <button className="btn" onClick={() => setCarruseles(false)}>Cerrar</button>
+            </div>
+            <p className="panel-help" style={{ margin: '0 0 12px' }}>
+              Vienen con las slides puestas y el mismo diseño en todas. Reemplazás el texto y listo;
+              el slide interno lo multiplicás con “Duplicar”.
+            </p>
+            <div className="carr-list">
+              {CAROUSELS.map((c) => (
+                <button key={c.id} className="carr-card" onClick={() => { setCarruseles(false); onStartCarousel(fmt, c) }}>
+                  <span className="carr-mini">
+                    {buildCarousel(c).map((s, i) => (
+                      <span key={i} className="carr-slide"><PiecePreview template={s.template} content={s.content} format={fmt} /></span>
+                    ))}
+                  </span>
+                  <span className="carr-meta">
+                    <span className="n">{c.name} · {c.slides.length} slides</span>
+                    <span className="purpose">{c.purpose}</span>
+                  </span>
+                </button>
+              ))}
+              <button className="carr-card blanco" onClick={() => { setCarruseles(false); onStartCarousel(fmt) }}>
+                <span className="carr-meta">
+                  <span className="n">Empezar en blanco · 3 slides</span>
+                  <span className="purpose">Si ya sabés qué querés y preferís componerlo vos.</span>
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 2 · RETOMAR — solo si hay */}
       {projects && projects.length > 0 && (
