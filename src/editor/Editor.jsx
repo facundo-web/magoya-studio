@@ -64,6 +64,7 @@ function shapeBox(o, ref) {
     case 'arrow': case 'handArrow': case 'sparkline': return { w: size, h: size * 0.5 }
     case 'bars': return { w: size, h: size * 0.62 }
     case 'window': return { w: size, h: size * (o.ratio || 0.62) }
+    case 'panel': { const w = ref * (o.scale || 0.34); return { w, h: w * (o.ratio || 0.7) } }
     case 'badge': {
       const px = size * 0.26
       const w = measure(String(o.text || 'NUEVO').toUpperCase(), { px, weight: 800, tracking: 0.06 }) + px * 1.5
@@ -369,7 +370,8 @@ export default function Editor({
       setObjects([...objects, { kind: 'shape', shape: icon.shape, tint: 'accent', ...pos, scale: 0.34, rotation: 0, shadow: false, opacity: 1,
         ...(icon.shape === 'badge' ? { text: 'NUEVO' } : {}),
         ...(icon.shape === 'callout' ? { text: '¿Y si el dato ya lo tenías?', tint: '#FFFFFF', shadow: true } : {}),
-        ...(icon.shape === 'window' ? { scale: 0.62, ratio: 0.62, shadow: true, text: 'panel.magoya.com', tint: '#FFFFFF', front: true } : {}) }])
+        ...(icon.shape === 'window' ? { scale: 0.62, ratio: 0.62, shadow: true, text: 'panel.magoya.com', tint: '#FFFFFF', front: true } : {}),
+        ...(icon.shape === 'panel' ? { scale: 0.34, ratio: 0.7, radius: 0.06 } : {}) }])
       setSelObj(objects.length); return
     }
     if (icon.isDevice) {
@@ -601,15 +603,21 @@ export default function Editor({
   }
 
   // ---- editar texto tocándolo sobre la pieza ----
+  // Los pasos numerados (plantilla "Método") se podían SELECCIONAR en la
+  // pieza pero no leer ni escribir: el editor abría vacío y lo que
+  // tipeabas no iba a ningún lado. Sólo se podían editar desde el panel.
+  const pasos = () => content.steps || template.defaults?.steps || []
   const getText = (eid) => {
     if (eid.startsWith('role:')) { const k = eid.slice(5); return content[k] ?? template.defaults?.[k] ?? '' }
     if (eid.startsWith('tb:')) { const i = +eid.slice(3); return (content.textBlocks || [])[i]?.text ?? '' }
+    if (eid.startsWith('step:')) { const i = +eid.slice(5); return pasos()[i] ?? '' }
     return ''
   }
   const setText = (eid, val) => {
     // escribir es un gesto: una palabra entera es un solo Deshacer
     if (eid.startsWith('role:')) set({ [eid.slice(5)]: val }, 'txt:' + eid)
     else if (eid.startsWith('tb:')) { const i = +eid.slice(3); set({ textBlocks: (content.textBlocks || []).map((b, idx) => (idx === i ? { ...b, text: val } : b)) }, 'txt:' + eid) }
+    else if (eid.startsWith('step:')) { const i = +eid.slice(5); set({ steps: pasos().map((s, idx) => (idx === i ? val : s)) }, 'txt:' + eid) }
   }
   const openTextEditor = (t) => {
     const eid = t.getAttribute('data-eid')
@@ -1110,7 +1118,12 @@ function FotosBody({ content, template, set, inputRef, onPhotoFile, objects, set
   const usar = (src, elementId, label) => (destino === 'fondo' && admiteFondo ? ponerFondo(src) : ponerEncima(src, elementId, label))
   const subir = async (file) => {
     if (!file || !file.type.startsWith('image/')) return onToast('Ese archivo no es una imagen')
-    const src = await compressImage(file, destino === 'fondo' ? 2048 : OBJ_MAX)
+    // Achicar la foto es una decisión nuestra (si no, el guardado del
+    // navegador se llena de una). Decirlo evita que después no se entienda
+    // por qué al ampliar mucho se ve blanda.
+    let info = null
+    const src = await compressImage(file, destino === 'fondo' ? 2048 : OBJ_MAX, 0.85, (i) => { info = i })
+    if (info?.achicada) onToast(`Foto achicada de ${info.deW}×${info.deH} a ${info.aW}×${info.aH} — entra igual en alta calidad`)
     const nice = file.name.replace(/\.[^.]+$/, '')
     let elementId
     if (onAddElement) elementId = (await onAddElement({ name: nice, src, kind: 'photo' }))?.id
@@ -1277,7 +1290,8 @@ function ObjectsBody({ objects, setObjects, selObj, setSelObj, objRemove, onToas
       setObjects([...objects, enCascada(objects, { kind: 'shape', shape: icon.shape, tint: 'accent', x: 0.5, y: 0.42, scale: 0.34, rotation: 0, shadow: false, opacity: 1,
         ...(icon.shape === 'badge' ? { text: 'NUEVO' } : {}),
         ...(icon.shape === 'callout' ? { text: '¿Y si el dato ya lo tenías?', tint: '#FFFFFF', shadow: true } : {}),
-        ...(icon.shape === 'window' ? { scale: 0.62, ratio: 0.62, shadow: true, text: 'panel.magoya.com', tint: '#FFFFFF', front: true } : {}) })])
+        ...(icon.shape === 'window' ? { scale: 0.62, ratio: 0.62, shadow: true, text: 'panel.magoya.com', tint: '#FFFFFF', front: true } : {}),
+        ...(icon.shape === 'panel' ? { scale: 0.34, ratio: 0.7, radius: 0.06 } : {}) })])
       setSelObj(objects.length); closePicker(); return
     }
     if (icon.isDevice) {
@@ -1426,6 +1440,7 @@ function ShapeGlyph({ shape }) {
     callout: <path d="M3,4 H21 V15 H9 L5,19 V15 H3 Z" fill={C} />,
     window: <g><rect x="2.5" y="4" width="19" height="16" rx="2.5" fill="none" stroke={C} strokeWidth="1.9" /><path d="M2.5,8.5 H21.5" stroke={C} strokeWidth="1.9" /><g fill={C}><circle cx="5.4" cy="6.2" r=".9" /><circle cx="8" cy="6.2" r=".9" /><circle cx="10.6" cy="6.2" r=".9" /></g></g>,
     dots: <g fill={C}><circle cx="4" cy="12" r="2" /><circle cx="10" cy="12" r="2" opacity=".35" /><circle cx="16" cy="12" r="2" opacity=".35" /><circle cx="22" cy="12" r="2" opacity=".35" /></g>,
+    panel: <rect x="3" y="5" width="18" height="14" rx="2.5" fill={C} />,
   }[shape]
   return <svg viewBox="0 0 24 24" width="70%" height="70%">{p}</svg>
 }
@@ -1684,6 +1699,14 @@ function ObjectProps({ o, i, updateObject, objRemove, objDuplicate, objBringFron
                 onChange={(v) => updateObject(i, { active: v - 1 })} />
             </>
           )}
+          {o.shape === 'panel' && (
+            <>
+              <Ctl label="Proporción" value={Math.round((o.ratio ?? 0.7) * 100)} min={20} max={200} suffix="%"
+                onChange={(v) => updateObject(i, { ratio: v / 100 }, 'ratio')} />
+              <Ctl label="Esquinas redondeadas" value={Math.round((o.radius ?? 0.06) * 100)} min={0} max={50} suffix="%"
+                onChange={(v) => updateObject(i, { radius: v / 100 }, 'radius')} />
+            </>
+          )}
           <label>Color</label>
           <div className="swatches" style={{ marginBottom: 8 }}>
             {TINTS.map((t) => (
@@ -1745,10 +1768,14 @@ function ObjectProps({ o, i, updateObject, objRemove, objDuplicate, objBringFron
       {/* la gente piensa en "cuánto se transparenta", no en "cuánta opacidad" */}
       <Ctl label="Transparencia" value={Math.round((1 - (o.opacity ?? 1)) * 100)} min={0} max={90} step={5} suffix="%"
         onChange={(v) => updateObject(i, { opacity: 1 - v / 100 }, 'op')} />
+      {/* El motor unificó el criterio: sin la propiedad NO hay sombra. Los
+          chips seguían con el viejo (`!== false`), así que un objeto de un
+          proyecto guardado mostraba "Con sombra" prendido y se dibujaba sin
+          sombra. El control tiene que decir lo que pasa. */}
       <label>Sombra</label>
       <div className="chips">
-        <button className={'chip' + (o.shadow !== false ? ' on' : '')} onClick={() => updateObject(i, { shadow: true })}>Con sombra</button>
-        <button className={'chip' + (o.shadow === false ? ' on' : '')} onClick={() => updateObject(i, { shadow: false })}>Sin sombra</button>
+        <button className={'chip' + (o.shadow === true ? ' on' : '')} onClick={() => updateObject(i, { shadow: true })}>Con sombra</button>
+        <button className={'chip' + (o.shadow !== true ? ' on' : '')} onClick={() => updateObject(i, { shadow: false })}>Sin sombra</button>
       </div>
     </>
   )
@@ -1968,6 +1995,9 @@ function TextProps({ eid, content, set, getText, setText, onVolverAlStack }) {
   const isTb = eid.startsWith('tb:')
   const idx = isTb ? +eid.slice(3) : -1
   const block = isTb ? (content.textBlocks || [])[idx] : null
+  // el rol para el contador y el tamaño. Un paso numerado es `step:0`, no
+  // un rol: recortando por posición salía ':0' y se rompían los dos.
+  const rolDeEid = eid.startsWith('step:') ? 'step' : eid.startsWith('role:') ? eid.slice(5) : null
   const val = getText(eid)
   const updateBlock = (patch) => set({ textBlocks: (content.textBlocks || []).map((b, i) => (i === idx ? { ...b, ...patch } : b)) })
   return (
@@ -1976,7 +2006,7 @@ function TextProps({ eid, content, set, getText, setText, onVolverAlStack }) {
       <label>Contenido</label>
       <textarea value={val} onChange={(e) => setText(eid, e.target.value)} rows={2} />
       {(() => {
-        const role = isTb ? (block?.style || 'title') : eid.slice(5)
+        const role = isTb ? (block?.style || 'title') : rolDeEid
         const max = MAXCHARS[role]
         if (!max) return null
         const n = String(val || '').length
@@ -1988,7 +2018,7 @@ function TextProps({ eid, content, set, getText, setText, onVolverAlStack }) {
       })()}
       {/* F3 · reglas editoriales: avisa, no bloquea */}
       {(() => {
-        const role = isTb ? (block?.style || 'title') : eid.slice(5)
+        const role = isTb ? (block?.style || 'title') : rolDeEid
         const notes = checkCopy(role, val, content)
         if (!notes.length) return null
         return <ul className="copy-notes">{notes.map((m, i) => <li key={i}>{m}</li>)}</ul>
@@ -2005,11 +2035,11 @@ function TextProps({ eid, content, set, getText, setText, onVolverAlStack }) {
       <label>Tamaño</label>
       <div className="chips" style={{ marginBottom: 10 }}>
         {[[null, 'Automático'], [0.75, 'Chico'], [1, 'Normal'], [1.3, 'Grande'], [1.7, 'Enorme']].map(([v, l]) => {
-          const actual = isTb ? block?.size : content.sizes?.[eid.slice(5)]
+          const actual = isTb ? block?.size : (rolDeEid ? content.sizes?.[rolDeEid] : null)
           const on = (v === null && !actual) || actual === v
           const aplicar = () => {
             if (isTb) updateBlock({ size: v })
-            else set({ sizes: { ...(content.sizes || {}), [eid.slice(5)]: v || undefined } })
+            else if (rolDeEid) set({ sizes: { ...(content.sizes || {}), [rolDeEid]: v || undefined } })
           }
           return <button key={l} className={'chip' + (on ? ' on' : '')} onClick={aplicar}>{l}</button>
         })}

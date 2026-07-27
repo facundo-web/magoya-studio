@@ -16,6 +16,14 @@ import { arrowPath, handArrowPath, sparklePath, calloutPath, barsRects, sparklin
 
 const clamp01 = (v) => Math.max(0, Math.min(1, Number(v) || 0))
 
+// UN SOLO criterio de sombra para toda la app: la sombra se PIDE.
+// Antes cada rama decidía distinto para un objeto sin la propiedad:
+// la imagen y la ventana usaban `o.shadow !== false` (undefined = CON sombra)
+// y la forma y el bocadillo usaban `o.shadow` (undefined = SIN sombra). La
+// misma plantilla salía con sombra en un objeto y sin sombra en otro, y el
+// toggle mostraba un estado que no era el que se dibujaba.
+const conSombra = (o) => o.shadow === true
+
 // luminancia relativa, para poder decidir contrastes sin adivinar
 function lum(hex) {
   const h = String(hex || '#000').replace('#', '')
@@ -37,6 +45,25 @@ function ratio(a, b) {
 function acentoLegible(clave, scheme) {
   const pedido = (ACCENTS[clave] || { value: scheme.accent }).value
   return ratio(pedido, scheme.surface) >= 1.6 ? pedido : scheme.accent
+}
+
+// mezcla dos colores hex (t=0 → a, t=1 → b)
+function mix(a, b, t) {
+  const rgb = (h) => { const s = String(h || '#000').replace('#', ''); return [0, 2, 4].map((i) => parseInt(s.slice(i, i + 2), 16) || 0) }
+  const [r1, g1, b1] = rgb(a), [r2, g2, b2] = rgb(b)
+  const k = Math.max(0, Math.min(1, t))
+  const c = (x, y) => Math.round(x + (y - x) * k).toString(16).padStart(2, '0')
+  return `#${c(r1, r2)}${c(g1, g2)}${c(b1, b2)}`
+}
+// aleja `color` de `fondo` tirando hacia `hacia` hasta que se distingan.
+// Es lo que evita que "teñir con el esquema" termine en dos verdes iguales
+// pegados (el globo desaparecido sobre el papel del mismo tono).
+function separar(color, fondo, min, hacia) {
+  for (let t = 0; t <= 1.0001; t += 0.05) {
+    const c = mix(color, hacia, t)
+    if (ratio(c, fondo) >= min) return c
+  }
+  return hacia
 }
 
 // texto oscuro o claro según luminancia del fondo
@@ -424,6 +451,52 @@ export function tamanoComun(slides, format) {
   return lock
 }
 
+// ---- paleta del chat, derivada del esquema ----
+// El chat se dibujaba SIEMPRE igual: papel #E7E0D6, header #0F5132, globo
+// propio #DCF8C6, recibido blanco. Elegías el esquema y sólo cambiaba el
+// borde de la pieza (menos del 6% de los píxeles). Ahora todo sale de
+// `scheme` + acento, pero con la MISMA estructura de WhatsApp (papel,
+// barra oscura arriba, globo propio teñido a la derecha, recibido a la
+// izquierda) y con los contrastes forzados para que nada se funda.
+function chatPalette(scheme, accent) {
+  // `contrastOn` decide por umbral de luminancia (>0.55 → tinta oscura) y en
+  // los tonos del medio se equivoca: sobre el verde digital apagado elegía
+  // crema (2.6:1) teniendo negro a mano (6.3:1). Acá se mide y gana el mejor.
+  const mejorTinta = (fondo) => (ratio('#0D0C0C', fondo) >= ratio('#F6F1EB', fondo) ? '#0D0C0C' : '#F6F1EB')
+  const fondo = scheme.surface
+  const oscura = lum(fondo) < 0.2
+  // el "papel" del chat: sobre fondos oscuros es un crema teñido con el
+  // esquema (el wallpaper claro de WhatsApp); sobre fondos claros baja un
+  // tono para que el panel no se funda con la pieza. 1.25 es a propósito
+  // poco: es el mismo salto que hay en WhatsApp entre el globo blanco y su
+  // fondo beige. Si se pide más, la crema y la arena se vuelven barro gris.
+  const haciaPapel = oscura ? '#F6F1EB' : scheme.onSurface
+  const papel = separar(mix(fondo, haciaPapel, oscura ? 0.86 : 0.12), fondo, 1.25, haciaPapel)
+  const papelClaro = mejorTinta(papel) === '#0D0C0C'
+  const tinta = papelClaro ? '#0D0C0C' : '#F6F1EB'
+  // barra de arriba: el tono más profundo de la familia, con una pizca de
+  // acento para que no sea el mismo color plano que el fondo de la pieza.
+  const profundo = lum(fondo) <= lum(scheme.onSurface) ? fondo : scheme.onSurface
+  const header = separar(mix(profundo, accent, 0.16), papel, 3, papelClaro ? '#0D0C0C' : '#F6F1EB')
+  // globo propio = el acento (es LA regla del chat de WhatsApp);
+  // recibido = el papel empujado al extremo (blanco sobre papel claro,
+  // gris oscuro sobre papel oscuro).
+  const mio = separar(accent, papel, 1.35, tinta)
+  const otro = separar(mix(papel, papelClaro ? '#FFFFFF' : '#0D0C0C', 0.6), papel, 1.25, papelClaro ? '#FFFFFF' : '#0D0C0C')
+  // el avatar tiene que verse SOBRE el header: si el acento se le parece
+  // (verde sobre verde), se usa el papel.
+  const avatar = ratio(accent, header) >= 1.8 ? accent : papel
+  const tintaHeader = mejorTinta(header)
+  return {
+    papel, header, mio, otro, avatar,
+    tintaAvatar: mejorTinta(avatar),
+    tintaMia: mejorTinta(mio),
+    tintaOtro: mejorTinta(otro),
+    tintaHeader,
+    tintaHeaderSuave: mix(tintaHeader, header, 0.3),
+  }
+}
+
 // ---- renderer de chat (WhatsApp) ----
 function drawChat(b, { template, content, format }) {
   const { w: W, h: H } = format
@@ -447,21 +520,24 @@ function drawChat(b, { template, content, format }) {
     b.gradientOverlay({ w: W, h: H, angle: grad.angle ?? g.angle, stops: g.stops, opacity: grad.opacity ?? 1 })
   }
 
-  // panel del chat
+  // toda la paleta del chat sale del esquema elegido
+  const pal = chatPalette(scheme, accent)
+
+  // panel del chat (el "papel" / wallpaper)
   const px = W * 0.06, py = H * 0.055, pw = W * 0.88, ph = H * 0.89
   const R = ref * 0.045
-  b.rect({ x: px, y: py, w: pw, h: ph, fill: '#E7E0D6', rx: R }) // fondo tipo WhatsApp (beige)
+  b.rect({ x: px, y: py, w: pw, h: ph, fill: pal.papel, rx: R })
 
-  // header verde
+  // header
   const hh = ref * 0.13
-  b.rect({ x: px, y: py, w: pw, h: hh, fill: '#0F5132', rx: R })
-  b.rect({ x: px, y: py + hh - R, w: pw, h: R, fill: '#0F5132' }) // cuadrar la base del header
+  b.rect({ x: px, y: py, w: pw, h: hh, fill: pal.header, rx: R })
+  b.rect({ x: px, y: py + hh - R, w: pw, h: R, fill: pal.header }) // cuadrar la base del header
   // avatar
   const av = hh * 0.58, avx = px + ref * 0.03, avy = py + (hh - av) / 2
-  b.rect({ x: avx, y: avy, w: av, h: av, fill: accent, rx: av / 2 })
-  b.text({ x: avx + av / 2, y: avy + av * 0.24, lines: ['m'], px: av * 0.52, weight: 800, fill: '#0F5132', anchor: 'middle' })
-  b.text({ x: avx + av + ref * 0.022, y: py + hh * 0.22, lines: [chatName], px: ref * 0.038, weight: 700, fill: '#FFFFFF' })
-  b.text({ x: avx + av + ref * 0.022, y: py + hh * 0.56, lines: [chatStatus], px: ref * 0.026, weight: 500, fill: 'rgba(255,255,255,.82)' })
+  b.rect({ x: avx, y: avy, w: av, h: av, fill: pal.avatar, rx: av / 2 })
+  b.text({ x: avx + av / 2, y: avy + av * 0.24, lines: ['m'], px: av * 0.52, weight: 800, fill: pal.tintaAvatar, anchor: 'middle' })
+  b.text({ x: avx + av + ref * 0.022, y: py + hh * 0.22, lines: [chatName], px: ref * 0.038, weight: 700, fill: pal.tintaHeader })
+  b.text({ x: avx + av + ref * 0.022, y: py + hh * 0.56, lines: [chatStatus], px: ref * 0.026, weight: 500, fill: pal.tintaHeaderSuave })
 
   // Objetos "detrás": detrás de los MENSAJES, pero encima del panel. Si van
   // antes del panel quedan 100% tapados (el panel es opaco y cubre casi toda
@@ -482,8 +558,11 @@ function drawChat(b, { template, content, format }) {
     const tw = Math.min(maxBubbleW, contentW + padX * 2)
     const th = lines.length * fpx * lh + padY * 2
     const bx = mine ? px + pw - ref * 0.03 - tw : px + ref * 0.03
-    b.rect({ x: bx, y: cy, w: tw, h: th, fill: mine ? '#DcF8C6' : '#FFFFFF', rx: ref * 0.024 })
-    b.text({ x: bx + padX, y: cy + padY, lines, px: fpx, weight: 500, fill: '#111111', lineHeight: lh })
+    // el globo propio lleva el acento; el recibido va sobre la superficie.
+    // La tinta la decide el contraste con el globo, no un negro fijo.
+    const globo = mine ? pal.mio : pal.otro
+    b.rect({ x: bx, y: cy, w: tw, h: th, fill: globo, rx: ref * 0.024 })
+    b.text({ x: bx + padX, y: cy + padY, lines, px: fpx, weight: 500, fill: mine ? pal.tintaMia : pal.tintaOtro, lineHeight: lh })
     cy += th + ref * 0.022
     if (cy > py + ph - ref * 0.06) break
   }
@@ -511,7 +590,7 @@ function drawObjects(b, { objects, W, H, ref, accent, scheme }) {
     const cy = H * (o.y ?? 0.5)
     const rotation = o.rotation || 0
     const flipX = !!o.flipX
-    const shadow = o.shadow !== false
+    const shadow = conSombra(o)
     const opacity = o.opacity ?? 1
     // DISPOSITIVO: marco + foto adentro de la pantalla (automático)
     if (o.kind === 'device') {
@@ -522,14 +601,17 @@ function drawObjects(b, { objects, W, H, ref, accent, scheme }) {
       const dh = dw / (sc.ratio || 1)
       const dx = cx - dw / 2, dy = cy - dh / 2
       // 1) pantalla (foto) por debajo del marco
+      // La pantalla gira alrededor del CENTRO DEL DISPOSITIVO (rcx/rcy), no
+      // del suyo: en la notebook la pantalla está más arriba que el medio del
+      // marco, así que con rotación la foto se salía del encuadre.
       if (o.src) {
         b.framedImage({
-          cx: dx + (sc.x + sc.w / 2) * dw, cy: dy + (sc.y + sc.h / 2) * dh,
+          cx: dx + (sc.x + sc.w / 2) * dw, cy: dy + (sc.y + sc.h / 2) * dh, rcx: cx, rcy: cy,
           w: sc.w * dw, h: sc.h * dh, rotation, flipX, href: o.src, natural: o.natural,
           focal: o.focal || { x: 0.5, y: 0.5 }, radius: sc.r * sc.w * dw, zoom: o.zoom || 1, shadow: false, opacity,
         })
       } else {
-        b.framedImage({ cx: dx + (sc.x + sc.w / 2) * dw, cy: dy + (sc.y + sc.h / 2) * dh, w: sc.w * dw, h: sc.h * dh, rotation, href: null, radius: sc.r * sc.w * dw })
+        b.framedImage({ cx: dx + (sc.x + sc.w / 2) * dw, cy: dy + (sc.y + sc.h / 2) * dh, rcx: cx, rcy: cy, w: sc.w * dw, h: sc.h * dh, rotation, href: null, radius: sc.r * sc.w * dw })
       }
       // 2) marco del dispositivo encima, con sombra de objeto físico
       const frameUrl = getAsset(dev.url) || dev.url
@@ -538,7 +620,7 @@ function drawObjects(b, { objects, W, H, ref, accent, scheme }) {
       // 3) reflejo de la pantalla: lo que lo termina de sacar de "ícono"
       if (o.glare !== false) {
         b.screenGlare({
-          cx: dx + (sc.x + sc.w / 2) * dw, cy: dy + (sc.y + sc.h / 2) * dh,
+          cx: dx + (sc.x + sc.w / 2) * dw, cy: dy + (sc.y + sc.h / 2) * dh, rcx: cx, rcy: cy,
           w: sc.w * dw, h: sc.h * dh, radius: sc.r * sc.w * dw,
           rotation, strength: o.glare ?? 1,
         })
@@ -605,24 +687,31 @@ function drawShape(b, { o, W, H, ref, accent, scheme }) {
   const color = o.tint === 'accent' ? accent : (o.tint || accent)
   const op = o.opacity ?? 1
   const swMul = o.sw || 1 // grosor de trazo ajustable por el usuario
-  const hardShadow = o.shadow ? b.filter({ kind: 'hard', dx: ref * 0.012, dy: ref * 0.012, color: '#0D0C0C', opacity: 0.9 }) : null
+  // La sombra dura se crea SÓLO cuando la rama la va a usar. Antes se creaba
+  // acá arriba para cualquier forma, así que el bocadillo y la ventana (que
+  // llevan su propia sombra suave) dejaban un <filter> definido y nunca
+  // aplicado: ensucia el SVG y, peor, hace pasar los tests que comparan
+  // strings — es exactamente la trampa que dice el comentario de las barras.
+  const hardShadow = () => (conSombra(o)
+    ? b.filter({ kind: 'hard', dx: ref * 0.012, dy: ref * 0.012, color: '#0D0C0C', opacity: 0.9 })
+    : null)
   const g = { rotation: rot, cx, cy, flipX, opacity: op }
 
   if (o.shape === 'arrow' || o.shape === 'handArrow') {
     const w = size, h = size * 0.5
     const tx = cx - w / 2, ty = cy - h / 2
     if (o.shape === 'arrow') {
-      b.path({ d: arrowPath(w, h), fill: color, tx, ty, ...g, filterId: hardShadow })
+      b.path({ d: arrowPath(w, h), fill: color, tx, ty, ...g, filterId: hardShadow() })
     } else {
       const { body, head } = handArrowPath(w, h)
       const sw = Math.max(3, ref * 0.012 * swMul)
-      b.path({ d: body, stroke: color, sw, tx, ty, ...g, filterId: hardShadow })
-      b.path({ d: head, stroke: color, sw, tx, ty, ...g, filterId: hardShadow })
+      b.path({ d: body, stroke: color, sw, tx, ty, ...g, filterId: hardShadow() })
+      b.path({ d: head, stroke: color, sw, tx, ty, ...g, filterId: hardShadow() })
     }
     return
   }
   if (o.shape === 'sparkle') {
-    b.path({ d: sparklePath(size / 2), fill: color, tx: cx, ty: cy, ...g, filterId: hardShadow })
+    b.path({ d: sparklePath(size / 2), fill: color, tx: cx, ty: cy, ...g, filterId: hardShadow() })
     return
   }
   if (o.shape === 'dots') {
@@ -632,8 +721,19 @@ function drawShape(b, { o, W, H, ref, accent, scheme }) {
     const x0 = cx - w / 2, y0 = cy - (ds[0]?.r || 0)
     const apagados = ds.filter((d) => !d.on).map((d) => circlePath(x0 + d.cx, y0 + d.cy, d.r)).join(' ')
     const encendido = ds.find((d) => d.on)
-    if (apagados) b.path({ d: apagados, fill: color, ...g, opacity: 0.35 * op, filterId: hardShadow })
-    if (encendido) b.path({ d: circlePath(x0 + encendido.cx, y0 + encendido.cy, encendido.r), fill: color, ...g, opacity: op, filterId: hardShadow })
+    if (apagados) b.path({ d: apagados, fill: color, ...g, opacity: 0.35 * op, filterId: hardShadow() })
+    if (encendido) b.path({ d: circlePath(x0 + encendido.cx, y0 + encendido.cy, encendido.r), fill: color, ...g, opacity: op, filterId: hardShadow() })
+    return
+  }
+  if (o.shape === 'panel') {
+    // Un rectángulo de color y nada más. Faltaba: para armar un collage había
+    // que usar la etiqueta (que obliga a poner texto) o la ventana (que mete
+    // los tres puntitos de navegador). Acá sólo hay color, proporción y giro.
+    const w = ref * (o.scale || 0.34)
+    const h = w * (o.ratio || 0.7)
+    const x0 = cx - w / 2, y0 = cy - h / 2
+    const r = (o.radius || 0.06) * Math.min(w, h)
+    b.path({ d: roundRect(x0, y0, w, h, r), fill: color, ...g, filterId: hardShadow() })
     return
   }
   if (o.shape === 'badge') {
@@ -645,7 +745,7 @@ function drawShape(b, { o, W, H, ref, accent, scheme }) {
     // la etiqueta ignoraba rotación y reflejo: los controles estaban y no
     // hacían nada. Se dibuja como path para poder girarla entera.
     b.path({ d: roundRect(cx - w / 2, cy - h / 2, w, h, h / 2), fill: solid ? color : 'none',
-      stroke: solid ? null : color, sw: Math.max(2, ref * 0.006 * swMul), ...g, filterId: hardShadow })
+      stroke: solid ? null : color, sw: Math.max(2, ref * 0.006 * swMul), ...g, filterId: hardShadow() })
     b.text({ x: cx, y: cy - px * 0.62, lines: [txt], px, weight: 800, tracking: 0.06,
       fill: solid ? contrastOn(color) : color, anchor: 'middle', opacity: op, rotation: rot, rcx: cx, rcy: cy })
     return
@@ -664,8 +764,8 @@ function drawShape(b, { o, W, H, ref, accent, scheme }) {
     const rects = barsRects(w, h, vals)
     const dResto = rects.slice(0, -1).map((r) => roundRect(x0 + r.x, y0 + r.y, r.w, r.h, r.rx)).join(' ')
     const ultima = rects[rects.length - 1]
-    if (dResto) b.path({ d: dResto, fill: color, ...g, opacity: 0.42 * op, filterId: hardShadow })
-    if (ultima) b.path({ d: roundRect(x0 + ultima.x, y0 + ultima.y, ultima.w, ultima.h, ultima.rx), fill: color, ...g, opacity: op, filterId: hardShadow })
+    if (dResto) b.path({ d: dResto, fill: color, ...g, opacity: 0.42 * op, filterId: hardShadow() })
+    if (ultima) b.path({ d: roundRect(x0 + ultima.x, y0 + ultima.y, ultima.w, ultima.h, ultima.rx), fill: color, ...g, opacity: op, filterId: hardShadow() })
     return
   }
   if (o.shape === 'sparkline') {
@@ -673,7 +773,7 @@ function drawShape(b, { o, W, H, ref, accent, scheme }) {
     const w = size, h = size * 0.5
     const x0 = cx - w / 2, y0 = cy - h / 2
     const { line, last } = sparkline(w, h, vals)
-    b.path({ d: line, stroke: color, sw: Math.max(3, ref * 0.01 * swMul), tx: x0, ty: y0, ...g, filterId: hardShadow })
+    b.path({ d: line, stroke: color, sw: Math.max(3, ref * 0.01 * swMul), tx: x0, ty: y0, ...g, filterId: hardShadow() })
     b.path({ d: roundRect(x0 + last[0] - ref * 0.012, y0 + last[1] - ref * 0.012, ref * 0.024, ref * 0.024, ref * 0.012), fill: color, ...g })
     return
   }
@@ -684,7 +784,7 @@ function drawShape(b, { o, W, H, ref, accent, scheme }) {
     const x0 = cx - w / 2, y0 = cy - h / 2
     const barH = Math.max(ref * 0.018, h * 0.1)
     const r = ref * 0.014
-    const soft = o.shadow !== false ? b.filter({ kind: 'soft', r: ref * 0.02, dy: ref * 0.012, opacity: 0.32 }) : null
+    const soft = conSombra(o) ? b.filter({ kind: 'soft', r: ref * 0.02, dy: ref * 0.012, opacity: 0.32 }) : null
     // el color elegido pinta el marco (antes las swatches no hacían nada)
     const marco = o.fill || color || '#FFFFFF'
     const cromo = contrastOn(marco) === '#0D0C0C' ? '#D8DBDE' : 'rgba(255,255,255,.35)'
@@ -695,8 +795,10 @@ function drawShape(b, { o, W, H, ref, accent, scheme }) {
     const bx = x0 + ref * 0.003, by = y0 + barH
     const bw = w - ref * 0.006, bh = h - barH - ref * 0.004
     if (o.src) {
+      // el cuerpo de la ventana está DEBAJO de la barra de título, así que su
+      // centro no es el de la forma: gira alrededor de (cx, cy) como el marco.
       b.framedImage({
-        cx, cy: by + bh / 2, w: bw, h: bh,
+        cx, cy: by + bh / 2, w: bw, h: bh, rcx: cx, rcy: cy,
         rotation: rot, flipX, href: o.src, natural: o.natural, focal: o.focal || { x: 0.5, y: 0.5 },
         radius: r * 0.5, zoom: o.zoom || 1, opacity: op,
       })
@@ -710,7 +812,7 @@ function drawShape(b, { o, W, H, ref, accent, scheme }) {
         fill: tinta, anchor: 'start', lineHeight: 1.35, opacity: op, rotation: rot, rcx: cx, rcy: cy,
       })
     } else {
-      b.imageCover({ x: bx, y: by, w: bw, h: bh, href: null, rotation: rot })
+      b.imageCover({ x: bx, y: by, w: bw, h: bh, href: null, rotation: rot, rcx: cx, rcy: cy })
     }
     // 7 · el chrome también rota: antes el marco giraba y los puntitos no
     const dCromo = windowChrome(w, barH).map((c) => roundRect(x0 + c.cx - c.r, y0 + c.cy - c.r, c.r * 2, c.r * 2, c.r)).join(' ')
@@ -735,7 +837,7 @@ function drawShape(b, { o, W, H, ref, accent, scheme }) {
     // se descuenta medio interlineado: si no, el aire de abajo se ve mayor
     const h = Math.max(w * 0.42, lines.length * px * lh + padY * 2 - px * (lh - 1) * 0.5)
     const x0 = cx - w / 2, y0 = cy - h / 2
-    const soft = o.shadow ? b.filter({ kind: 'soft', r: ref * 0.012, dy: ref * 0.008, opacity: 0.28 }) : null
+    const soft = conSombra(o) ? b.filter({ kind: 'soft', r: ref * 0.012, dy: ref * 0.008, opacity: 0.28 }) : null
     // el color elegido pinta la burbuja (antes se ignoraba y siempre salía
     // blanca) y el texto se adapta para que se lea
     const burbuja = o.fill || color || '#FFFFFF'

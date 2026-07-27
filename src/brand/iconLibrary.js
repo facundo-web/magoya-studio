@@ -117,6 +117,10 @@ export const SHAPES = [
   { id: 'shape:callout', slug: 'callout', category: 'shapes', label: 'Bocadillo', shape: 'callout', isShape: true, color: '#00DE68' },
   { id: 'shape:window', slug: 'window', category: 'shapes', label: 'Captura de pantalla', shape: 'window', isShape: true, color: '#FFFFFF' },
   { id: 'shape:dots', slug: 'dots', category: 'shapes', label: 'Puntitos de carrusel', shape: 'dots', isShape: true, color: '#00DE68' },
+  // un rectángulo de color y nada más. Faltaba: para armar un collage había
+  // que usar la etiqueta (que obliga a poner texto) o la ventana (que mete
+  // los tres puntitos de navegador).
+  { id: 'shape:panel', slug: 'panel', category: 'shapes', label: 'Panel de color', shape: 'panel', isShape: true, color: '#00DE68' },
 ]
 
 export const ALL_OBJECTS = [...ICONS, ...MARKS, ...SHAPES, ...MAGOYA_OBJECTS, ...DEVICES]

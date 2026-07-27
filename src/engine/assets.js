@@ -97,14 +97,23 @@ export async function preloadBrandAssets() {
 // archivo crudo era lo que llenaba el guardado del navegador de una.
 // `maxSide` según para qué es: 2048 para el fondo (ocupa toda la pieza),
 // 1400 para objetos y pantallas de dispositivo (se ven a un cuarto de eso).
-export function compressImage(file, maxSide = 2048, quality = 0.85) {
+// `onInfo` cuenta qué pasó con la foto. Existe porque achicarla es una
+// decisión que tomamos nosotros y el usuario no se enteraba: subía una de
+// 4000 px, la guardábamos en 2048 y después no entendía por qué al ampliar
+// se veía blanda.
+export function compressImage(file, maxSide = 2048, quality = 0.85, onInfo) {
   return new Promise((resolve) => {
     const r = new FileReader()
     r.onload = () => {
       const img = new Image()
       img.onload = () => {
         const scale = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight))
-        if (scale === 1 && r.result.length < 1.2e6) return resolve(r.result)
+        const avisar = (w, h) => onInfo && onInfo({
+          deW: img.naturalWidth, deH: img.naturalHeight, aW: w, aH: h,
+          achicada: w < img.naturalWidth,
+        })
+        if (scale === 1 && r.result.length < 1.2e6) { avisar(img.naturalWidth, img.naturalHeight); return resolve(r.result) }
+        avisar(Math.round(img.naturalWidth * scale), Math.round(img.naturalHeight * scale))
         const c = document.createElement('canvas')
         c.width = Math.round(img.naturalWidth * scale)
         c.height = Math.round(img.naturalHeight * scale)

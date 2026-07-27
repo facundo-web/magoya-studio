@@ -121,14 +121,16 @@ export function createBuilder() {
       body.push(`<rect x="${n(x)}" y="${n(y)}" width="${n(w)}" height="${n(h)}" fill="url(#${gid})"/>`)
     },
     // imagen con cover + focal point + B&N opcional
-    imageCover({ x, y, w, h, href, natural, focal = { x: 0.5, y: 0.5 }, grayscale = false, dim = 0, blur = 0, rotation = 0, radius = 0 }) {
+    imageCover({ x, y, w, h, href, natural, focal = { x: 0.5, y: 0.5 }, grayscale = false, dim = 0, blur = 0, rotation = 0, radius = 0, rcx = null, rcy = null }) {
       if (!href) {
         // Esqueleto estático (acá va una foto): fondo neutro + pictograma.
         // Rota y se redondea como el panel real: si no, una plantilla con
         // paneles inclinados se veía derecha hasta que cargabas las fotos.
         const s = Math.min(w, h)
         const cx = x + w / 2, cy = y + h / 2
-        const g = rotation ? `<g transform="rotate(${n(rotation)} ${n(cx)} ${n(cy)})">` : '<g>'
+        // el centro de giro puede ser el del objeto que lo contiene (rcx/rcy),
+        // igual que en framedImage: el esqueleto tiene que acompañar al marco
+        const g = rotation ? `<g transform="rotate(${n(rotation)} ${n(rcx ?? cx)} ${n(rcy ?? cy)})">` : '<g>'
         body.push(
           g +
           `<rect x="${n(x)}" y="${n(y)}" width="${n(w)}" height="${n(h)}" rx="${n(radius)}" fill="#DAD5CC"/>` +
@@ -164,8 +166,13 @@ export function createBuilder() {
         iy = y - (ih - h) * focal.y
       }
       const par = natural ? 'none' : 'xMidYMid slice'
+      // El esqueleto rotaba y la foto real no: una plantilla con paneles
+      // inclinados se enderezaba justo al cargar la imagen. El rotate va
+      // AFUERA del clip para que la máscara gire con ella.
+      const gcx = rcx ?? (x + w / 2), gcy = rcy ?? (y + h / 2)
+      const rot = rotation ? ` transform="rotate(${n(rotation)} ${n(gcx)} ${n(gcy)})"` : ''
       body.push(
-        `<g clip-path="url(#${clipId})"${filterAttr}><image href="${href}" x="${n(ix)}" y="${n(iy)}" width="${n(iw)}" height="${n(ih)}" preserveAspectRatio="${par}"/></g>`
+        `<g${rot}${filterAttr}><g clip-path="url(#${clipId})"><image href="${href}" x="${n(ix)}" y="${n(iy)}" width="${n(iw)}" height="${n(ih)}" preserveAspectRatio="${par}"/></g></g>`
       )
     },
     // imagen de asset (logo/motivo), fit contain
@@ -194,7 +201,10 @@ export function createBuilder() {
       body.push(`<rect x="0" y="0" width="${n(w)}" height="${n(h)}" fill="url(#${gid})" opacity="${opacity}"/>`)
     },
     // objeto flotante: ícono en "tile" (app-icon) o imagen, con sombra + rotación
-    object({ cx, cy, size, rotation = 0, flipX = false, href, tile = false, tileColor = '#000', tileRadius = 0.22, shadow = true, iconInset = 0.22, opacity = 1, aspect = 1, extraFilter = null }) {
+    // shadow por defecto en FALSE, igual que framedImage: el criterio de toda
+    // la app es que la sombra se pide. Dos primitivas con defaults opuestos
+    // era la mitad del lío que arrastraba `o.shadow`.
+    object({ cx, cy, size, rotation = 0, flipX = false, href, tile = false, tileColor = '#000', tileRadius = 0.22, shadow = false, iconInset = 0.22, opacity = 1, aspect = 1, extraFilter = null }) {
       if (!href) return
       const w = size
       const h = size * aspect
@@ -234,8 +244,11 @@ export function createBuilder() {
     // Dos capas: un "glint" con CORTE DURO (el borde neto es lo que el ojo
     // lee como vidrio; un degradé suave se lee como plástico) y un lavado
     // tenue en la diagonal opuesta. Va recortado a la pantalla.
-    screenGlare({ cx, cy, w, h, radius = 0, rotation = 0, strength = 1 }) {
+    screenGlare({ cx, cy, w, h, radius = 0, rotation = 0, strength = 1, rcx = null, rcy = null }) {
       if (w <= 0 || h <= 0) return
+      // mismo centro de giro que la foto que refleja (ver framedImage)
+      const px = rcx ?? cx
+      const py = rcy ?? cy
       const x = cx - w / 2, y = cy - h / 2
       const clipId = id('gclip')
       defs.push(`<clipPath id="${clipId}"><rect x="${n(x)}" y="${n(y)}" width="${n(w)}" height="${n(h)}" rx="${n(radius)}"/></clipPath>`)
@@ -254,7 +267,7 @@ export function createBuilder() {
         `<stop offset="0.55" stop-color="#FFFFFF" stop-opacity="0"/>` +
         `</linearGradient>`
       )
-      const t = rotation ? ` transform="rotate(${n(rotation)} ${n(cx)} ${n(cy)})"` : ''
+      const t = rotation ? ` transform="rotate(${n(rotation)} ${n(px)} ${n(py)})"` : ''
       body.push(
         `<g${t} clip-path="url(#${clipId})">` +
         `<rect x="${n(x)}" y="${n(y)}" width="${n(w)}" height="${n(h)}" fill="url(#${wid})"/>` +
@@ -263,8 +276,15 @@ export function createBuilder() {
       )
     },
     // imagen enmascarada en un marco rectangular (pantalla/mockup)
-    framedImage({ cx, cy, w, h, rotation = 0, flipX = false, href, natural, focal = { x: 0.5, y: 0.5 }, radius = 0, zoom = 1, shadow = false, opacity = 1 }) {
+    // rcx/rcy = CENTRO DE GIRO. Por defecto es el centro de la imagen, pero
+    // cuando la imagen vive adentro de otra cosa (la pantalla de la notebook,
+    // el cuerpo de la ventana debajo de la barra de título) ese centro NO es
+    // el del objeto: el marco giraba alrededor del objeto y la foto alrededor
+    // de sí misma, así que al rotar la foto se corría del encuadre.
+    framedImage({ cx, cy, w, h, rotation = 0, flipX = false, href, natural, focal = { x: 0.5, y: 0.5 }, radius = 0, zoom = 1, shadow = false, opacity = 1, rcx = null, rcy = null }) {
       if (!href) return
+      const px = rcx ?? cx
+      const py = rcy ?? cy
       const x = cx - w / 2
       const y = cy - h / 2
       const clipId = id('fclip')
@@ -285,8 +305,8 @@ export function createBuilder() {
       }
       const par = natural ? 'none' : 'xMidYMid slice'
       const ftp = []
-      if (rotation) ftp.push(`rotate(${n(rotation)} ${n(cx)} ${n(cy)})`)
-      if (flipX) ftp.push(`translate(${n(2 * cx)} 0) scale(-1 1)`)
+      if (rotation) ftp.push(`rotate(${n(rotation)} ${n(px)} ${n(py)})`)
+      if (flipX) ftp.push(`translate(${n(2 * px)} 0) scale(-1 1)`)
       const transform = ftp.length ? ` transform="${ftp.join(' ')}"` : ''
       const op = opacity < 1 ? ` opacity="${opacity}"` : ''
       body.push(
