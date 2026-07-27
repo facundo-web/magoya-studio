@@ -1,6 +1,6 @@
 import React, { useRef } from 'react'
-import { TEMPLATES, placeholderContent, demoContent } from '../templates/index.js'
-import { FORMATS_BY_ID, FORMATS, formatsByNetwork } from '../formats/registry.js'
+import { TEMPLATES, demoContent } from '../templates/index.js'
+import { FORMATS_BY_ID, formatsByNetwork } from '../formats/registry.js'
 import PiecePreview from './PiecePreview.jsx'
 import Icon from '../ui/Icon.jsx'
 
@@ -28,7 +28,6 @@ export default function Gallery({
   const fmt = galleryFormat
   const groups = formatsByNetwork()
   const byId = Object.fromEntries(templates.map((t) => [t.id, t]))
-  const blank = templates.find((t) => t.id === 'blank')
 
   const visible = templates.filter((t) => {
     if (t.hidden) return false        // es variante de otra, no plantilla propia

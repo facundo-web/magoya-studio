@@ -6,7 +6,7 @@ import { checkCopy, checkPiece } from '../lib/copyCheck.js'
 import MockupPreview, { MOCKUPS } from './MockupPreview.jsx'
 import Icon from '../ui/Icon.jsx'
 import { FORMATS_BY_ID, formatsByNetwork, CAROUSEL_FORMATS } from '../formats/registry.js'
-import { COLOR_SCHEMES, ACCENTS, WORDMARKS, TEXT_STYLES, GRADIENTS, HIGHLIGHTS } from '../brand/brandKit.js'
+import { COLOR_SCHEMES, ACCENTS, WORDMARKS, GRADIENTS, HIGHLIGHTS } from '../brand/brandKit.js'
 import { ALL_OBJECTS, ICONS_BY_ID, ICON_CATEGORIES } from '../brand/iconLibrary.js'
 import { PHOTOS } from '../brand/photoLibrary.js'
 
@@ -83,6 +83,57 @@ function shapeBox(o, ref) {
 
 const clampScale = (v) => Math.min(1.2, Math.max(0.05, v))
 
+// Cerrar tiene que funcionar igual en todos lados. Los menús sólo cerraban
+// con `mouseleave`: en touch ese evento no existe, así que quedaban abiertos
+// tapando la barra hasta volver a tocar el botón que los abrió.
+function useCerrar(abierto, onClose) {
+  const ref = useRef(null)
+  useEffect(() => {
+    if (!abierto) return
+    const afuera = (e) => { if (ref.current && !ref.current.contains(e.target)) onClose() }
+    const esc = (e) => { if (e.key === 'Escape') { e.stopPropagation(); onClose() } }
+    document.addEventListener('pointerdown', afuera, true)
+    document.addEventListener('keydown', esc, true)
+    return () => {
+      document.removeEventListener('pointerdown', afuera, true)
+      document.removeEventListener('keydown', esc, true)
+    }
+  }, [abierto, onClose])
+  return ref
+}
+
+// Overlay de modal: Escape cierra, click afuera cierra, el foco entra y
+// vuelve. Antes cada modal lo resolvía distinto (o no lo resolvía).
+function ModalOverlay({ onClose, clase, overlay = 'mk-modal-ov', etiqueta, children }) {
+  const ref = useModal(onClose)
+  return (
+    <div className={overlay} onClick={onClose}>
+      <div className={clase} ref={ref} role="dialog" aria-modal="true" aria-label={etiqueta}
+        onClick={(e) => e.stopPropagation()}>
+        {children}
+      </div>
+    </div>
+  )
+}
+
+// Escape cierra el modal, el foco entra al abrirlo y vuelve al cerrar.
+function useModal(onClose) {
+  const ref = useRef(null)
+  const antes = useRef(null)
+  useEffect(() => {
+    antes.current = document.activeElement
+    const esc = (e) => { if (e.key === 'Escape') { e.stopPropagation(); onClose() } }
+    document.addEventListener('keydown', esc, true)
+    const primero = ref.current?.querySelector('input, button, select, textarea')
+    primero?.focus()
+    return () => {
+      document.removeEventListener('keydown', esc, true)
+      try { antes.current?.focus() } catch {}
+    }
+  }, [onClose])
+  return ref
+}
+
 // Cada elemento nuevo cae un poquito corrido del anterior. Si todos caen en
 // el mismo punto quedan perfectamente apilados y sólo se puede agarrar el
 // último — hay que acordarse de mover cada uno apenas lo ponés.
@@ -126,25 +177,6 @@ function ZoomCtl({ zoom, setZoom, fit }) {
   )
 }
 
-/* ---------------- Sección colapsable ---------------- */
-function Section({ title, help, summary, defaultOpen = false, children }) {
-  const [open, setOpen] = useState(defaultOpen)
-  return (
-    <div className={'sec' + (open ? ' open' : '')}>
-      <button className="sec-head" onClick={() => setOpen((o) => !o)}>
-        <span className="sec-title">{title}</span>
-        {!open && summary ? <span className="sec-sum">{summary}</span> : null}
-        <span className={'sec-chev' + (open ? ' open' : '')}><Icon n="chevron" size={13} /></span>
-      </button>
-      {open && (
-        <div className="sec-body">
-          {help && <p className="panel-help">{help}</p>}
-          {children}
-        </div>
-      )}
-    </div>
-  )
-}
 
 /* ---------------- Estilo: variantes de la plantilla (Bloque B) ----------------
    Las miniaturas se renderizan CON TU CONTENIDO REAL (patrón Canva Layouts):
@@ -296,6 +328,13 @@ export default function Editor({
   }
   // drop desde el picker (drag & drop) → agregar el objeto donde cayó
   const addObjectAt = async (data, pos) => {
+    if (data.type === 'biblioteca') {
+      const src = await fetchCompressed(data.url, OBJ_MAX)
+      const natural = await imageSize(src)
+      setObjects([...objects, { kind: 'image', src, label: data.label, natural, ...pos, scale: 0.4, rotation: 0, shadow: false, opacity: 1 }])
+      setSelObj(objects.length)
+      return
+    }
     if (data.type === 'element') {
       const el = elements.find((x) => x.id === data.id)
       if (!el) return
@@ -327,7 +366,9 @@ export default function Editor({
       setObjects([...objects, { kind: 'image', src, natural, ...pos, scale: icon.isDevice ? 0.5 : 0.34, rotation: 0, shadow: true, opacity: 1 }])
     } else {
       const isMark = !!icon.isMark
-      setObjects([...objects, { kind: 'icon', iconId: icon.id, style: isMark ? 'plain' : 'tile', tint: isMark ? 'accent' : undefined, ...pos, scale: icon.category === 'agro' ? 0.16 : isMark ? 0.34 : 0.3, rotation: isMark ? 0 : -8, shadow: true, opacity: 1 }])
+      // mismos valores que al tocarlo: antes el drop lo creaba rotado -8° y
+      // con sombra, así que el mismo ícono se veía distinto según cómo lo pusiste
+      setObjects([...objects, { kind: 'icon', iconId: icon.id, style: isMark ? 'plain' : 'tile', tint: isMark ? 'accent' : undefined, ...pos, scale: icon.category === 'agro' ? 0.16 : isMark ? 0.34 : 0.3, rotation: 0, shadow: false, opacity: 1 }])
     }
     setSelObj(objects.length)
   }
@@ -343,7 +384,9 @@ export default function Editor({
     const onKey = (e) => {
       const tag = document.activeElement?.tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
-      if (e.key === 'Escape') { setSelObj(null); setSelText(null); setEditing(null); return }
+      // con un modal abierto los atajos del lienzo no tienen que responder
+      if (document.querySelector('.mk-modal-ov, .chooser-ov')) return
+      if (e.key === 'Escape') { setCtxMenu(null); setSelObj(null); setSelText(null); setEditing(null); return }
       if (e.metaKey || e.ctrlKey) {
         if (e.key === '0') { e.preventDefault(); setZoom(0); return }
         if (e.key === '+' || e.key === '=') { e.preventDefault(); setZoom((z) => Math.min(4, (z || fitZoom()) * 1.2)); return }
@@ -777,7 +820,7 @@ export default function Editor({
             })}
             {ctxMenu && selObj != null && (
               <div className="ctx-menu" style={{ left: ctxMenu.x, top: ctxMenu.y }}
-                onPointerDown={(e) => e.stopPropagation()} onMouseLeave={() => setCtxMenu(null)}>
+                onPointerDown={(e) => e.stopPropagation()}>
                 <button onClick={() => { objDuplicate(selObj); setCtxMenu(null) }}><Icon n="copy" size={14} /> Duplicar</button>
                 <button onClick={() => { objBringFront(selObj); setCtxMenu(null) }}><Icon n="up" size={14} /> Subir</button>
                 <button onClick={() => { objSendBack(selObj); setCtxMenu(null) }}><Icon n="down" size={14} /> Bajar</button>
@@ -831,8 +874,7 @@ export default function Editor({
         )}
 
         {chooser && (
-          <div className="chooser-ov" onClick={() => setChooser(null)}>
-            <div className="chooser" onClick={(e) => e.stopPropagation()}>
+          <ModalOverlay onClose={() => setChooser(null)} clase="chooser" overlay="chooser-ov" etiqueta="Elegir diseño">
               <div className="chooser-head">
                 <strong>{chooser === 'add' ? 'Elegí el diseño de la nueva slide' : 'Cambiá el diseño de esta slide'}</strong>
                 <button className="btn" onClick={() => setChooser(null)}>Cerrar</button>
@@ -845,8 +887,7 @@ export default function Editor({
                   </button>
                 ))}
               </div>
-            </div>
-          </div>
+          </ModalOverlay>
         )}
       </div>
 
@@ -856,8 +897,7 @@ export default function Editor({
       )}
 
       {mockupOpen && (
-        <div className="mk-modal-ov" onClick={() => setMockupOpen(false)}>
-          <div className="mk-modal" onClick={(e) => e.stopPropagation()}>
+        <ModalOverlay onClose={() => setMockupOpen(false)} clase="mk-modal" etiqueta="Ver en mockup">
             <div className="mk-modal-head">
               <div className="mk-tabs">
                 {MOCKUPS.map((m) => (
@@ -876,8 +916,7 @@ export default function Editor({
               </div>
             </div>
             <div className="mk-stage"><MockupPreview template={template} content={content} format={format} mockup={mockup} dark={mkDark} safeZones={mkSafe} slides={slides} /></div>
-          </div>
-        </div>
+        </ModalOverlay>
       )}
 
       <div className="col-resize" onPointerDown={(e) => startResize('right', e)} title="Arrastrá para ajustar el panel" />
@@ -1036,7 +1075,10 @@ function FotosBody({ content, template, set, inputRef, onPhotoFile, objects, set
           <div className="photo-lib">
             {misFotos.map((el) => (
               <div key={el.id} className="photo-lib-item wrap" title={el.name}>
-                <img src={el.src} alt={el.name} onClick={() => usar(el.src, el.id, el.name)} />
+                {/* se podía arrastrar (el cursor lo prometía) y al soltar no
+                    pasaba nada: faltaba declarar qué se arrastra */}
+                <img src={el.src} alt={el.name} onClick={() => usar(el.src, el.id, el.name)}
+                  draggable onDragStart={(e) => e.dataTransfer.setData('application/x-magoya', JSON.stringify({ type: 'element', id: el.id }))} />
                 <button className="el-del" title="Quitar de mis fotos" onClick={(e) => { e.stopPropagation(); onDeleteElement && onDeleteElement(el.id) }}><Icon n="close" size={11} /></button>
               </div>
             ))}
@@ -1048,8 +1090,9 @@ function FotosBody({ content, template, set, inputRef, onPhotoFile, objects, set
       <div className="photo-lib">
         {PHOTOS.map((p) => (
           <button key={p.slug} className="photo-lib-item" title={p.label}
-            onClick={async () => usar(await fetchCompressed(p.url, destino === 'fondo' ? 2048 : OBJ_MAX), undefined, p.label)}>
-            <img src={p.url} alt={p.label} loading="lazy" />
+            onClick={async () => usar(await fetchCompressed(p.url, destino === 'fondo' ? 2048 : OBJ_MAX), undefined, p.label)}
+            draggable onDragStart={(e) => e.dataTransfer.setData('application/x-magoya', JSON.stringify({ type: 'biblioteca', url: p.url, label: p.label }))}>
+            <img src={p.url} alt={p.label} loading="lazy" draggable={false} />
           </button>
         ))}
       </div>
@@ -1321,65 +1364,6 @@ function StepsBody({ content, template, set }) {
   )
 }
 
-/* ---------------- Fotos: insertar sobre la pieza (con recorte) ---------------- */
-function PhotosBody({ objects, setObjects, setSelObj, elements = [], onAddElement, onDeleteElement, onToast }) {
-  const fileRef = useRef(null)
-  const misFotos = elements.filter((e) => e.kind === 'photo')
-
-  // `label` = cómo se llama en el inspector; sin esto toda foto decía "Imagen"
-  const place = async (src, elementId, label) => {
-    const natural = await imageSize(src)
-    setObjects([...objects, enCascada(objects, { kind: 'image', src, elementId, label, natural, x: 0.5, y: 0.5, scale: 0.5, rotation: 0, shadow: false, opacity: 1 })])
-    setSelObj(objects.length)
-  }
-  const upload = async (file) => {
-    if (!file || !file.type.startsWith('image/')) return onToast('Ese archivo no es una imagen')
-    const src = await compressImage(file, OBJ_MAX)
-    const nice = file.name.replace(/\.[^.]+$/, '')
-    let elementId
-    if (onAddElement) elementId = (await onAddElement({ name: nice, src, kind: 'photo' }))?.id
-    place(src, elementId, nice)
-  }
-  const useLib = async (url, label) => {
-    place(await fetchCompressed(url), undefined, label)
-  }
-
-  return (
-    <>
-      <div className="dropzone" onClick={() => fileRef.current?.click()}
-        onDragOver={(e) => e.preventDefault()}
-        onDrop={(e) => { e.preventDefault(); e.dataTransfer.files[0] && upload(e.dataTransfer.files[0]) }}>
-        Subí una foto o arrastrala acá
-      </div>
-      <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => e.target.files[0] && upload(e.target.files[0])} />
-
-      {misFotos.length > 0 && (
-        <>
-          <label style={{ marginTop: 12 }}>Mis fotos</label>
-          <div className="photo-lib">
-            {misFotos.map((el) => (
-              <div key={el.id} className="photo-lib-item wrap" title={el.name}>
-                <img src={el.src} alt={el.name} onClick={() => place(el.src, el.id, el.name)}
-                  draggable onDragStart={(e) => e.dataTransfer.setData('application/x-magoya', JSON.stringify({ type: 'element', id: el.id }))} />
-                <button className="el-del" title="Quitar de mis fotos" onClick={(e) => { e.stopPropagation(); onDeleteElement && onDeleteElement(el.id) }}><Icon n="close" size={11} /></button>
-              </div>
-            ))}
-          </div>
-        </>
-      )}
-
-      <label style={{ marginTop: 12 }}>Biblioteca Magoya</label>
-      <div className="photo-lib">
-        {PHOTOS.map((p) => (
-          <button key={p.slug} className="photo-lib-item" title={p.label} onClick={() => useLib(p.url, p.label)}>
-            <img src={p.url} alt={p.label} loading="lazy" />
-          </button>
-        ))}
-      </div>
-      <div className="hint">Después de ponerla, usá <b>✂ Quitar fondo</b> en el panel de la derecha para recortar la persona u objeto.</div>
-    </>
-  )
-}
 
 /* ---------------- Object properties (panel derecho / inspector) ---------------- */
 function ObjectProps({ o, i, updateObject, objRemove, objDuplicate, objBringFront, objSendBack, onToast, goToBg }) {
@@ -1872,11 +1856,12 @@ function ChatBody({ content, template, set }) {
 function MoreMenu({ onSaveTemplate, onExportFile }) {
   const [open, setOpen] = useState(false)
   const act = (fn) => { setOpen(false); fn && fn() }
+  const ref = useCerrar(open, () => setOpen(false))
   return (
-    <div className="menu">
+    <div className="menu" ref={ref}>
       <button className="btn" onClick={() => setOpen((o) => !o)}>Más <span className={'sec-chev chev-menu' + (open ? ' open' : '')}><Icon n="chevron" size={12} /></span></button>
       {open && (
-        <div className="menu-pop" onMouseLeave={() => setOpen(false)}>
+        <div className="menu-pop">
           <button onClick={() => act(onSaveTemplate)}><span>Guardar como plantilla</span><Icon n="bookmark" size={15} /></button>
           <button onClick={() => act(onExportFile)}><span>Bajar el archivo editable (.json)</span><Icon n="down" size={15} /></button>
         </div>
@@ -1909,6 +1894,7 @@ const SHARE_INTENTS = [
 
 function ShareModal({ onClose, onShare, onShareReview, onExportFile, mockup, setMockup }) {
   const [pick, setPick] = useState('review')
+  const ref = useModal(onClose)
   const run = () => {
     if (pick === 'review') onShareReview && onShareReview(mockup)
     else if (pick === 'show') onShare && onShare(mockup)
@@ -1918,7 +1904,7 @@ function ShareModal({ onClose, onShare, onShareReview, onExportFile, mockup, set
   const cur = SHARE_INTENTS.find((i) => i.k === pick)
   return (
     <div className="mk-modal-ov" onClick={onClose}>
-      <div className="share-modal" onClick={(e) => e.stopPropagation()}>
+      <div className="share-modal" ref={ref} role="dialog" aria-modal="true" aria-label="Compartir" onClick={(e) => e.stopPropagation()}>
         <div className="share-head">
           <strong>Compartir</strong>
           <button className="btn" onClick={onClose}>Cerrar</button>
@@ -1968,15 +1954,16 @@ function DownloadMenu({ template, content, format, slides, busy, setBusy, onToas
     finally { setBusy(false); setProg(null) }
   }
   const onProgress = (hechas, total) => setProg({ hechas, total })
+  const refMenu = useCerrar(open, () => setOpen(false))
   return (
-    <div className="menu">
+    <div className="menu" ref={refMenu}>
       <button className="btn primary" disabled={busy} onClick={() => setOpen((o) => !o)}>
         {busy
           ? (prog ? `Slide ${prog.hechas} de ${prog.total}…` : 'Generando…')
           : <><Icon n="down" size={16} /> Descargar</>}
       </button>
       {open && (
-        <div className="menu-pop" onMouseLeave={() => setOpen(false)}>
+        <div className="menu-pop">
           <div className="grp">Recomendado</div>
           <button className="rec" onClick={() => run(() => exportPiece({ template, content, format, kind: 'png', scale: 3 }), 'PNG @3x')}>
             <span>PNG — listo para redes</span><span>@3x</span>

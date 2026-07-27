@@ -437,13 +437,7 @@ export default function App() {
   }
 
   // ---- acciones ----
-  function save() {
-    const proj = serialize()
-    const next = upsertProject(proj)
-    setProjects(next)
-    setDirty(false)
-    showToast('✓ Proyecto guardado')
-  }
+
   async function share(mockup) {
     const link = toShareLink(serialize(), typeof mockup === 'string' ? mockup : undefined)
     if (link && link.tooLong) {
@@ -603,7 +597,7 @@ export default function App() {
           <button className="btn ghost-light" onClick={() => { const p = preview; setPreview(null); if (location.hash) location.hash = ''; openFromSerialized(p, 'link') }}>Editar esta pieza</button>
         </div>
         <div className="preview-stage">
-          <div className="review-wrap"
+          <div className={'review-wrap' + (preview.shareId ? ' comentable' : '')}
             onClick={(e) => {
               if (!preview.shareId) return
               if (e.target.closest('.c-pin') || e.target.closest('.pin-form')) return
@@ -642,6 +636,9 @@ export default function App() {
               ))}
             </div>
           )}
+          {/* en un link de sólo-vista no hay dónde guardar el veredicto:
+              mostrar los botones era prometer algo que no funciona */}
+          {preview.shareId && (
           <div className="verdict-row">
             {miVoto ? (
               <>
@@ -658,6 +655,7 @@ export default function App() {
               </>
             )}
           </div>
+          )}
           {!preview.shareId && <p className="preview-note">Así se ve publicada. La foto no viaja en este link — usá "Compartir para revisión" para verla completa.</p>}
         </div>
         {toast && <div className="toast">{toast}</div>}
