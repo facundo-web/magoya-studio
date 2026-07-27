@@ -76,6 +76,20 @@ export function sparkline(w, h, values) {
   return { line: d, area, last: pts[pts.length - 1] }
 }
 
+// ---- PUNTITOS DE CARRUSEL ----
+// Antes eran un SVG fijo de 5 puntos: "los puntitos no les puse para que
+// edites cuánta cantidad querés. Hay que sumarlo en la miscelánea".
+// Ahora es paramétrico: cuántos son y cuál está activo.
+export function dotsCircles(w, count = 5, active = 0) {
+  const nn = Math.max(2, Math.min(12, Math.round(count)))
+  const r = w / (nn * 3.2)
+  const step = nn > 1 ? (w - r * 2) / (nn - 1) : 0
+  return Array.from({ length: nn }, (_, i) => ({
+    cx: n(r + i * step), cy: n(r), r: n(r),
+    on: i === ((active % nn) + nn) % nn,
+  }))
+}
+
 // ---- CHROME de captura (barra tipo ventana) ----
 export function windowChrome(w, barH) {
   const r = barH * 0.18

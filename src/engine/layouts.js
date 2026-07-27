@@ -9,10 +9,10 @@
 
 import { safeRect } from '../formats/registry.js'
 import { COLOR_SCHEMES, DEFAULT_SCHEME, ACCENTS, TEXT_STYLES, WORDMARKS, WORDMARK_RATIO, MOTIF_ESTRATOS, GRADIENTS, FONT_HAND_STACK, HIGHLIGHTS, TEXT_COLORS } from '../brand/brandKit.js'
-import { ICONS_BY_ID } from '../brand/iconLibrary.js'
+import { ICONS_BY_ID, LIGHT_TILE } from '../brand/iconLibrary.js'
 import { getAsset, coloredIcon } from './assets.js'
 import { fitText, measure, wrapText } from './textLayout.js'
-import { arrowPath, handArrowPath, sparklePath, calloutPath, barsRects, sparkline, windowChrome } from './shapes.js'
+import { arrowPath, handArrowPath, sparklePath, calloutPath, barsRects, sparkline, windowChrome, dotsCircles } from './shapes.js'
 
 const clamp01 = (v) => Math.max(0, Math.min(1, Number(v) || 0))
 
@@ -520,8 +520,14 @@ function drawObjects(b, { objects, W, H, ref, accent, scheme }) {
       // antes: shadow forzada a false en los trazos → el toggle no hacía nada
       b.object({ cx, cy, size, rotation, flipX, href: coloredIcon(icon.url, tint || icon.color, o.sw || 1), tile: false, shadow, opacity })
     } else {
-      // tile app-icon: squircle color de marca + glifo blanco
-      b.object({ cx, cy, size, rotation, flipX, href: coloredIcon(icon.url, '#FFFFFF'), tile: true, tileColor: o.tileColor || icon.color, shadow, opacity })
+      // tile app-icon: squircle color de marca + glifo blanco. Salvo las
+      // que en la realidad son al revés (Gemini): tile blanco, glifo color.
+      const claro = LIGHT_TILE[icon.slug]
+      b.object({
+        cx, cy, size, rotation, flipX,
+        href: coloredIcon(icon.url, claro || '#FFFFFF'),
+        tile: true, tileColor: o.tileColor || (claro ? '#FFFFFF' : icon.color), shadow, opacity,
+      })
     }
   }
 }
@@ -553,6 +559,17 @@ function drawShape(b, { o, W, H, ref, accent, scheme }) {
   }
   if (o.shape === 'sparkle') {
     b.path({ d: sparklePath(size / 2), fill: color, tx: cx, ty: cy, ...g, filterId: hardShadow })
+    return
+  }
+  if (o.shape === 'dots') {
+    // los puntitos del carrusel: cantidad y cuál está activo, editables
+    const w = size
+    const ds = dotsCircles(w, o.count ?? 5, o.active ?? 0)
+    const x0 = cx - w / 2, y0 = cy - (ds[0]?.r || 0)
+    const apagados = ds.filter((d) => !d.on).map((d) => circlePath(x0 + d.cx, y0 + d.cy, d.r)).join(' ')
+    const encendido = ds.find((d) => d.on)
+    if (apagados) b.path({ d: apagados, fill: color, ...g, opacity: 0.35 * op, filterId: hardShadow })
+    if (encendido) b.path({ d: circlePath(x0 + encendido.cx, y0 + encendido.cy, encendido.r), fill: color, ...g, opacity: op, filterId: hardShadow })
     return
   }
   if (o.shape === 'badge') {
@@ -646,6 +663,10 @@ function drawShape(b, { o, W, H, ref, accent, scheme }) {
     }
     return
   }
+}
+// círculo como path, para poder juntar varios en un solo <path>
+function circlePath(cx, cy, r) {
+  return `M${cx - r},${cy} a${r},${r} 0 1,0 ${r * 2},0 a${r},${r} 0 1,0 ${-r * 2},0 Z`
 }
 function roundRect(x, y, w, h, r) {
   return `M${x + r},${y} H${x + w - r} A${r},${r} 0 0 1 ${x + w},${y + r} V${y + h - r} A${r},${r} 0 0 1 ${x + w - r},${y + h} H${x + r} A${r},${r} 0 0 1 ${x},${y + h - r} V${y + r} A${r},${r} 0 0 1 ${x + r},${y} Z`

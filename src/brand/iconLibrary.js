@@ -10,9 +10,15 @@ const modules = import.meta.glob('./assets/icons/**/*.svg', { eager: true, query
 // marcas gráficas (flechas, círculos, subrayados, doodles) — assets de marca
 const markModules = import.meta.glob('./assets/*.svg', { eager: true, query: '?url', import: 'default' })
 
+// Marcas que en la vida real son un TILE BLANCO con el glifo de color, no
+// un tile de color con el glifo blanco. Gemini es el caso que saltó: "el
+// Gemini es raro el color que tiene, no hay violeta así... violeta el
+// cosito, no el fondo".
+export const LIGHT_TILE = { googlegemini: '#4285F4', google: '#4285F4' }
+
 const COLORS = {
   // IA
-  openai: '#000000', anthropic: '#D97757', claude: '#D97757', googlegemini: '#8E75B2',
+  openai: '#000000', anthropic: '#D97757', claude: '#D97757', googlegemini: '#4285F4',
   google: '#4285F4', perplexity: '#20808D', huggingface: '#FFD21E', mistralai: '#FA520F',
   ollama: '#000000', meta: '#0668E1',
   // Redes
@@ -60,7 +66,9 @@ export const ICONS = Object.entries(modules).map(([path, url]) => {
 })
 
 // ---- trazos y misceláneas (currentColor → se tiñen con el acento/negro) ----
-const MARK_NAMES = { 'flourish-arrow': 'Flecha', 'flourish-circle': 'Círculo', 'flourish-underline': 'Subrayado', 'flourish-navarrow': 'Botón flecha', 'doodle-dots': 'Dots de carrusel' }
+// `doodle-dots` salió de acá: era una imagen fija de 5 puntos y no había
+// forma de decir cuántos son. Ahora es una forma paramétrica (shape:dots).
+const MARK_NAMES = { 'flourish-arrow': 'Flecha', 'flourish-circle': 'Círculo', 'flourish-underline': 'Subrayado', 'flourish-navarrow': 'Botón flecha' }
 export const MARKS = Object.entries(markModules)
   .map(([path, url]) => {
     const m = path.match(/\/((?:flourish|doodle)-[^/]+)\.svg$/)
@@ -108,6 +116,7 @@ export const SHAPES = [
   { id: 'shape:sparkline', slug: 'sparkline', category: 'shapes', label: 'Curva', shape: 'sparkline', isShape: true, color: '#00DE68' },
   { id: 'shape:callout', slug: 'callout', category: 'shapes', label: 'Bocadillo', shape: 'callout', isShape: true, color: '#00DE68' },
   { id: 'shape:window', slug: 'window', category: 'shapes', label: 'Captura de pantalla', shape: 'window', isShape: true, color: '#FFFFFF' },
+  { id: 'shape:dots', slug: 'dots', category: 'shapes', label: 'Puntitos de carrusel', shape: 'dots', isShape: true, color: '#00DE68' },
 ]
 
 export const ALL_OBJECTS = [...ICONS, ...MARKS, ...SHAPES, ...MAGOYA_OBJECTS, ...DEVICES]

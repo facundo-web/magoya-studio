@@ -8,7 +8,7 @@ import MockupPreview, { MOCKUPS } from './MockupPreview.jsx'
 import Icon from '../ui/Icon.jsx'
 import { FORMATS_BY_ID, formatsByNetwork, CAROUSEL_FORMATS } from '../formats/registry.js'
 import { COLOR_SCHEMES, ACCENTS, WORDMARKS, GRADIENTS, HIGHLIGHTS, TEXT_COLORS } from '../brand/brandKit.js'
-import { ALL_OBJECTS, ICONS_BY_ID, ICON_CATEGORIES } from '../brand/iconLibrary.js'
+import { ALL_OBJECTS, ICONS_BY_ID, ICON_CATEGORIES, LIGHT_TILE } from '../brand/iconLibrary.js'
 import { PHOTOS } from '../brand/photoLibrary.js'
 
 // colores para teñir logos "sin fondo" y marcas
@@ -1334,7 +1334,7 @@ function ObjectsBody({ objects, setObjects, selObj, setSelObj, objRemove, onToas
                   return (
                     <button key={icon.id} title={icon.label + ' — tocá o arrastrá a la pieza'} onClick={() => addIcon(icon)}
                       className={'icon-pick' + (asset ? ' asset' : '') + (icon.isShape ? ' shape' : '') + (icon.isMark ? ' mark' : '')}
-                      style={(asset || icon.isShape) ? undefined : { background: icon.color }}
+                      style={(asset || icon.isShape) ? undefined : { background: LIGHT_TILE[icon.slug] ? '#FFFFFF' : icon.color }}
                       draggable onDragStart={(e) => e.dataTransfer.setData('application/x-magoya', JSON.stringify({ type: 'icon', id: icon.id }))}>
                       {icon.isShape ? <ShapeGlyph shape={icon.shape} /> : <img src={icon.url} alt={icon.label} />}
                     </button>
@@ -1403,6 +1403,7 @@ function ShapeGlyph({ shape }) {
     sparkline: <g fill="none" stroke={C} strokeWidth="2.2" strokeLinecap="round"><path d="M3,17 C7,17 8,12 12,12 C16,12 16,6 21,5" /></g>,
     callout: <path d="M3,4 H21 V15 H9 L5,19 V15 H3 Z" fill={C} />,
     window: <g><rect x="2.5" y="4" width="19" height="16" rx="2.5" fill="none" stroke={C} strokeWidth="1.9" /><path d="M2.5,8.5 H21.5" stroke={C} strokeWidth="1.9" /><g fill={C}><circle cx="5.4" cy="6.2" r=".9" /><circle cx="8" cy="6.2" r=".9" /><circle cx="10.6" cy="6.2" r=".9" /></g></g>,
+    dots: <g fill={C}><circle cx="4" cy="12" r="2" /><circle cx="10" cy="12" r="2" opacity=".35" /><circle cx="16" cy="12" r="2" opacity=".35" /><circle cx="22" cy="12" r="2" opacity=".35" /></g>,
   }[shape]
   return <svg viewBox="0 0 24 24" width="70%" height="70%">{p}</svg>
 }
@@ -1569,6 +1570,14 @@ function ObjectProps({ o, i, updateObject, objRemove, objDuplicate, objBringFron
             <div className="field"><label>Valores (separados por coma)</label>
               <input type="text" value={(o.values || [3, 5, 4, 7, 9]).join(', ')}
                 onChange={(e) => updateObject(i, { values: e.target.value.split(',').map((v) => +v.trim() || 0).filter((v) => v >= 0) })} /></div>
+          )}
+          {o.shape === 'dots' && (
+            <>
+              <Ctl label="Cuántos puntos" value={o.count ?? 5} min={2} max={12} step={1}
+                onChange={(v) => updateObject(i, { count: v, active: Math.min(o.active ?? 0, v - 1) })} />
+              <Ctl label="Cuál está lleno" value={(o.active ?? 0) + 1} min={1} max={o.count ?? 5} step={1}
+                onChange={(v) => updateObject(i, { active: v - 1 })} />
+            </>
           )}
           <label>Color</label>
           <div className="swatches" style={{ marginBottom: 8 }}>
