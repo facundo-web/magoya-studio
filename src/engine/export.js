@@ -119,16 +119,16 @@ function slugify(s) {
 }
 
 // export de UNA pieza
-export async function exportPiece({ template, content, format, kind = 'png', scale = 2 }) {
+export async function exportPiece({ template, content, format, kind = 'png', scale = 2, sizeLock = null }) {
   const name = slugify((content && content.title) || template.name) + '-' + format.id
   if (kind === 'svg') {
     const fontFaceCss = await buildFontFaceCss()
-    const svg = renderPieceSVG({ template, content, format, fontFaceCss })
+    const svg = renderPieceSVG({ template, content, format, fontFaceCss, sizeLock })
     downloadBlob(new Blob([svg], { type: 'image/svg+xml' }), name + '.svg')
     return
   }
   const fontFaceCss = await buildFontFaceCss()
-  const svg = renderPieceSVG({ template, content, format, fontFaceCss })
+  const svg = renderPieceSVG({ template, content, format, fontFaceCss, sizeLock })
   const type = kind === 'jpg' ? 'image/jpeg' : 'image/png'
   const blob = await rasterize(svg, { w: format.w, h: format.h, scale, type })
   downloadBlob(blob, name + '.' + kind)
@@ -137,7 +137,7 @@ export async function exportPiece({ template, content, format, kind = 'png', sca
 // export de carrusel: varias slides (cada una {template,content}) mismo formato
 // onProgress(hechas, total): un ZIP de 8 slides @3x tarda bastante y el
 // aviso se iba a los 2 s — parecía colgado y la gente recargaba la página.
-export async function exportCarousel({ slides, format, kind = 'zip', scale = 2, name = 'carrusel', onProgress }) {
+export async function exportCarousel({ slides, format, kind = 'zip', scale = 2, name = 'carrusel', onProgress, sizeLock = null }) {
   const fontFaceCss = await buildFontFaceCss()
   const base = slugify(name)
   if (kind === 'pdf') {
@@ -145,7 +145,7 @@ export async function exportCarousel({ slides, format, kind = 'zip', scale = 2, 
     const orientation = format.w >= format.h ? 'landscape' : 'portrait'
     const pdf = new jsPDF({ orientation, unit: 'px', format: [format.w, format.h] })
     for (let i = 0; i < slides.length; i++) {
-      const svg = renderPieceSVG({ template: slides[i].template, content: slides[i].content, format, fontFaceCss })
+      const svg = renderPieceSVG({ template: slides[i].template, content: slides[i].content, format, fontFaceCss, sizeLock })
       const blob = await rasterize(svg, { w: format.w, h: format.h, scale, type: 'image/jpeg' })
       const dataUrl = await blobToDataURL(blob)
       if (i > 0) pdf.addPage([format.w, format.h], orientation)
@@ -159,7 +159,7 @@ export async function exportCarousel({ slides, format, kind = 'zip', scale = 2, 
   const JSZip = (await import('jszip')).default
   const zip = new JSZip()
   for (let i = 0; i < slides.length; i++) {
-    const svg = renderPieceSVG({ template: slides[i].template, content: slides[i].content, format, fontFaceCss })
+    const svg = renderPieceSVG({ template: slides[i].template, content: slides[i].content, format, fontFaceCss, sizeLock })
     const blob = await rasterize(svg, { w: format.w, h: format.h, scale, type: 'image/png' })
     zip.file(`${base}-${String(i + 1).padStart(2, '0')}.png`, blob)
     onProgress && onProgress(i + 1, slides.length)

@@ -76,6 +76,7 @@ export function resolvePiece(template, content) {
     gradient: c.gradient !== undefined ? c.gradient : d.gradient || null,
     objects: c.objects || d.objects || [],
     steps: c.steps || d.steps || [],
+    sizes: c.sizes || d.sizes || null,
     vignette: c.vignette ?? d.vignette ?? 0,
     photoDim: c.photoDim ?? d.photoDim ?? 0,
     photoBlur: c.photoBlur ?? d.photoBlur ?? 0,
@@ -96,8 +97,11 @@ function pick(a, b) {
   return a !== undefined && a !== null ? a : b
 }
 
-// dibuja la pieza en el builder
-export function drawPiece(b, { template, content, format }) {
+// `sizeLock` = tamaño fijo por estilo, en px. Sirve para que en un carrusel
+// el mismo rol mida IGUAL en todas las slides: si no, el auto-ajuste achica
+// el texto según cuánto escribiste en cada una y la cita salta de 30 a 58 px
+// entre la primera y la última. Se ve roto al scrollear.
+export function drawPiece(b, { template, content, format, sizeLock = null }) {
   if (template.category === 'chat') { drawChat(b, { template, content, format }); return }
   const p = resolvePiece(template, content)
   const { w: W, h: H } = format
@@ -149,13 +153,19 @@ export function drawPiece(b, { template, content, format }) {
     if (txt === undefined || txt === null || String(txt).trim() === '') return
     const st = TEXT_STYLES[role] || TEXT_STYLES.body
     const hand = role === 'kicker' && p.handAccent
-    const startPx = ref * st.sizeRel * (hand ? 1.9 : 1) * p.scale
+    // tamaño elegido a mano (multiplicador por bloque o por rol)
+    const elegido = opts.size || p.sizes?.[role] || null
+    const manual = elegido || 1
+    const startPx = ref * st.sizeRel * (hand ? 1.9 : 1) * p.scale * manual
     const value = (st.upper && !hand) ? String(txt).toUpperCase() : String(txt)
     const maxLines = role === 'title' || role === 'quote' ? 4 : role === 'kicker' || role === 'cta' ? 1 : 3
+    // si elegiste un tamaño a mano, ese manda: el tamaño común del carrusel
+    // es para los que están en "Automático"
+    const fijo = !elegido && sizeLock && sizeLock[role]
     const fit = fitText(value, {
       weight: hand ? 700 : st.weight, tracking: hand ? 0 : (st.tracking || 0),
-      maxWidth: maxTextW, maxHeight: H * 0.5, startPx,
-      lineHeight: st.lineHeight || 1.15, maxLines,
+      maxWidth: maxTextW, maxHeight: fijo ? 1e6 : H * 0.5, startPx: fijo || startPx,
+      lineHeight: st.lineHeight || 1.15, maxLines: fijo ? 99 : maxLines,
     })
     blocks.push({ role, st, value, px: fit.px, lines: fit.lines, lineHeight: st.lineHeight || 1.15, hand, hl: opts.hl || null, eid: opts.eid || null })
   }
@@ -165,7 +175,7 @@ export function drawPiece(b, { template, content, format }) {
   }
   // bloques de texto sumados por el usuario (freeform / componentes)
   p.textBlocks.forEach((tb, idx) => {
-    pushBlock(tb.style || 'title', tb.text, { hl: (HIGHLIGHTS[tb.highlight] || {}).value, eid: `tb:${idx}` })
+    pushBlock(tb.style || 'title', tb.text, { hl: (HIGHLIGHTS[tb.highlight] || {}).value, eid: `tb:${idx}`, size: tb.size })
   })
   // pasos numerados (plantilla "método")
   ;(p.steps || []).forEach((st, idx) => {
@@ -279,6 +289,52 @@ export function drawPiece(b, { template, content, format }) {
 
   // ---- objetos DELANTE del texto (profundidad) ----
   drawObjects(b, { objects: (p.objects || []).filter((o) => o.front), W, H, ref, accent: p.accent, scheme: p.scheme })
+}
+
+// Qué tamaño le toca a cada estilo en esta pieza, sin dibujar nada.
+// Con esto se calcula el tamaño común de un carrusel: el MÍNIMO entre las
+// slides, que es el único que entra en todas.
+export function medirPieza(template, content, format) {
+  if (template.category === 'chat') return {}
+  const p = resolvePiece(template, content)
+  const { w: W, h: H } = format
+  const safe = safeRect(format)
+  const ref = Math.min(W, H)
+  const onPhoto = p.surface === 'photo'
+  const dens = DENSITY[p.density] || DENSITY.normal
+  const opaquePlate = (p.plate === 'band' || p.plate === 'card')
+  const maxTextW = safe.w * (onPhoto && !opaquePlate ? 0.92 : 0.8) * dens.w
+  const out = {}
+  const medir = (role, txt, size) => {
+    if (txt === undefined || txt === null || String(txt).trim() === '') return
+    const st = TEXT_STYLES[role] || TEXT_STYLES.body
+    const hand = role === 'kicker' && p.handAccent
+    const elegido = size || p.sizes?.[role] || null
+    if (elegido) return            // no participa del tamaño común
+    const startPx = ref * st.sizeRel * (hand ? 1.9 : 1) * p.scale
+    const value = (st.upper && !hand) ? String(txt).toUpperCase() : String(txt)
+    const maxLines = role === 'title' || role === 'quote' ? 4 : role === 'kicker' || role === 'cta' ? 1 : 3
+    const fit = fitText(value, {
+      weight: hand ? 700 : st.weight, tracking: hand ? 0 : (st.tracking || 0),
+      maxWidth: maxTextW, maxHeight: H * 0.5, startPx,
+      lineHeight: st.lineHeight || 1.15, maxLines,
+    })
+    out[role] = Math.min(out[role] ?? Infinity, fit.px)
+  }
+  for (const role of STACK_ORDER) if (p.roles.includes(role)) medir(role, p.text[role])
+  ;(p.textBlocks || []).forEach((tb) => medir(tb.style || 'title', tb.text, tb.size))
+  return out
+}
+
+// El tamaño común de un carrusel: por estilo, el más chico de todas las
+// slides. Es el único que entra en la que más texto tiene.
+export function tamanoComun(slides, format) {
+  const lock = {}
+  for (const s of slides || []) {
+    const m = medirPieza(s.template, s.content, format)
+    for (const [k, v] of Object.entries(m)) lock[k] = Math.min(lock[k] ?? Infinity, v)
+  }
+  return lock
 }
 
 // ---- renderer de chat (WhatsApp) ----

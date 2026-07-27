@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import PiecePreview from './PiecePreview.jsx'
 import { TEMPLATES, MAXCHARS } from '../templates/index.js'
 import { variantsFor, activeVariantId } from '../templates/variants.js'
+import { tamanoComun } from '../engine/layouts.js'
 import { checkCopy, checkPiece } from '../lib/copyCheck.js'
 import MockupPreview, { MOCKUPS } from './MockupPreview.jsx'
 import Icon from '../ui/Icon.jsx'
@@ -264,6 +265,15 @@ export default function Editor({
   useEffect(() => { setZoom(0) }, [format.id])
 
   const isCarousel = slides && slides.length > 0
+  // Feedback de Aye: "en un mismo campo el tamaño del texto cambia de slide
+  // en slide porque la cantidad de texto que lleva es diferente". Es cierto:
+  // el auto-ajuste achica cada slide por separado. Con esto todas usan el
+  // tamaño de la que más texto tiene, que es el único que entra en todas.
+  const mismoTamano = content.mismoTamano !== false
+  const sizeLock = React.useMemo(
+    () => (isCarousel && slides.length > 1 && mismoTamano ? tamanoComun(slides, format) : null),
+    [isCarousel, slides, format, mismoTamano],
+  )
   const canCarousel = CAROUSEL_FORMATS.includes(format.id)
   // podías quedar con 5 slides en formato "Miniatura de YouTube" y nadie
   // avisaba: se exportaba un ZIP de 5 miniaturas sin sentido
@@ -750,7 +760,7 @@ export default function Editor({
           <button className="btn" onClick={() => setMockupOpen(true)}><Icon n="eye" size={16} /> Ver en mockup</button>
           <button className="btn" onClick={() => setShareOpen(true)}><Icon n="share" size={16} /> Compartir</button>
           <MoreMenu onSaveTemplate={onSaveTemplate} onExportFile={onExportFile} />
-          <DownloadMenu template={template} content={content} format={format} slides={slides} busy={busy} setBusy={setBusy} onToast={onToast} />
+          <DownloadMenu template={template} content={content} format={format} slides={slides} sizeLock={sizeLock} busy={busy} setBusy={setBusy} onToast={onToast} />
         </div>
 
         <div className="stage-canvas" onPointerDown={onStageDown} ref={stageRef}
@@ -780,7 +790,7 @@ export default function Editor({
               setCtxMenu({ x: e.clientX - fr.left, y: e.clientY - fr.top })
             }}
           >
-            <PiecePreview template={template} content={content} format={format} />
+            <PiecePreview template={template} content={content} format={format} sizeLock={sizeLock} />
             {editing && (
               <textarea
                 className="inline-edit"
@@ -861,7 +871,7 @@ export default function Editor({
                 draggable onDragStart={() => setDragSlide(i)} onDragEnd={() => setDragSlide(null)}
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={(e) => { e.preventDefault(); if (dragSlide != null && dragSlide !== i && onReorderSlides) onReorderSlides(dragSlide, i); setDragSlide(null) }}>
-                <PiecePreview template={s.template} content={s.content} format={format} />
+                <PiecePreview template={s.template} content={s.content} format={format} sizeLock={sizeLock} />
                 <span className="sn">{i + 1}</span>
               </button>
             ))}
@@ -869,6 +879,9 @@ export default function Editor({
             {onDuplicateSlide && <button className="btn" style={{ marginLeft: 8 }} onClick={onDuplicateSlide} title="Duplica esta slide para continuar la historia (ej: el chat que sigue)"><Icon n="copy" size={15} /> Duplicar slide</button>}
             <button className="btn" onClick={() => setChooser('add')}>Desde plantilla</button>
             <button className="btn" onClick={() => setChooser('change')}>Cambiar diseño</button>
+            <label className="safe-toggle" title="Que el título y el texto midan igual en todas las slides, aunque una tenga más letras">
+              <input type="checkbox" checked={mismoTamano} onChange={(e) => set({ mismoTamano: e.target.checked })} /> Mismo tamaño de texto
+            </label>
             {slides.length > 1 && <button className="btn" onClick={() => onDeleteSlide(activeSlide)}>Borrar slide</button>}
           </div>
         )}
@@ -915,7 +928,7 @@ export default function Editor({
                 <button className="btn" onClick={() => setMockupOpen(false)}>Cerrar</button>
               </div>
             </div>
-            <div className="mk-stage"><MockupPreview template={template} content={content} format={format} mockup={mockup} dark={mkDark} safeZones={mkSafe} slides={slides} /></div>
+            <div className="mk-stage"><MockupPreview template={template} content={content} format={format} mockup={mockup} dark={mkDark} safeZones={mkSafe} slides={slides} sizeLock={sizeLock} /></div>
         </ModalOverlay>
       )}
 
@@ -1793,6 +1806,20 @@ function TextProps({ eid, content, set, getText, setText }) {
         if (!notes.length) return null
         return <ul className="copy-notes">{notes.map((m, i) => <li key={i}>{m}</li>)}</ul>
       })()}
+      {/* "no me deja elegir el tamaño de la tipografía" — ahora sí, con
+          Automático como default (el que entra solo) */}
+      <label>Tamaño</label>
+      <div className="chips" style={{ marginBottom: 10 }}>
+        {[[null, 'Automático'], [0.75, 'Chico'], [1, 'Normal'], [1.3, 'Grande'], [1.7, 'Enorme']].map(([v, l]) => {
+          const actual = isTb ? block?.size : content.sizes?.[eid.slice(5)]
+          const on = (v === null && !actual) || actual === v
+          const aplicar = () => {
+            if (isTb) updateBlock({ size: v })
+            else set({ sizes: { ...(content.sizes || {}), [eid.slice(5)]: v || undefined } })
+          }
+          return <button key={l} className={'chip' + (on ? ' on' : '')} onClick={aplicar}>{l}</button>
+        })}
+      </div>
       {isTb && block ? (
         <>
           <label>Estilo</label>
@@ -1937,7 +1964,7 @@ function ShareModal({ onClose, onShare, onShareReview, onExportFile, mockup, set
 }
 
 /* ---------------- Download menu ---------------- */
-function DownloadMenu({ template, content, format, slides, busy, setBusy, onToast }) {
+function DownloadMenu({ template, content, format, slides, sizeLock, busy, setBusy, onToast }) {
   const [open, setOpen] = useState(false)
   const [prog, setProg] = useState(null)     // {hechas, total}
   const isCarousel = slides && slides.length > 0
@@ -1965,18 +1992,18 @@ function DownloadMenu({ template, content, format, slides, busy, setBusy, onToas
       {open && (
         <div className="menu-pop">
           <div className="grp">Recomendado</div>
-          <button className="rec" onClick={() => run(() => exportPiece({ template, content, format, kind: 'png', scale: 3 }), 'PNG @3x')}>
+          <button className="rec" onClick={() => run(() => exportPiece({ template, content, format, kind: 'png', scale: 3, sizeLock }), 'PNG @3x')}>
             <span>PNG — listo para redes</span><span>@3x</span>
           </button>
           <div className="grp">Otras opciones</div>
-          <button onClick={() => run(() => exportPiece({ template, content, format, kind: 'png', scale: 2 }), 'PNG @2x')}><span>PNG más liviano</span><span>@2x</span></button>
-          <button onClick={() => run(() => exportPiece({ template, content, format, kind: 'jpg', scale: 2 }), 'JPG')}><span>JPG</span><span>@2x</span></button>
-          <button onClick={() => run(() => exportPiece({ template, content, format, kind: 'svg' }), 'SVG')}><span>SVG — vectorial</span><span>∞</span></button>
+          <button onClick={() => run(() => exportPiece({ template, content, format, kind: 'png', scale: 2, sizeLock }), 'PNG @2x')}><span>PNG más liviano</span><span>@2x</span></button>
+          <button onClick={() => run(() => exportPiece({ template, content, format, kind: 'jpg', scale: 2, sizeLock }), 'JPG')}><span>JPG</span><span>@2x</span></button>
+          <button onClick={() => run(() => exportPiece({ template, content, format, kind: 'svg', sizeLock }), 'SVG')}><span>SVG — vectorial</span><span>∞</span></button>
           {isCarousel && (
             <>
               <div className="grp">Carrusel ({slides.length} slides)</div>
-              <button onClick={() => run(() => exportCarousel({ slides, format, kind: 'zip', scale: 3, onProgress }), 'ZIP de PNGs')}><span>ZIP de PNGs</span><span>@3x</span></button>
-              <button onClick={() => run(() => exportCarousel({ slides, format, kind: 'pdf', scale: 2, onProgress }), 'PDF')}><span>PDF</span><span>multipágina</span></button>
+              <button onClick={() => run(() => exportCarousel({ slides, format, kind: 'zip', scale: 3, onProgress, sizeLock }), 'ZIP de PNGs')}><span>ZIP de PNGs</span><span>@3x</span></button>
+              <button onClick={() => run(() => exportCarousel({ slides, format, kind: 'pdf', scale: 2, onProgress, sizeLock }), 'PDF')}><span>PDF</span><span>multipágina</span></button>
             </>
           )}
         </div>

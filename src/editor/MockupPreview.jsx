@@ -49,14 +49,14 @@ function Vecino({ alto, cortadoArriba = false }) {
   )
 }
 
-export default function MockupPreview({ template, content, format, mockup = 'ig', dark = false, safeZones = false, slides = null }) {
+export default function MockupPreview({ template, content, format, mockup = 'ig', dark = false, safeZones = false, slides = null, sizeLock = null }) {
   // Un carrusel se veía como UNA pieza suelta: no se podía revisar cómo
   // encadena. Acá se pasa slide por slide, con los puntos de Instagram.
   const carrusel = slides && slides.length > 1
   const [i, setI] = React.useState(0)
   const idx = Math.min(i, carrusel ? slides.length - 1 : 0)
   const act = carrusel ? slides[idx] : { template, content }
-  const piece = <PiecePreview template={act.template} content={act.content} format={format} />
+  const piece = <PiecePreview template={act.template} content={act.content} format={format} sizeLock={sizeLock} />
   const ar = `${format.w} / ${format.h}`
   const dk = dark ? ' dark' : ''
   const nav = carrusel && (
