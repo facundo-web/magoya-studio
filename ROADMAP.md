@@ -346,23 +346,23 @@ abajo sale de ahí.
 "Efectos" pasa a llamarse **Fondo**, tonos claros, panel lateral que no se
 puede esconder del todo.)
 
+| L9 | **Split en el motor** + 4 plantillas nuevas de las referencias | "más plantillas con más estilos de diseño, que ya estén armados" |
+| L10 | Las piezas libres conservan **su propio texto** en la galería | "los textos no son representativos de lo que hay adentro" |
+| L11 | **Foto de fondo en cualquier plantilla** (`bg` manda sobre la plantilla) | "debería poder permitirte una vez que lo estás editando" |
+| L12 | **Desenfoque y Oscurecer** por foto | "si querés que sea más blureada" |
+| L13 | La **ventana**: marco blanco, y adentro captura *o* texto *o* esqueleto | "este quedó mal… le falta mejora" |
+
 ### Pendiente
 
-1. **Más plantillas, con la decoración ya puesta.** Es *el* pedido. Del set
-   de referencias que mandaron: split vertical (foto a un lado, texto al
-   otro), placa de speakers con dos retratos, tarjeta de evento sobre foto,
+1. **Más plantillas todavía.** Van 4 (Foto al costado, Miniatura de YouTube,
+   Quiénes hablan, Evento sobre foto). Del set de referencias quedan:
    celular con notificaciones, cuenta regresiva con numeral gigante,
-   miniatura de YouTube (Inés la nombró como su caso concreto).
-2. **La forma "ventana"** quedó mal — "este sería como si fuera una ventana
-   de algo… le falta mejora".
-3. **El logo se ve flojo** — "este logo me parece que queda como muy por
+   collage de fotos con stickers, tabla/calendario con la fecha marcada.
+2. **El logo se ve flojo** — "este logo me parece que queda como muy por
    debajo".
-4. **Más variación de color** en el conjunto de la pieza.
-5. **El viewport de la home**: "no se ven todos los elementos bien, quedó
-   todo como muy grande, y los textos no son representativos".
-6. **Foto: blanco y negro / desenfoque por foto**, no sólo por plantilla.
-7. **Fondo en una plantilla que no lo trae**: "debería poder permitirte una
-   vez que lo estás editando".
+3. **Más variación de color** en el conjunto de la pieza.
+4. **El viewport de la home**: "no se ven todos los elementos bien, quedó
+   todo como muy grande". (Los textos ya son los de cada plantilla.)
 
 ### Fuera de alcance por ahora (decidido con Facu)
 
