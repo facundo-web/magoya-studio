@@ -352,17 +352,32 @@ puede esconder del todo.)
 | L12 | **Desenfoque y Oscurecer** por foto | "si querés que sea más blureada" |
 | L13 | La **ventana**: marco blanco, y adentro captura *o* texto *o* esqueleto | "este quedó mal… le falta mejora" |
 
+| L14 | **8 plantillas nuevas** de las referencias · 30 en total | "más plantillas con más estilos de diseño, que ya estén armados" |
+| L15 | El logo pasa a 0.24 del lado corto, con sombra sobre foto | "queda como muy por debajo" |
+| L16 | **8 esquemas de color** (Verde digital, Verde medio, Lime, Arena) + acento Crema | "que tenga más variación de colores" |
+| L17 | Galería de 178/150 a 146/124: seis por fila | "no te entra todo acá, quedó todo muy grande" |
+| L18 | Lo que el motor sabía y no se podía activar: ángulo del degradé, etiqueta en contorno, zoom de la captura, reflejo del dispositivo, color del tile | — |
+| L19 | Dos pestañas ya no se pisan (`rev` por proyecto, sin merge automático) | auditoría |
+| L20 | Volanta manuscrita medida con su tipografía · `fitText` corta con puntos suspensivos · campo Valores · nombres accesibles | auditoría |
+
+### Bugs que aparecieron haciendo lo de arriba
+
+- El rol `cta` estaba en `STACK_ORDER` pero no en `resolvePiece`: una
+  plantilla clásica que lo declarara lo perdía en silencio.
+- Los paneles de foto vacíos no rotaban (`imageCover` no aceptaba rotación),
+  así que en la galería una plantilla inclinada se veía derecha.
+- Un `useEffect` colocado arriba de la declaración de su dependencia:
+  ReferenceError en render, pantalla en blanco, y el build compilando igual.
+- Un acento verde sobre los fondos verdes nuevos era invisible. `acentoLegible()`
+  mide contraste real y cae al del esquema.
+
 ### Pendiente
 
-1. **Más plantillas todavía.** Van 4 (Foto al costado, Miniatura de YouTube,
-   Quiénes hablan, Evento sobre foto). Del set de referencias quedan:
-   celular con notificaciones, cuenta regresiva con numeral gigante,
-   collage de fotos con stickers, tabla/calendario con la fecha marcada.
-2. **El logo se ve flojo** — "este logo me parece que queda como muy por
-   debajo".
-3. **Más variación de color** en el conjunto de la pieza.
-4. **El viewport de la home**: "no se ven todos los elementos bien, quedó
-   todo como muy grande". (Los textos ya son los de cada plantilla.)
+1. **Una forma "panel"**: un rectángulo de color rotable, sin texto ni
+   cromo de ventana. Lo pidió el collage y no existe.
+2. **Chat**: apenas responde al color de fondo elegido.
+3. **El aviso de "achicamos la foto"** se perdió en alguna refactorización.
+4. **Fotos rotadas dentro de un marco** pueden desplazarse del encuadre.
 
 ### Fuera de alcance por ahora (decidido con Facu)
 
