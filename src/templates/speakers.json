@@ -17,18 +17,61 @@
     "showLogo": true,
     "density": "compact",
     "textBlocks": [
-      { "style": "kicker", "text": "QUIÉNES HABLAN" },
-      { "style": "title", "text": "Dos que lo hicieron, no dos que lo leyeron" },
-      { "style": "subtitle", "text": "Nombre Apellido\nRol · Magoya" },
-      { "style": "subtitle", "text": "Nombre Apellido\nRol · empresa" }
+      {
+        "style": "kicker",
+        "text": "QUIÉNES HABLAN"
+      },
+      {
+        "style": "title",
+        "text": "Dos que lo hicieron"
+      },
+      {
+        "style": "subtitle",
+        "text": "Nombre Apellido\nRol · Magoya"
+      },
+      {
+        "style": "subtitle",
+        "text": "Nombre Apellido\nRol · empresa"
+      }
     ],
     "pos": {
-      "tb:2": { "x": 0.08, "y": 0.78 },
-      "tb:3": { "x": 0.54, "y": 0.78 }
+      "tb:2": {
+        "x": 0.07,
+        "y": 0.755
+      },
+      "tb:3": {
+        "x": 0.53,
+        "y": 0.755
+      }
     },
     "objects": [
-      { "kind": "image", "frame": true, "x": 0.28, "y": 0.53, "scale": 0.38, "ratio": 1.2, "radius": 0.1, "rotation": 0, "shadow": true, "opacity": 1 },
-      { "kind": "image", "frame": true, "x": 0.72, "y": 0.53, "scale": 0.38, "ratio": 1.2, "radius": 0.1, "rotation": 0, "shadow": true, "opacity": 1 }
-    ]
+      {
+        "kind": "image",
+        "frame": true,
+        "x": 0.28,
+        "y": 0.53,
+        "scale": 0.34,
+        "ratio": 1.2,
+        "radius": 0.1,
+        "rotation": 0,
+        "shadow": true,
+        "opacity": 1
+      },
+      {
+        "kind": "image",
+        "frame": true,
+        "x": 0.72,
+        "y": 0.53,
+        "scale": 0.34,
+        "ratio": 1.2,
+        "radius": 0.1,
+        "rotation": 0,
+        "shadow": true,
+        "opacity": 1
+      }
+    ],
+    "sizes": {
+      "title": 0.7
+    }
   }
 }

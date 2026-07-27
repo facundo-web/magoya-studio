@@ -128,7 +128,10 @@ export function resolvePiece(template, content) {
     // logo automático: lo decide el contraste con el fondo. Es la regla de
     // marca que menos debería depender del criterio de cada uno.
     logo: c.logo || d.logo || (onPhoto ? 'cream' : (COLOR_SCHEMES[c.scheme || d.scheme || DEFAULT_SCHEME]?.onSurface === '#0D0C0C' ? 'black' : 'cream')),
-    treatment: c.treatment || d.treatment || 'bw',
+    // B&N es la regla de arte para las plantillas PENSADAS con foto. Si una
+    // plantilla sólida recibe una foto porque la persona la puso, ponerla en
+    // gris sin que nadie lo pida es una sorpresa, no una regla.
+    treatment: c.treatment || d.treatment || (template.surface === 'photo' || d.hasPhoto ? 'bw' : 'color'),
     photo: c.photo || null,
     gradient: c.gradient !== undefined ? c.gradient : d.gradient || null,
     // posición libre por bloque de texto (eid → {x,y} relativo 0..1).

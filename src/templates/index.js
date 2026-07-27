@@ -184,6 +184,17 @@ export function applyDesign(nuevo, copyDe = {}, o = {}) {
   // esa slide manda: puede tener el acento o el fondo ya tocados a mano
   if (o.disenoDe) DESIGN_KEYS.forEach((k) => { if (o.disenoDe[k] !== undefined) base[k] = o.disenoDe[k] })
 
+  // NO heredar el copy de muestra de la plantilla nueva. `placeholderContent`
+  // llena todos los roles con placeholders porque sirve para arrancar una
+  // pieza; acá estamos cambiando el diseño de algo YA escrito, y dejarlos
+  // hacía aparecer frases que nadie tipeó ("IA APLICADA" plantada en la
+  // portada de un carrusel). Los roles se llenan sólo con lo que había.
+  //
+  // Van en '' y no borrados: el motor hace `pick(content[rol], defaults[rol])`,
+  // así que un rol AUSENTE cae igual al texto de fábrica de la plantilla.
+  // La cadena vacía es lo único que dice "acá no va nada".
+  COPY_ROLES.forEach((r) => { base[r] = '' })
+
   // ---- juntar todo el copy que había, venga de roles o de bloques ----
   const bolsa = {}
   COPY_ROLES.forEach((r) => {
@@ -194,6 +205,12 @@ export function applyDesign(nuevo, copyDe = {}, o = {}) {
     const k = b.style || 'title'
     if (bolsa[k] === undefined && String(b.text || '').trim() !== '') bolsa[k] = b.text
   })
+  // Lo que quedó guardado de un cambio de diseño anterior vuelve a estar
+  // disponible: si pasás de tres roles a dos y después volvés a tres, la
+  // bajada tiene que reaparecer en vez de haberse perdido para siempre.
+  Object.entries(copyDe.__guardado || {}).forEach(([k, v]) => {
+    if (bolsa[k] === undefined && String(v || '').trim() !== '') bolsa[k] = v
+  })
   const tomar = (rol) => {
     for (const k of (PARECIDOS[rol] || [rol])) {
       if (bolsa[k] !== undefined) { const v = bolsa[k]; delete bolsa[k]; return v }
@@ -203,11 +220,21 @@ export function applyDesign(nuevo, copyDe = {}, o = {}) {
 
   if (nuevo.freeform) {
     // en las piezas libres los bloques SON de la persona: se pasan tal
-    // cual, con su tamaño, resaltado y color.
+    // cual, con su tamaño, resaltado y color. Una pieza libre acepta
+    // cualquier estilo, así que acá no se pierde nada.
     const suyos = (copyDe.textBlocks || []).filter((b) => String(b.text || '').trim() !== '')
-    base.textBlocks = suyos.length
-      ? suyos.map((b) => ({ ...b }))
-      : REPARTO.filter((r) => bolsa[r] !== undefined).map((r) => ({ style: r, text: bolsa[r] }))
+    if (suyos.length) {
+      base.textBlocks = suyos.map((b) => ({ ...b }))
+      suyos.forEach((b) => delete bolsa[b.style || 'title'])
+    } else {
+      const desdeRoles = REPARTO.filter((r) => bolsa[r] !== undefined)
+      if (desdeRoles.length) {
+        base.textBlocks = desdeRoles.map((r) => ({ style: r, text: bolsa[r] }))
+        desdeRoles.forEach((r) => delete bolsa[r])
+      }
+      // si no había NADA escrito, se quedan los bloques de muestra de la
+      // plantilla: una pieza libre vacía no se puede ni ver
+    }
   } else {
     const declarados = nuevo.roles || []
     REPARTO.filter((r) => declarados.includes(r)).forEach((r) => {
@@ -215,6 +242,13 @@ export function applyDesign(nuevo, copyDe = {}, o = {}) {
       if (v !== undefined) base[r] = v
     })
   }
+
+  // Lo que no encontró lugar en el diseño nuevo NO se tira: queda a un
+  // costado. Antes desaparecía sin aviso — probabas un diseño con menos
+  // roles, volvías, y esa frase ya no existía.
+  const sobrante = {}
+  Object.entries(bolsa).forEach(([k, v]) => { if (String(v || '').trim() !== '') sobrante[k] = v })
+  if (Object.keys(sobrante).length) base.__guardado = sobrante
 
   // la foto es de la persona, no del diseño
   if (copyDe.photo) base.photo = copyDe.photo

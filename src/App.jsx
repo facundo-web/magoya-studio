@@ -519,10 +519,22 @@ export default function App() {
     // Cambia el DISEÑO y conserva lo escrito. Antes se pasaba el content
     // entero y el diseño viejo le ganaba a la plantilla nueva: elegías otro
     // diseño y no cambiaba nada visible (lo vimos con Aye en vivo).
-    mutatePieces((ps) => ps.map((p, i) => (
-      i === active ? { template, content: applyDesign(template, p.content, { plantillaVieja: p.template }) } : p
-    )))
-    showToast('Listo: mismo texto, diseño nuevo')
+    let guardado = null
+    mutatePieces((ps) => ps.map((p, i) => {
+      if (i !== active) return p
+      const content = applyDesign(template, p.content, { plantillaVieja: p.template })
+      guardado = content.__guardado
+      return { template, content }
+    }))
+    // Si el diseño nuevo tiene menos lugares que el viejo, algo de lo escrito
+    // no entra. No se pierde (vuelve solo si cambiás a un diseño que lo
+    // acepte), pero hay que decirlo: si no, ves desaparecer una frase.
+    const faltan = guardado ? Object.keys(guardado).length : 0
+    showToast(faltan
+      ? (faltan === 1
+        ? 'Diseño nuevo. Un texto no entra acá: queda guardado y vuelve si elegís un diseño que lo tenga.'
+        : `Diseño nuevo. ${faltan} textos no entran acá: quedan guardados y vuelven si elegís un diseño que los tenga.`)
+      : 'Listo: mismo texto, diseño nuevo')
   }
   // "quiero combinar diseños y no es muy claro cómo hacerlo" (Aye).
   // Combinar = que las slides se parezcan entre sí. Esto toma la slide en
@@ -530,13 +542,16 @@ export default function App() {
   function applyDesignToAll() {
     const src = pieces[active]
     if (!src || pieces.length < 2) return
-    mutatePieces((ps) => ps.map((p, i) => (
-      i === active ? p : {
-        template: src.template,
-        content: applyDesign(src.template, p.content, { disenoDe: src.content, plantillaVieja: p.template }),
-      }
-    )))
-    showToast(`Diseño aplicado a las otras ${pieces.length - 1} slides — los textos quedaron`, true)
+    let conGuardado = 0
+    mutatePieces((ps) => ps.map((p, i) => {
+      if (i === active) return p
+      const content = applyDesign(src.template, p.content, { disenoDe: src.content, plantillaVieja: p.template })
+      if (content.__guardado) conGuardado++
+      return { template: src.template, content }
+    }))
+    showToast(conGuardado
+      ? `Diseño aplicado a las otras ${pieces.length - 1} slides. En ${conGuardado === 1 ? 'una' : conGuardado} hay texto que este diseño no tiene dónde poner: queda guardado.`
+      : `Diseño aplicado a las otras ${pieces.length - 1} slides — los textos quedaron`, true)
   }
   function deleteSlide(i) {
     if (pieces.length <= 1) { showToast('Es la única slide: no se puede borrar'); return }

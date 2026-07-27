@@ -311,9 +311,11 @@ export default function Editor({
   // foto: subir → dataURL (compartido entre panel y overlay)
   const onPhotoFile = async (file) => {
     if (!file || !file.type.startsWith('image/')) return onToast('Ese archivo no es una imagen')
-    const big = file.size > 8 * 1024 * 1024
-    const src = await compressImage(file)
-    if (big) onToast('Achicamos la foto para que entre — se ve igual de bien')
+    // el aviso salía por PESO del archivo, que no es lo que dispara el
+    // achique: una foto de 3 MB y 4000 px se achicaba en silencio
+    let info = null
+    const src = await compressImage(file, 2048, 0.85, (i) => { info = i })
+    if (info?.achicada) onToast(`Foto achicada de ${info.deW}×${info.deH} a ${info.aW}×${info.aH} — entra igual en alta calidad`)
     const natural = await imageSize(src)
     set({ photo: { src, natural, focal: content.photo?.focal || { x: 0.5, y: 0.5 } } })
   }
@@ -1308,7 +1310,11 @@ function ObjectsBody({ objects, setObjects, selObj, setSelObj, objRemove, onToas
   }
   const addImage = async (file) => {
     if (!file || !file.type.startsWith('image/')) return onToast('No es una imagen')
-    const src = await compressImage(file, OBJ_MAX)
+    // Este camino achica MÁS que el de fondo (1400 px contra 2048) y era el
+    // único que no avisaba nada.
+    let info = null
+    const src = await compressImage(file, OBJ_MAX, 0.85, (i) => { info = i })
+    if (info?.achicada) onToast(`Foto achicada de ${info.deW}×${info.deH} a ${info.aW}×${info.aH} — entra igual en alta calidad`)
     let elementId
     const nice = file.name.replace(/\.[^.]+$/, '')
     if (onAddElement) { const el = await onAddElement({ name: nice, src }); elementId = el?.id }

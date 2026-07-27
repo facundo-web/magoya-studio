@@ -30,23 +30,46 @@ export function measure(text, { px, weight, tracking = 0, family }) {
   return base + spacing
 }
 
-// parte un texto en líneas que entran en maxWidth
-export function wrapText(text, { px, weight, tracking = 0, maxWidth, family }) {
-  const words = String(text).split(/\s+/).filter(Boolean)
-  if (!words.length) return ['']
-  const lines = []
-  let line = words[0]
-  for (let i = 1; i < words.length; i++) {
-    const test = line + ' ' + words[i]
-    if (measure(test, { px, weight, tracking, family }) <= maxWidth) {
-      line = test
-    } else {
-      lines.push(line)
-      line = words[i]
-    }
+// Parte una palabra que NO entra ni sola: una URL, un hashtag, el nombre
+// largo de un producto. Antes se devolvía entera en una línea y el texto
+// se iba de la pieza sin achicarse ni avisar — con
+// "magoya.com/informes-agronomicos-automatizados" la caja llegaba a
+// x=2408 en un lienzo de 1080.
+function partirPalabra(w, opts, maxWidth) {
+  const trozos = []
+  let actual = ''
+  for (const ch of String(w)) {
+    const test = actual + ch
+    if (actual && measure(test, opts) > maxWidth) { trozos.push(actual); actual = ch }
+    else actual = test
   }
-  lines.push(line)
-  return lines
+  if (actual) trozos.push(actual)
+  return trozos.length ? trozos : ['']
+}
+
+// parte un texto en líneas que entran en maxWidth.
+// Los saltos de línea que escribió la persona se respetan: antes `\n` se
+// trataba como un espacio más y "Nombre\nRol" salía en un solo renglón.
+export function wrapText(text, { px, weight, tracking = 0, maxWidth, family }) {
+  const opts = { px, weight, tracking, family }
+  const parrafos = String(text).split(/\r?\n/)
+  const lines = []
+  for (const parrafo of parrafos) {
+    const words = parrafo.split(/[ \t]+/).filter(Boolean)
+    if (!words.length) { lines.push(''); continue }
+    let line = null
+    for (const w of words) {
+      const trozos = measure(w, opts) > maxWidth ? partirPalabra(w, opts, maxWidth) : [w]
+      for (const t of trozos) {
+        if (line === null) { line = t; continue }
+        const test = line + ' ' + t
+        if (measure(test, opts) <= maxWidth) line = test
+        else { lines.push(line); line = t }
+      }
+    }
+    if (line !== null) lines.push(line)
+  }
+  return lines.length ? lines : ['']
 }
 
 // auto-encaja un texto en un box: baja el tamaño hasta que entra en
