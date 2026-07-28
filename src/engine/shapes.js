@@ -91,7 +91,13 @@ export function dotsCircles(w, count = 5, active = 0) {
 }
 
 // ---- CHROME de captura (barra tipo ventana) ----
+// Los tres puntitos de la barra de título. Estaban mal medidos: el radio
+// era 0.18 de la barra (diámetro 0.36) pero los centros iban cada 0.34, o
+// sea que se PISABAN entre sí y se leían como una mancha. Ahora respetan la
+// proporción real de macOS —diámetro ~0.42 de la barra, separación ~0.71—
+// y llevan sus colores, que es lo que hace que se reconozca la ventana.
+const SEMAFORO = ['#FF5F57', '#FEBC2E', '#28C840']
 export function windowChrome(w, barH) {
-  const r = barH * 0.18
-  return [0.28, 0.62, 0.96].map((f) => ({ cx: n(barH * f), cy: n(barH / 2), r: n(r) }))
+  const r = barH * 0.21
+  return SEMAFORO.map((color, i) => ({ cx: n(barH * (0.72 + i * 0.71)), cy: n(barH / 2), r: n(r), color }))
 }

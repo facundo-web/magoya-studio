@@ -790,7 +790,6 @@ function drawShape(b, { o, W, H, ref, accent, scheme }) {
     const soft = conSombra(o) ? b.filter({ kind: 'soft', r: ref * 0.02, dy: ref * 0.012, opacity: 0.32 }) : null
     // el color elegido pinta el marco (antes las swatches no hacían nada)
     const marco = o.fill || color || '#FFFFFF'
-    const cromo = contrastOn(marco) === '#0D0C0C' ? '#D8DBDE' : 'rgba(255,255,255,.35)'
     b.path({ d: roundRect(x0, y0, w, h, r), fill: marco, rotation: rot, cx, cy, flipX, opacity: op, filterId: soft })
     // cuerpo de la ventana: una captura, un texto, o el esqueleto de
     // "acá va la captura". Antes, sin foto, quedaba una caja de color
@@ -817,9 +816,17 @@ function drawShape(b, { o, W, H, ref, accent, scheme }) {
     } else {
       b.imageCover({ x: bx, y: by, w: bw, h: bh, href: null, rotation: rot, rcx: cx, rcy: cy })
     }
-    // 7 · el chrome también rota: antes el marco giraba y los puntitos no
-    const dCromo = windowChrome(w, barH).map((c) => roundRect(x0 + c.cx - c.r, y0 + c.cy - c.r, c.r * 2, c.r * 2, c.r)).join(' ')
-    b.path({ d: dCromo, fill: cromo, rotation: rot, cx, cy, flipX, opacity: op })
+    // 7 · el chrome también rota: antes el marco giraba y los puntitos no.
+    // Cada punto va con su color: es lo que hace que se lea "ventana" de una.
+    // Sobre un marco oscuro se aclaran apenas para que no se apaguen.
+    const marcoClaro = contrastOn(marco) === '#0D0C0C'
+    windowChrome(w, barH).forEach((c) => {
+      b.path({
+        d: circlePath(x0 + c.cx, y0 + c.cy, c.r),
+        fill: marcoClaro ? c.color : mix(c.color, '#FFFFFF', 0.25),
+        rotation: rot, cx, cy, flipX, opacity: op,
+      })
+    })
     if (o.text) {
       const px = barH * 0.5
       b.text({ x: cx, y: y0 + (barH - px) / 2 - px * 0.05, lines: [String(o.text)], px, weight: 600,

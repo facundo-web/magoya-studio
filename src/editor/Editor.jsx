@@ -716,6 +716,13 @@ export default function Editor({
                   <StepsBody content={content} template={template} set={set} />
                 </>
               )}
+              {/* Sumar una línea suelta se podía sólo en las piezas libres:
+                  en una cita o en un titular no había forma, y no hay razón
+                  — el motor dibuja los bloques igual en cualquier plantilla.
+                  "quiero agregar un texto y moverlo" (Aye). */}
+              <div className="panel-title" style={{ marginTop: 16 }}>Textos sueltos</div>
+              <p className="panel-help">Los que sumás vos. Arrastralos en la pieza para ubicarlos donde quieras.</p>
+              <TextBlocksBody content={content} set={set} onSelectText={onSelectText} selText={selText} />
             </>
           )
         )}
