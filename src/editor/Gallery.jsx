@@ -1,6 +1,7 @@
 import React, { useRef } from 'react'
 import { TEMPLATES, demoContent } from '../templates/index.js'
 import { CAROUSELS, buildCarousel } from '../templates/carousels.js'
+import { masUsadas } from '../project/uso.js'
 import { FORMATS_BY_ID, formatsByNetwork } from '../formats/registry.js'
 import PiecePreview from './PiecePreview.jsx'
 import Icon from '../ui/Icon.jsx'
@@ -39,6 +40,12 @@ export default function Gallery({
   const fmt = galleryFormat
   const groups = formatsByNetwork()
   const byId = Object.fromEntries(templates.map((t) => [t.id, t]))
+
+  // Lo que el equipo YA usa, arriba de todo. Sale de las descargas, no de
+  // una encuesta: "volver sobre las piezas que más te sirvieron" (Lucho).
+  // Aparece recién cuando hay señal de verdad, para que la home no arranque
+  // con una sección vacía.
+  const usadas = React.useMemo(() => masUsadas(templates.filter((t) => !t.hidden)), [templates, filter])
 
   const visible = templates.filter((t) => {
     if (t.hidden) return false        // es variante de otra, no plantilla propia
@@ -199,6 +206,24 @@ export default function Gallery({
                 </div>
               )
             })}
+          </div>
+        </div>
+      )}
+
+      {/* Lo que más usan, cuando ya hay datos */}
+      {usadas.length > 0 && (
+        <div className="h3-recent">
+          <div className="h3-trow"><span className="h3-label">Las que más usás</span></div>
+          <div className="h3-grid">
+            {usadas.map(({ t, veces }) => (
+              <div key={t.id} className="h3-card">
+                <button className="h3-thumb" onClick={() => onPick(t, fmt)} title={t.purpose}>
+                  <PiecePreview template={t} content={demoContent(t)} format={fmt} />
+                </button>
+                <div className="h3-name">{t.name}</div>
+                <div className="purpose">{veces} descargas</div>
+              </div>
+            ))}
           </div>
         </div>
       )}

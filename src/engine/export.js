@@ -5,6 +5,7 @@
 // ============================================================
 
 import { renderPieceSVG } from './render.js'
+import { registrarUso } from '../project/uso.js'
 
 // woff2 de @fontsource (Vite los resuelve a URLs)
 import w400 from '@fontsource/manrope/files/manrope-latin-400-normal.woff2'
@@ -129,6 +130,8 @@ export function setProjectExportName(name) {
 
 // export de UNA pieza
 export async function exportPiece({ template, content, format, kind = 'png', scale = 2, sizeLock = null }) {
+  // bajarla ES la señal de que la plantilla sirvió (ver project/uso.js)
+  registrarUso(template?.id)
   const name = slugify((content && content.title) || template.name) + '-' + format.id
   if (kind === 'svg') {
     const fontFaceCss = await buildFontFaceCss()
@@ -147,6 +150,9 @@ export async function exportPiece({ template, content, format, kind = 'png', sca
 // onProgress(hechas, total): un ZIP de 8 slides @3x tarda bastante y el
 // aviso se iba a los 2 s — parecía colgado y la gente recargaba la página.
 export async function exportCarousel({ slides, format, kind = 'zip', scale = 2, name, onProgress, sizeLock = null }) {
+  // un carrusel usa varias plantillas: cuentan todas, cada una una vez
+  const contadas = new Set()
+  ;(slides || []).forEach((s) => { const id = s?.template?.id; if (id && !contadas.has(id)) { contadas.add(id); registrarUso(id) } })
   const fontFaceCss = await buildFontFaceCss()
   // nombre explícito → nombre del proyecto abierto → título de la portada
   const base = slugify(name || _projectName || slides?.[0]?.content?.title || 'carrusel')

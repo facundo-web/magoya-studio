@@ -115,7 +115,7 @@ export async function loadElements() {
 }
 
 function guardarMeta(list) {
-  const meta = list.map(({ id, name, kind, ref }) => ({ id, name, kind, ref }))
+  const meta = list.map(({ id, name, kind, ref, origin }) => ({ id, name, kind, ref, origin }))
   try {
     localStorage.setItem(ELEMENTS_KEY, JSON.stringify(meta))
     return true
@@ -126,15 +126,28 @@ function guardarMeta(list) {
 }
 
 // kind: 'photo' (fotos subidas) | 'element' (logos, PNG recortados, gráficos)
-export async function addElement({ name, src, kind = 'element' }) {
-  const el = { id: newProjectId().replace('p_', 'el_'), name: name || 'Elemento', src, kind }
+// `origin` = de dónde salió, cuando tiene una identidad estable fuera de los
+// bytes (ej: 'magoya:campo-soja', una foto de la biblioteca de marca). Sirve
+// para no guardar dos veces la MISMA foto de biblioteca sólo porque una vez
+// entró a 2048 px (fondo) y otra a 1400 px (encima): son bytes distintos,
+// pero para la persona es la misma foto.
+//
+// Devuelve el elemento con `dup: true` si ya estaba: el caller usa eso para
+// no cantar "guardado" cada vez que volvés a tocar la misma foto.
+export async function addElement({ name, src, kind = 'element', origin } = {}) {
+  let ref
   try {
-    el.ref = await putPhoto(src)
+    ref = await putPhoto(src)
   } catch (e) {
     console.warn('[elements] IndexedDB no disponible', e)
-    return { el, saved: false }
+    return { el: { id: newProjectId().replace('p_', 'el_'), name: name || 'Elemento', src, kind, origin }, saved: false }
   }
   const actuales = metaElements()
+  // Ya está: por bytes (putPhoto hashea el contenido, así que la MISMA
+  // imagen da la MISMA ref) o por origen. No se duplica ni se re-escribe.
+  const ya = actuales.find((e) => e.ref === ref || (origin && e.origin === origin))
+  if (ya) return { el: { ...ya, src, dup: true }, saved: true }
+  const el = { id: newProjectId().replace('p_', 'el_'), name: name || 'Elemento', src, kind, origin, ref }
   const saved = guardarMeta([{ ...el }, ...actuales])
   return { el, saved }
 }
