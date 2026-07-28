@@ -6,7 +6,10 @@
   "surface": "solid",
   "anchor": "bottom-left",
   "motif": false,
-  "roles": ["kicker", "title"],
+  "roles": [
+    "kicker",
+    "title"
+  ],
   "defaults": {
     "scheme": "deep",
     "accent": "emerald",
@@ -16,7 +19,25 @@
     "kicker": "RESULTADO",
     "title": "De 4 planillas a un solo tablero.",
     "objects": [
-      { "kind": "shape", "shape": "bars", "tint": "accent", "x": 0.72, "y": 0.35, "scale": 0.42, "rotation": 0, "shadow": false, "opacity": 1, "values": [3, 4, 4, 6, 9] }
+      {
+        "kind": "shape",
+        "shape": "bars",
+        "tint": "accent",
+        "x": 0.72,
+        "y": 0.35,
+        "scale": 0.42,
+        "rotation": 0,
+        "shadow": false,
+        "opacity": 1,
+        "values": [
+          3,
+          4,
+          4,
+          6,
+          9
+        ]
+      }
     ]
-  }
+  },
+  "objetivo": "prueba"
 }

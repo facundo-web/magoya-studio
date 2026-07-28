@@ -7,7 +7,11 @@
   "anchor": "center-center",
   "motif": false,
   "zocalo": false,
-  "roles": ["kicker", "title", "subtitle"],
+  "roles": [
+    "kicker",
+    "title",
+    "subtitle"
+  ],
   "defaults": {
     "scheme": "studio",
     "accent": "emerald",
@@ -21,5 +25,6 @@
     "kicker": "JUEVES 18 · 11 H",
     "title": "Desayuno AI en campo",
     "subtitle": "Espacio Darwin · Buenos Aires\nCupos limitados, se confirma por mail."
-  }
+  },
+  "objetivo": "webinar"
 }

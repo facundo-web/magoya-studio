@@ -18,19 +18,88 @@
     "rule": "none",
     "vignette": 0.35,
     "textBlocks": [
-      { "style": "kicker", "text": "ALERTAS EN EL CELULAR" },
-      { "style": "title", "text": "Tu lote te escribe al celular" }
+      {
+        "style": "kicker",
+        "text": "ALERTAS EN EL CELULAR"
+      },
+      {
+        "style": "title",
+        "text": "Tu lote te escribe al celular"
+      }
     ],
     "pos": {
-      "tb:0": { "x": 0.06, "y": 0.07 },
-      "tb:1": { "x": 0.06, "y": 0.115 }
+      "tb:0": {
+        "x": 0.06,
+        "y": 0.07
+      },
+      "tb:1": {
+        "x": 0.06,
+        "y": 0.115
+      }
     },
     "objects": [
-      { "kind": "image", "frame": true, "x": 0.52, "y": 0.615, "scale": 0.2716, "ratio": 2.124, "radius": 0.19, "rotation": 0, "shadow": false, "opacity": 1 },
-      { "kind": "device", "deviceId": "devices:phone", "x": 0.52, "y": 0.615, "scale": 0.3, "rotation": 0, "shadow": true, "opacity": 1 },
-      { "kind": "shape", "shape": "callout", "tint": "#ECE3DB", "x": 0.27, "y": 0.4, "scale": 0.34, "rotation": 0, "shadow": true, "opacity": 1, "front": true, "text": "Humedad 18% en lote 7" },
-      { "kind": "shape", "shape": "callout", "tint": "accent", "x": 0.76, "y": 0.585, "scale": 0.34, "rotation": 0, "shadow": true, "opacity": 1, "front": true, "text": "Roya en 3 ha del lote 12" },
-      { "kind": "shape", "shape": "callout", "tint": "#ECE3DB", "x": 0.29, "y": 0.75, "scale": 0.34, "rotation": 0, "shadow": true, "opacity": 1, "front": true, "text": "Tu informe ya está listo" }
+      {
+        "kind": "image",
+        "frame": true,
+        "x": 0.52,
+        "y": 0.615,
+        "scale": 0.2716,
+        "ratio": 2.124,
+        "radius": 0.19,
+        "rotation": 0,
+        "shadow": false,
+        "opacity": 1
+      },
+      {
+        "kind": "device",
+        "deviceId": "devices:phone",
+        "x": 0.52,
+        "y": 0.615,
+        "scale": 0.3,
+        "rotation": 0,
+        "shadow": true,
+        "opacity": 1
+      },
+      {
+        "kind": "shape",
+        "shape": "callout",
+        "tint": "#ECE3DB",
+        "x": 0.27,
+        "y": 0.4,
+        "scale": 0.34,
+        "rotation": 0,
+        "shadow": true,
+        "opacity": 1,
+        "front": true,
+        "text": "Humedad 18% en lote 7"
+      },
+      {
+        "kind": "shape",
+        "shape": "callout",
+        "tint": "accent",
+        "x": 0.76,
+        "y": 0.585,
+        "scale": 0.34,
+        "rotation": 0,
+        "shadow": true,
+        "opacity": 1,
+        "front": true,
+        "text": "Roya en 3 ha del lote 12"
+      },
+      {
+        "kind": "shape",
+        "shape": "callout",
+        "tint": "#ECE3DB",
+        "x": 0.29,
+        "y": 0.75,
+        "scale": 0.34,
+        "rotation": 0,
+        "shadow": true,
+        "opacity": 1,
+        "front": true,
+        "text": "Tu informe ya está listo"
+      }
     ]
-  }
+  },
+  "objetivo": "ensenar"
 }

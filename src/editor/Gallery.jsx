@@ -8,12 +8,21 @@ import Icon from '../ui/Icon.jsx'
 // La home resuelve UNA cosa: cómo arrancás. Tres caminos, siempre visibles.
 // El formato NO se decide acá (se cambia en el editor cuando querés): sacarlo
 // de la home es lo que la hace corta.
+// Los filtros preguntan por lo que la persona SÍ sabe contestar.
+// "Con foto / sin foto" es una pregunta de diseño: alguien de marketing no
+// abre la herramienta pensando eso, abre pensando "vengo a invitar a un
+// webinar". Lucho: "hay que ir reduciéndole el lugar… necesitan menos
+// lugar para pensar o para la duda".
 const FILTERS = [
   { k: 'all', label: 'Todas' },
-  { k: 'photo', label: 'Con foto' },
-  { k: 'solid', label: 'Sin foto' },
+  { k: 'webinar', label: 'Invitar a algo' },
+  { k: 'prueba', label: 'Mostrar un resultado' },
+  { k: 'ensenar', label: 'Explicar algo' },
+  { k: 'anuncio', label: 'Anunciar' },
+  { k: 'equipo', label: 'Equipo y cultura' },
   { k: 'mine', label: 'Mías' },
 ]
+const OBJETIVOS = new Set(['webinar', 'prueba', 'ensenar', 'anuncio', 'equipo', 'cierre'])
 
 export default function Gallery({
   galleryFormat, setGalleryFormat, templates = TEMPLATES, onDeleteTemplate,
@@ -35,8 +44,7 @@ export default function Gallery({
     if (t.hidden) return false        // es variante de otra, no plantilla propia
     if (t.id === 'blank') return false // vive en el acceso grande de arriba
     if (filter === 'mine') return t.custom
-    if (filter === 'photo') return t.surface === 'photo'
-    if (filter === 'solid') return t.surface !== 'photo'
+    if (OBJETIVOS.has(filter)) return t.objetivo === filter
     return true
   })
 

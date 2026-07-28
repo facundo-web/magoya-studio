@@ -9,7 +9,12 @@
   "anchor": "center-left",
   "motif": false,
   "zocalo": false,
-  "roles": ["kicker", "title", "subtitle", "cta"],
+  "roles": [
+    "kicker",
+    "title",
+    "subtitle",
+    "cta"
+  ],
   "defaults": {
     "scheme": "cream",
     "accent": "emerald",
@@ -22,5 +27,6 @@
     "title": "Sumate a la charla de IA en campo",
     "subtitle": "Una hora, casos reales y preguntas abiertas. Sin humo.",
     "cta": "magoya.com/ai-en-campo"
-  }
+  },
+  "objetivo": "libre"
 }

@@ -4,7 +4,7 @@ import { TEMPLATES, MAXCHARS } from '../templates/index.js'
 import { variantsFor, activeVariantId } from '../templates/variants.js'
 import { tamanoComun } from '../engine/layouts.js'
 import { checkCopy, checkPiece } from '../lib/copyCheck.js'
-import MockupPreview, { MOCKUPS } from './MockupPreview.jsx'
+import MockupPreview, { MOCKUPS, mockupsPara } from './MockupPreview.jsx'
 import Icon from '../ui/Icon.jsx'
 import { FORMATS_BY_ID, formatsByNetwork, CAROUSEL_FORMATS } from '../formats/registry.js'
 import { COLOR_SCHEMES, ACCENTS, WORDMARKS, GRADIENTS, HIGHLIGHTS, TEXT_COLORS } from '../brand/brandKit.js'
@@ -245,6 +245,11 @@ export default function Editor({
   const [mockupOpen, setMockupOpen] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
   const [mockup, setMockup] = useState('ig')
+  // si cambiás el formato, el mockup elegido puede dejar de tener sentido
+  useEffect(() => {
+    const ok = mockupsPara(format)
+    if (ok.length && !ok.some((m) => m.k === mockup)) setMockup(ok[0].k)
+  }, [format.id])
   const [mkSafe, setMkSafe] = useState(false)
   const [mkDark, setMkDark] = useState(false)
   const [panel, setPanel] = useState('text')
@@ -982,9 +987,12 @@ export default function Editor({
         <ModalOverlay onClose={() => setMockupOpen(false)} clase="mk-modal" etiqueta="Ver en mockup">
             <div className="mk-modal-head">
               <div className="mk-tabs">
-                {MOCKUPS.map((m) => (
+                {(mockupsPara(format).length ? mockupsPara(format) : MOCKUPS).map((m) => (
                   <button key={m.k} className={mockup === m.k ? 'on' : ''} onClick={() => setMockup(m.k)}>{m.label}</button>
                 ))}
+                {!mockupsPara(format).length && (
+                  <span className="mk-nota">{format.label} no es una medida de estas redes — se ve aproximado.</span>
+                )}
               </div>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 {mockup === 'phone' && (
@@ -1740,7 +1748,7 @@ function ObjectProps({ o, i, updateObject, objRemove, objDuplicate, objBringFron
           )}
         </>
       )}
-      {o.kind === 'icon' && (objIcon?.category === 'agro' || objIcon?.category === 'trazos') && (
+      {o.kind === 'icon' && (objIcon?.category === 'agro' || objIcon?.isMark) && (
         <Ctl label="Grosor del trazo" value={Math.round((o.sw || 1) * 100)} min={40} max={300} step={10} suffix="%"
           onChange={(v) => updateObject(i, { sw: v / 100 }, 'sw')} />
       )}

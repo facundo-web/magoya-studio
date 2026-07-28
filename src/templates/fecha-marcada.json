@@ -17,21 +17,83 @@
     "showLogo": true,
     "rule": "none",
     "textBlocks": [
-      { "style": "kicker", "text": "GUARDÁ LA FECHA" },
-      { "style": "title", "text": "18 SEP", "size": 2 },
-      { "style": "subtitle", "text": "Webinar: cómo leer un mapa de rinde sin ser especialista" },
-      { "style": "cta", "text": "Anotate en magoya.com/webinars" }
+      {
+        "style": "kicker",
+        "text": "GUARDÁ LA FECHA"
+      },
+      {
+        "style": "title",
+        "text": "18 SEP",
+        "size": 2
+      },
+      {
+        "style": "subtitle",
+        "text": "Webinar: cómo leer un mapa de rinde sin ser especialista"
+      },
+      {
+        "style": "cta",
+        "text": "Anotate en magoya.com/webinars"
+      }
     ],
     "pos": {
-      "tb:0": { "x": 0.5, "y": 0.26, "anchor": "middle" },
-      "tb:1": { "x": 0.5, "y": 0.4, "anchor": "middle" },
-      "tb:2": { "x": 0.5, "y": 0.635, "anchor": "middle" },
-      "tb:3": { "x": 0.5, "y": 0.755, "anchor": "middle" }
+      "tb:0": {
+        "x": 0.5,
+        "y": 0.26,
+        "anchor": "middle"
+      },
+      "tb:1": {
+        "x": 0.5,
+        "y": 0.4,
+        "anchor": "middle"
+      },
+      "tb:2": {
+        "x": 0.5,
+        "y": 0.635,
+        "anchor": "middle"
+      },
+      "tb:3": {
+        "x": 0.5,
+        "y": 0.755,
+        "anchor": "middle"
+      }
     },
     "objects": [
-      { "kind": "icon", "iconId": "marks:flourish-circle", "style": "plain", "tint": "accent", "x": 0.5, "y": 0.465, "scale": 0.68, "rotation": 0, "shadow": false, "opacity": 1, "front": true },
-      { "kind": "shape", "shape": "sparkle", "tint": "accent", "x": 0.1, "y": 0.645, "scale": 0.05, "rotation": 0, "shadow": false, "opacity": 1 },
-      { "kind": "shape", "shape": "sparkle", "tint": "accent", "x": 0.9, "y": 0.34, "scale": 0.04, "rotation": 0, "shadow": false, "opacity": 1 }
+      {
+        "kind": "icon",
+        "iconId": "marks:flourish-circle",
+        "style": "plain",
+        "tint": "accent",
+        "x": 0.5,
+        "y": 0.465,
+        "scale": 0.68,
+        "rotation": 0,
+        "shadow": false,
+        "opacity": 1,
+        "front": true
+      },
+      {
+        "kind": "shape",
+        "shape": "sparkle",
+        "tint": "accent",
+        "x": 0.1,
+        "y": 0.645,
+        "scale": 0.05,
+        "rotation": 0,
+        "shadow": false,
+        "opacity": 1
+      },
+      {
+        "kind": "shape",
+        "shape": "sparkle",
+        "tint": "accent",
+        "x": 0.9,
+        "y": 0.34,
+        "scale": 0.04,
+        "rotation": 0,
+        "shadow": false,
+        "opacity": 1
+      }
     ]
-  }
+  },
+  "objetivo": "webinar"
 }

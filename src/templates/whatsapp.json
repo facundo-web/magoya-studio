@@ -12,8 +12,15 @@
     "chatName": "Magoya",
     "chatStatus": "en línea",
     "messages": [
-      { "from": "them", "text": "Che, ¿con qué IA armo informes técnicos y planes de manejo?" },
-      { "from": "me", "text": "Usá Claude o ChatGPT: lenguaje claro, estructura sólida y adaptable a tu contexto." }
+      {
+        "from": "them",
+        "text": "Che, ¿con qué IA armo informes técnicos y planes de manejo?"
+      },
+      {
+        "from": "me",
+        "text": "Usá Claude o ChatGPT: lenguaje claro, estructura sólida y adaptable a tu contexto."
+      }
     ]
-  }
+  },
+  "objetivo": "ensenar"
 }

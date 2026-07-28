@@ -6,7 +6,12 @@
   "surface": "solid",
   "anchor": "center-left",
   "motif": true,
-  "roles": ["metric", "metricLabel", "body", "author"],
+  "roles": [
+    "metric",
+    "metricLabel",
+    "body",
+    "author"
+  ],
   "defaults": {
     "scheme": "cream",
     "accent": "deep",
@@ -16,5 +21,6 @@
     "metricLabel": "abandona una herramienta digital en el primer año",
     "body": "No es adopción. Es onboarding mal diseñado.",
     "author": "Fuente: USDA ERS, 2025"
-  }
+  },
+  "objetivo": "prueba"
 }

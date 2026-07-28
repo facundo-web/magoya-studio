@@ -22,10 +22,20 @@ import avatarUrl from '../brand/assets/magoya-avatar.svg?url'
 // ============================================================
 
 export const MOCKUPS = [
-  { k: 'ig', label: 'Feed Instagram' },
-  { k: 'phone', label: 'Story / Reel' },
-  { k: 'li', label: 'Post LinkedIn' },
+  { k: 'ig', label: 'Feed Instagram', ratios: [[1, 1], [4, 5]] },
+  { k: 'phone', label: 'Story / Reel', ratios: [[9, 16]] },
+  { k: 'li', label: 'Post LinkedIn', ratios: [[1, 1], [4, 5], [1.91, 1]] },
 ]
+
+// Un mockup sólo tiene sentido si la pieza entra en esa red. Antes se
+// ofrecían los tres siempre, así que podías "ver en LinkedIn" una miniatura
+// de YouTube de 1280×720 — Facu: "ese posteo no aplicaría para LinkedIn,
+// las medidas de LinkedIn son otras… es la historia del huevo y la gallina".
+export function mockupsPara(format) {
+  if (!format) return MOCKUPS
+  const r = format.w / format.h
+  return MOCKUPS.filter((m) => m.ratios.some(([a, b]) => Math.abs(r - a / b) < 0.06))
+}
 
 // íconos de UI (stroke, fieles a las apps sin copiar assets de marca)
 const I = {
