@@ -8,7 +8,7 @@ import MockupPreview, { MOCKUPS } from './MockupPreview.jsx'
 import Icon from '../ui/Icon.jsx'
 import { FORMATS_BY_ID, formatsByNetwork, CAROUSEL_FORMATS } from '../formats/registry.js'
 import { COLOR_SCHEMES, ACCENTS, WORDMARKS, GRADIENTS, HIGHLIGHTS, TEXT_COLORS } from '../brand/brandKit.js'
-import { ALL_OBJECTS, ICONS_BY_ID, ICON_CATEGORIES, LIGHT_TILE } from '../brand/iconLibrary.js'
+import { ALL_OBJECTS, ICONS_BY_ID, ICON_CATEGORIES, LIGHT_TILE, TILE_GRADIENT, TILE_SHAPE } from '../brand/iconLibrary.js'
 import { PHOTOS } from '../brand/photoLibrary.js'
 
 // colores para teñir logos "sin fondo" y marcas
@@ -1383,7 +1383,14 @@ function ObjectsBody({ objects, setObjects, selObj, setSelObj, objRemove, onToas
                   return (
                     <button key={icon.id} title={icon.label + ' — tocá o arrastrá a la pieza'} onClick={() => addIcon(icon)}
                       className={'icon-pick' + (asset ? ' asset' : '') + (icon.isShape ? ' shape' : '') + (icon.isMark ? ' mark' : '')}
-                      style={(asset || icon.isShape) ? undefined : { background: LIGHT_TILE[icon.slug] ? '#FFFFFF' : icon.color }}
+                      style={(asset || icon.isShape) ? undefined : {
+                        // la miniatura tiene que mostrar lo que se va a dibujar:
+                        // degradé, círculo o cuadradito, según la marca
+                        background: TILE_GRADIENT[icon.slug]
+                          ? `linear-gradient(${TILE_GRADIENT[icon.slug].angle ?? 135}deg, ${TILE_GRADIENT[icon.slug].stops.map((st) => st.c).join(', ')})`
+                          : LIGHT_TILE[icon.slug] ? '#FFFFFF' : icon.color,
+                        borderRadius: TILE_SHAPE[icon.slug] === 'circle' ? '50%' : undefined,
+                      }}
                       draggable onDragStart={(e) => e.dataTransfer.setData('application/x-magoya', JSON.stringify({ type: 'icon', id: icon.id }))}>
                       {icon.isShape ? <ShapeGlyph shape={icon.shape} /> : <img src={icon.url} alt={icon.label} />}
                     </button>

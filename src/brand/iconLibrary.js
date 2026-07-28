@@ -16,6 +16,40 @@ const markModules = import.meta.glob('./assets/*.svg', { eager: true, query: '?u
 // cosito, no el fondo".
 export const LIGHT_TILE = { googlegemini: '#4285F4', google: '#4285F4' }
 
+// ---- fidelidad de marca ----
+// simple-icons da siluetas de UN color. Varias marcas no son así en la vida
+// real y por eso "no se notan 100% originales": el fondo de Instagram es un
+// degradé, el destello de Gemini va de azul a violeta, y TikTok tiene el
+// desfase cian/magenta. Acá está lo que hace falta para que se parezcan.
+
+// degradé del TILE (el cuadradito de atrás)
+export const TILE_GRADIENT = {
+  instagram: { angle: 45, stops: [
+    { o: 0, c: '#FEDA75' }, { o: 0.25, c: '#FA7E1E' }, { o: 0.5, c: '#D62976' },
+    { o: 0.75, c: '#962FBF' }, { o: 1, c: '#4F5BD5' },
+  ] },
+}
+
+// degradé del GLIFO (para las marcas de tile claro, tipo Gemini)
+export const GLYPH_GRADIENT = {
+  googlegemini: { angle: 120, stops: [
+    { o: 0, c: '#4285F4' }, { o: 0.45, c: '#9B72CB' }, { o: 1, c: '#D96570' },
+  ] },
+}
+
+// forma del tile: en la realidad no todos son cuadraditos redondeados
+export const TILE_SHAPE = {
+  whatsapp: 'circle', telegram: 'circle', reddit: 'circle', facebook: 'circle',
+}
+
+// TikTok: la nota se imprime tres veces, corrida, para el efecto anaglifo
+export const OFFSET_INK = {
+  tiktok: [
+    { color: '#25F4EE', dx: -0.055, dy: -0.035 },
+    { color: '#FE2C55', dx: 0.055, dy: 0.035 },
+  ],
+}
+
 const COLORS = {
   // IA
   openai: '#000000', anthropic: '#D97757', claude: '#D97757', googlegemini: '#4285F4',

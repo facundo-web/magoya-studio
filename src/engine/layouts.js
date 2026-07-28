@@ -9,8 +9,8 @@
 
 import { safeRect } from '../formats/registry.js'
 import { COLOR_SCHEMES, DEFAULT_SCHEME, ACCENTS, TEXT_STYLES, WORDMARKS, WORDMARK_RATIO, MOTIF_ESTRATOS, GRADIENTS, FONT_HAND_STACK, HIGHLIGHTS, TEXT_COLORS } from '../brand/brandKit.js'
-import { ICONS_BY_ID, LIGHT_TILE } from '../brand/iconLibrary.js'
-import { getAsset, coloredIcon } from './assets.js'
+import { ICONS_BY_ID, LIGHT_TILE, TILE_GRADIENT, GLYPH_GRADIENT, TILE_SHAPE, OFFSET_INK } from '../brand/iconLibrary.js'
+import { getAsset, coloredIcon, gradientIcon } from './assets.js'
 import { fitText, measure, wrapText } from './textLayout.js'
 import { arrowPath, handArrowPath, sparklePath, calloutPath, barsRects, sparkline, windowChrome, dotsCircles } from './shapes.js'
 
@@ -669,13 +669,25 @@ function drawObjects(b, { objects, W, H, ref, accent, scheme }) {
       // antes: shadow forzada a false en los trazos → el toggle no hacía nada
       b.object({ cx, cy, size, rotation, flipX, href: coloredIcon(icon.url, tint || icon.color, o.sw || 1), tile: false, shadow, opacity })
     } else {
-      // tile app-icon: squircle color de marca + glifo blanco. Salvo las
-      // que en la realidad son al revés (Gemini): tile blanco, glifo color.
+      // Tile app-icon. El default es squircle de color con glifo blanco,
+      // pero varias marcas no son así y por eso "no se notaban originales":
+      //   · Gemini va al revés (tile claro, glifo de color) y en degradé
+      //   · el fondo de Instagram es un degradé, no un rosa plano
+      //   · WhatsApp, Telegram, Reddit y Facebook son círculos
+      //   · TikTok lleva la nota corrida en cian y magenta debajo
       const claro = LIGHT_TILE[icon.slug]
+      const gGlifo = GLYPH_GRADIENT[icon.slug]
+      const gTile = o.tileColor ? null : TILE_GRADIENT[icon.slug]
+      const capas = (OFFSET_INK[icon.slug] || []).map((k) => ({ ...k, href: coloredIcon(icon.url, k.color) }))
       b.object({
         cx, cy, size, rotation, flipX,
-        href: coloredIcon(icon.url, claro || '#FFFFFF'),
-        tile: true, tileColor: o.tileColor || (claro ? '#FFFFFF' : icon.color), shadow, opacity,
+        href: (gGlifo && gradientIcon(icon.url, gGlifo.stops, gGlifo.angle)) || coloredIcon(icon.url, claro || '#FFFFFF'),
+        tile: true,
+        tileColor: o.tileColor || (claro ? '#FFFFFF' : icon.color),
+        tileGradient: gTile,
+        tileShape: TILE_SHAPE[icon.slug] || 'squircle',
+        offsetInk: capas.length ? capas : null,
+        shadow, opacity,
       })
     }
   }

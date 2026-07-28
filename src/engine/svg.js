@@ -204,7 +204,7 @@ export function createBuilder() {
     // shadow por defecto en FALSE, igual que framedImage: el criterio de toda
     // la app es que la sombra se pide. Dos primitivas con defaults opuestos
     // era la mitad del lío que arrastraba `o.shadow`.
-    object({ cx, cy, size, rotation = 0, flipX = false, href, tile = false, tileColor = '#000', tileRadius = 0.22, shadow = false, iconInset = 0.22, opacity = 1, aspect = 1, extraFilter = null }) {
+    object({ cx, cy, size, rotation = 0, flipX = false, href, tile = false, tileColor = '#000', tileRadius = 0.22, tileShape = 'squircle', tileGradient = null, offsetInk = null, shadow = false, iconInset = 0.22, opacity = 1, aspect = 1, extraFilter = null }) {
       if (!href) return
       const w = size
       const h = size * aspect
@@ -227,10 +227,28 @@ export function createBuilder() {
       const op = opacity < 1 ? ` opacity="${opacity}"` : ''
       let inner = ''
       if (tile) {
-        const r = size * tileRadius
-        const pad = size * iconInset
+        // `tileShape` porque en la realidad no todos son cuadraditos: WhatsApp,
+        // Telegram, Reddit y Facebook son círculos. `tileGradient` porque el
+        // fondo de Instagram es un degradé, no un rosa plano.
+        const r = tileShape === 'circle' ? size / 2 : size * tileRadius
+        const pad = size * (tileShape === 'circle' ? iconInset * 1.15 : iconInset)
+        let relleno = tileColor
+        if (tileGradient?.stops?.length) {
+          const gid = id('tg')
+          const rad = ((tileGradient.angle ?? 135) * Math.PI) / 180
+          defs.push(
+            `<linearGradient id="${gid}" x1="${n(0.5 - Math.cos(rad) / 2)}" y1="${n(0.5 - Math.sin(rad) / 2)}" x2="${n(0.5 + Math.cos(rad) / 2)}" y2="${n(0.5 + Math.sin(rad) / 2)}">` +
+            tileGradient.stops.map((s) => `<stop offset="${s.o}" stop-color="${s.c}"/>`).join('') + '</linearGradient>'
+          )
+          relleno = `url(#${gid})`
+        }
+        // capas corridas debajo del glifo (el anaglifo de TikTok)
+        const capas = (offsetInk || []).map((k) =>
+          `<image href="${k.href}" x="${n(x + pad + size * k.dx)}" y="${n(y + pad + size * k.dy)}" width="${n(size - pad * 2)}" height="${n(size - pad * 2)}" preserveAspectRatio="xMidYMid meet"/>`
+        ).join('')
         inner =
-          `<rect x="${n(x)}" y="${n(y)}" width="${n(size)}" height="${n(size)}" rx="${n(r)}" fill="${tileColor}"/>` +
+          `<rect x="${n(x)}" y="${n(y)}" width="${n(size)}" height="${n(size)}" rx="${n(r)}" fill="${relleno}"/>` +
+          capas +
           `<image href="${href}" x="${n(x + pad)}" y="${n(y + pad)}" width="${n(size - pad * 2)}" height="${n(size - pad * 2)}" preserveAspectRatio="xMidYMid meet"/>`
       } else {
         // OJO: usa w×h, no size×size. Con `aspect` (dispositivos) el alto no

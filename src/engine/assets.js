@@ -59,6 +59,37 @@ export function coloredIcon(url, color, strokeMul = 1) {
   return dataUrl
 }
 
+// Algunas marcas NO son de un solo color: el destello de Gemini va de azul
+// a violeta, y pintarlo plano es lo que hacía que no se leyera como el logo
+// de verdad. simple-icons da la geometría exacta; acá le ponemos el relleno
+// que le corresponde en vez de un color liso.
+const gradCache = new Map()
+export function gradientIcon(url, stops, angle = 135) {
+  if (!url || !stops?.length) return null
+  const key = url + '|' + JSON.stringify(stops) + '|' + angle
+  if (gradCache.has(key)) return gradCache.get(key)
+  const text = iconText.get(url)
+  if (!text) return cache.get(url) || null
+  const rad = (angle * Math.PI) / 180
+  const x1 = (0.5 - Math.cos(rad) / 2).toFixed(3), y1 = (0.5 - Math.sin(rad) / 2).toFixed(3)
+  const x2 = (0.5 + Math.cos(rad) / 2).toFixed(3), y2 = (0.5 + Math.sin(rad) / 2).toFixed(3)
+  const gid = 'g' + Math.abs([...key].reduce((a, c) => (a * 31 + c.charCodeAt(0)) | 0, 7)).toString(36)
+  const def = `<defs><linearGradient id="${gid}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}">` +
+    stops.map((s) => `<stop offset="${s.o}" stop-color="${s.c}"/>`).join('') + '</linearGradient></defs>'
+  let out
+  if (text.includes('currentColor')) {
+    out = text.replace(/currentColor/g, `url(#${gid})`).replace(/<svg([^>]*)>/, (m, a) => `<svg${a}>${def}`)
+  } else {
+    out = text.replace(/<svg([^>]*)>/, (m, attrs) => {
+      const limpio = attrs.replace(/\sfill="[^"]*"/g, '')
+      return `<svg${limpio} fill="url(#${gid})">${def}`
+    })
+  }
+  const dataUrl = svgTextToDataURL(out)
+  gradCache.set(key, dataUrl)
+  return dataUrl
+}
+
 // precarga todos los assets de marca + íconos (una vez, en el boot)
 export async function preloadBrandAssets() {
   const simple = new Set()
