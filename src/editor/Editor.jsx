@@ -3,7 +3,7 @@ import PiecePreview from './PiecePreview.jsx'
 import { TEMPLATES, MAXCHARS } from '../templates/index.js'
 import { variantsFor, activeVariantId } from '../templates/variants.js'
 import { tamanoComun } from '../engine/layouts.js'
-import { checkCopy, checkPiece } from '../lib/copyCheck.js'
+import { checkCopy, checkPiece, checkContrast } from '../lib/copyCheck.js'
 import MockupPreview, { MOCKUPS, mockupsPara } from './MockupPreview.jsx'
 import Icon from '../ui/Icon.jsx'
 import { FORMATS_BY_ID, formatsByNetwork, CAROUSEL_FORMATS } from '../formats/registry.js'
@@ -33,6 +33,48 @@ async function fetchCompressed(url, maxSide = OBJ_MAX) {
   const blob = await (await fetch(url)).blob()
   return compressImage(blob, maxSide)
 }
+
+// ============================================================
+// R1 · TODO LO QUE ENTRA QUEDA EN EL BANCO
+//
+// La biblioteca guardaba sólo lo que subías por el panel Fotos. Todo lo que
+// la persona PRODUCÍA adentro de la herramienta se perdía al cerrar: el
+// recorte de "Quitar fondo" (que baja un modelo de ~5 MB y tarda) y las
+// fotos de la biblioteca Magoya que traías a la pieza. Ahora cualquier
+// imagen que entra o que sale de la herramienta queda también en la
+// biblioteca, con un nombre que se entiende.
+//
+// Se guarda EXACTAMENTE el mismo data-URL que va a la pieza, no una copia
+// recomprimida: putPhoto() hashea el contenido, así que los bytes quedan una
+// sola vez en IndexedDB y los comparten la pieza y la biblioteca.
+// ============================================================
+const DONDE = { photo: 'Mis fotos', element: 'Mis elementos' }
+
+// Devuelve el elemento de la biblioteca — el que se acaba de guardar o el
+// que YA estaba (marcado con `dup`). Siempre devuelve el elemento, aunque
+// fuera duplicado: el `id` es lo que enlaza el objeto de la pieza con su
+// entrada en la biblioteca, y perderlo por haber traído dos veces la misma
+// foto era romper el vínculo justo cuando ya la teníamos.
+async function alBanco(onAddElement, { name, src, kind = 'element', origin }) {
+  if (!onAddElement || !src) return null
+  try {
+    return await onAddElement({ name, src, kind, origin })
+  } catch (e) {
+    console.warn('[biblioteca] no se pudo guardar', e)
+    return null
+  }
+}
+
+// Guarda y avisa en una línea. Sin drama: si ya estaba, no dice nada.
+async function guardarYAvisar(onAddElement, onToast, item) {
+  const el = await alBanco(onAddElement, item)
+  if (el && !el.dup && onToast) onToast(`Guardado en ${DONDE[item.kind || 'element']}: «${el.name}»`)
+  return el
+}
+
+// "recorte de <lo que era>" — el nombre tiene que decir de dónde salió, si
+// no la biblioteca se llena de "Elemento", "Elemento", "Elemento".
+const nombreRecorte = (n) => (String(n || '').trim() ? `Recorte de ${String(n).trim()}` : 'Recorte (fondo quitado)')
 
 const ROLE_LABELS = {
   kicker: 'Etiqueta',
@@ -356,7 +398,10 @@ export default function Editor({
     if (data.type === 'biblioteca') {
       const src = await fetchCompressed(data.url, OBJ_MAX)
       const natural = await imageSize(src)
-      setObjects([...objects, { kind: 'image', src, label: data.label, natural, ...pos, scale: 0.4, rotation: 0, shadow: false, opacity: 1 }])
+      // arrastrada o tocada, es la misma foto entrando a la pieza: queda en
+      // "Mis fotos" por los dos caminos, no sólo por el del click
+      const el = await guardarYAvisar(onAddElement, onToast, { name: data.label, src, kind: 'photo', origin: data.slug ? 'magoya:' + data.slug : undefined })
+      setObjects([...objects, { kind: 'image', src, elementId: el?.id, label: data.label, natural, ...pos, scale: 0.4, rotation: 0, shadow: false, opacity: 1 }])
       setSelObj(objects.length)
       return
     }
@@ -1017,12 +1062,13 @@ export default function Editor({
           <>
             <div className="insp-kicker">Propiedades del elemento</div>
             <ObjectProps o={objects[selObj]} i={selObj} updateObject={updateObject} objRemove={objRemove} objDuplicate={objDuplicate} objBringFront={objBringFront} objSendBack={objSendBack} onToast={onToast}
+              onAddElement={onAddElement}
               goToBg={() => { setSelObj(null); setPanel('photos'); setSheet(true) }} />
           </>
         ) : selText ? (
           <>
             <div className="insp-kicker">Propiedades del texto</div>
-            <TextProps eid={selText} content={content} set={set} getText={getText} setText={setText} onVolverAlStack={volverAlStack} />
+            <TextProps eid={selText} template={template} content={content} set={set} getText={getText} setText={setText} onVolverAlStack={volverAlStack} />
           </>
         ) : (
           <div className="insp-empty">
@@ -1123,16 +1169,19 @@ function FotosBody({ content, template, set, inputRef, onPhotoFile, objects, set
   const [destino, setDestino] = useState('fondo')
   const misFotos = (elements || []).filter((e) => e.kind === 'photo')
 
-  const ponerFondo = async (src) => {
+  // el nombre de la foto de fondo viaja CON la foto: sin esto, al recortarla
+  // el recorte iba a la biblioteca llamándose "Recorte (fondo quitado)" y no
+  // había manera de saber de cuál de las cinco salió
+  const ponerFondo = async (src, name) => {
     const natural = await imageSize(src)
-    set({ bg: 'photo', photo: { src, natural, focal: content.photo?.focal || { x: 0.5, y: 0.5 } } })
+    set({ bg: 'photo', photo: { src, natural, name: name || content.photo?.name, focal: content.photo?.focal || { x: 0.5, y: 0.5 } } })
   }
   const ponerEncima = async (src, elementId, label) => {
     const natural = await imageSize(src)
     setObjects([...objects, enCascada(objects, { kind: 'image', src, elementId, label, natural, x: 0.5, y: 0.5, scale: 0.5, rotation: 0, shadow: false, opacity: 1 })])
     setSelObj(objects.length)
   }
-  const usar = (src, elementId, label) => (destino === 'fondo' && admiteFondo ? ponerFondo(src) : ponerEncima(src, elementId, label))
+  const usar = (src, elementId, label) => (destino === 'fondo' && admiteFondo ? ponerFondo(src, label) : ponerEncima(src, elementId, label))
   const subir = async (file) => {
     if (!file || !file.type.startsWith('image/')) return onToast('Ese archivo no es una imagen')
     // Achicar la foto es una decisión nuestra (si no, el guardado del
@@ -1142,9 +1191,24 @@ function FotosBody({ content, template, set, inputRef, onPhotoFile, objects, set
     const src = await compressImage(file, destino === 'fondo' ? 2048 : OBJ_MAX, 0.85, (i) => { info = i })
     if (info?.achicada) onToast(`Foto achicada de ${info.deW}×${info.deH} a ${info.aW}×${info.aH} — entra igual en alta calidad`)
     const nice = file.name.replace(/\.[^.]+$/, '')
-    let elementId
-    if (onAddElement) elementId = (await onAddElement({ name: nice, src, kind: 'photo' }))?.id
-    usar(src, elementId, nice)
+    // si ya avisamos del achique, no encimamos dos avisos: el guardado se ve
+    // solo en "Mis fotos", que está ahí abajo
+    const el = info?.achicada
+      ? await alBanco(onAddElement, { name: nice, src, kind: 'photo' })
+      : await guardarYAvisar(onAddElement, onToast, { name: nice, src, kind: 'photo' })
+    usar(src, el?.id, nice)
+  }
+  // Una foto de la biblioteca Magoya que traés a la pieza también es tuya:
+  // la próxima vez la tenés a mano en "Mis fotos" sin volver a buscarla.
+  // Se guarda el MISMO data-URL que va a la pieza, así los bytes quedan una
+  // sola vez en IndexedDB. `origin` la identificaría aunque el fondo
+  // (2048 px) y el objeto (1400 px) den bytes distintos — hoy no llega
+  // (App.jsx lo descarta, ver store.js), así que traer la misma foto una vez
+  // de fondo y otra encima deja dos entradas. No rompe nada, sólo repite.
+  const usarDeMagoya = async (p) => {
+    const src = await fetchCompressed(p.url, destino === 'fondo' ? 2048 : OBJ_MAX)
+    const el = await guardarYAvisar(onAddElement, onToast, { name: p.label, src, kind: 'photo', origin: 'magoya:' + p.slug })
+    usar(src, el?.id, p.label)
   }
 
   return (
@@ -1186,8 +1250,8 @@ function FotosBody({ content, template, set, inputRef, onPhotoFile, objects, set
       <div className="photo-lib">
         {PHOTOS.map((p) => (
           <button key={p.slug} className="photo-lib-item" title={p.label}
-            onClick={async () => usar(await fetchCompressed(p.url, destino === 'fondo' ? 2048 : OBJ_MAX), undefined, p.label)}
-            draggable onDragStart={(e) => e.dataTransfer.setData('application/x-magoya', JSON.stringify({ type: 'biblioteca', url: p.url, label: p.label }))}>
+            onClick={() => usarDeMagoya(p)}
+            draggable onDragStart={(e) => e.dataTransfer.setData('application/x-magoya', JSON.stringify({ type: 'biblioteca', url: p.url, label: p.label, slug: p.slug }))}>
             <img src={p.url} alt={p.label} loading="lazy" draggable={false} />
           </button>
         ))}
@@ -1214,6 +1278,7 @@ function FotosBody({ content, template, set, inputRef, onPhotoFile, objects, set
           <Pad2D x={content.photo.focal?.x ?? 0.5} y={content.photo.focal?.y ?? 0.5}
             onChange={(f) => set({ photo: { ...content.photo, focal: f } })} />
           <CutoutButton src={content.photo.src} onToast={onToast}
+            nombre={content.photo.name} onAddElement={onAddElement}
             onDone={(src, natural) => set({ photo: { ...content.photo, src, natural } })} />
         </>
       )}
@@ -1227,7 +1292,10 @@ function FotosBody({ content, template, set, inputRef, onPhotoFile, objects, set
 /* ---------------- Photo ---------------- */
 
 /* ---------------- Quitar fondo (recorte IA, 100% en el navegador) ------------- */
-function CutoutButton({ src, onDone, onToast }) {
+// `nombre` = de qué foto salió el recorte, para poder nombrarlo en la
+// biblioteca. `onAddElement` es lo que hace que el recorte SOBREVIVA: es lo
+// más caro de producir de toda la app y hasta ahora se perdía al cerrar.
+function CutoutButton({ src, onDone, onToast, nombre, onAddElement }) {
   const [busy, setBusy] = useState(false)
   const [pct, setPct] = useState(0)
   const run = async () => {
@@ -1237,7 +1305,9 @@ function CutoutButton({ src, onDone, onToast }) {
       const out = await removeBackground(src, setPct)
       const natural = await imageSize(out)
       onDone(out, natural)
-      onToast && onToast('✓ Fondo quitado')
+      // Un solo aviso, no dos: el recorte y su guardado son el mismo gesto.
+      const el = await alBanco(onAddElement, { name: nombreRecorte(nombre), src: out, kind: 'element' })
+      onToast && onToast(el && !el.dup ? '✓ Fondo quitado — te queda en Mis elementos' : '✓ Fondo quitado')
     } catch (e) {
       console.error(e)
       onToast && onToast('⚠ No se pudo quitar el fondo')
@@ -1330,10 +1400,13 @@ function ObjectsBody({ objects, setObjects, selObj, setSelObj, objRemove, onToas
     let info = null
     const src = await compressImage(file, OBJ_MAX, 0.85, (i) => { info = i })
     if (info?.achicada) onToast(`Foto achicada de ${info.deW}×${info.deH} a ${info.aW}×${info.aH} — entra igual en alta calidad`)
-    let elementId
     const nice = file.name.replace(/\.[^.]+$/, '')
-    if (onAddElement) { const el = await onAddElement({ name: nice, src }); elementId = el?.id }
-    placeImage(src, elementId, nice)
+    // esto YA se guardaba en la biblioteca, pero en silencio: nadie se
+    // enteraba de que el PNG quedaba a mano para la próxima pieza
+    const el = info?.achicada
+      ? await alBanco(onAddElement, { name: nice, src, kind: 'element' })
+      : await guardarYAvisar(onAddElement, onToast, { name: nice, src, kind: 'element' })
+    placeImage(src, el?.id, nice)
   }
   const iconsInCat = cat === 'custom' ? [] : ALL_OBJECTS.filter((i) => i.category === cat)
 
@@ -1530,7 +1603,7 @@ function ValoresInput({ valores, onChange }) {
 }
 
 /* ---------------- Object properties (panel derecho / inspector) ---------------- */
-function ObjectProps({ o, i, updateObject, objRemove, objDuplicate, objBringFront, objSendBack, onToast, goToBg }) {
+function ObjectProps({ o, i, updateObject, objRemove, objDuplicate, objBringFront, objSendBack, onToast, goToBg, onAddElement }) {
   const objIcon = (o.kind === 'icon' || o.kind === 'device') ? ICONS_BY_ID[o.iconId || o.deviceId] : null
   const isMark = !!objIcon?.isMark
   const showTint = o.kind === 'icon' && (isMark || o.style === 'plain')
@@ -1539,13 +1612,18 @@ function ObjectProps({ o, i, updateObject, objRemove, objDuplicate, objBringFron
     const natural = await imageSize(src)
     updateObject(i, { src, natural })
   }
+  // la captura que ponés en una pantalla o en un marco también es una foto
+  // que entró a la herramienta: queda en Mis fotos como cualquier otra
   const onDevFile = async (file) => {
     if (!file || !file.type.startsWith('image/')) return
     const src = await blobToCompressed(file)
+    guardarYAvisar(onAddElement, onToast, { name: file.name.replace(/\.[^.]+$/, ''), src, kind: 'photo' })
     setDevPhoto(src)
   }
-  const useLibPhoto = async (url) => {
-    setDevPhoto(await fetchCompressed(url))
+  const useLibPhoto = async (p) => {
+    const src = await fetchCompressed(p.url)
+    guardarYAvisar(onAddElement, onToast, { name: p.label, src, kind: 'photo', origin: 'magoya:' + p.slug })
+    setDevPhoto(src)
   }
   return (
     <>
@@ -1568,7 +1646,7 @@ function ObjectProps({ o, i, updateObject, objRemove, objDuplicate, objBringFron
           <label style={{ marginTop: 8 }}>o elegí de la biblioteca</label>
           <div className="photo-lib">
             {PHOTOS.slice(0, 9).map((p) => (
-              <button key={p.slug} className="photo-lib-item" title={p.label} onClick={() => useLibPhoto(p.url)}>
+              <button key={p.slug} className="photo-lib-item" title={p.label} onClick={() => useLibPhoto(p)}>
                 <img src={p.url} alt={p.label} loading="lazy" />
               </button>
             ))}
@@ -1595,6 +1673,7 @@ function ObjectProps({ o, i, updateObject, objRemove, objDuplicate, objBringFron
       {o.kind === 'image' && o.src && (
         <>
           <CutoutButton src={o.src} onToast={onToast}
+            nombre={o.label} onAddElement={onAddElement}
             onDone={(src, natural) => updateObject(i, { src, natural, shadow: false, cutout: true })} />
           {o.cutout && goToBg && (
             <div className="cutout-next">
@@ -1606,6 +1685,7 @@ function ObjectProps({ o, i, updateObject, objRemove, objDuplicate, objBringFron
       )}
       {o.kind === 'device' && o.src && (
         <CutoutButton src={o.src} onToast={onToast}
+          nombre={o.label || objIcon?.label} onAddElement={onAddElement}
           onDone={(src, natural) => updateObject(i, { src, natural })} />
       )}
       {o.kind === 'image' && !o.frame && (
@@ -2019,7 +2099,7 @@ function LogoBody({ content, template, set }) {
 }
 
 /* ---------------- Text properties (panel derecho / inspector) ---------------- */
-function TextProps({ eid, content, set, getText, setText, onVolverAlStack }) {
+function TextProps({ eid, template, content, set, getText, setText, onVolverAlStack }) {
   const isTb = eid.startsWith('tb:')
   const idx = isTb ? +eid.slice(3) : -1
   const block = isTb ? (content.textBlocks || [])[idx] : null
@@ -2044,10 +2124,15 @@ function TextProps({ eid, content, set, getText, setText, onVolverAlStack }) {
         const nota = n <= max ? '' : elegido ? '· más largo de lo recomendado' : '· va a entrar más chico'
         return <div className={'charcount' + (n > max ? ' over' : '')}>{n}/{max} {nota}</div>
       })()}
-      {/* F3 · reglas editoriales: avisa, no bloquea */}
+      {/* F3 · reglas editoriales: avisa, no bloquea.
+          Y en la misma lista, el contraste: es otro "che, ojo con esto",
+          no una alerta aparte. Si la pieza está bien, no aparece nada. */}
       {(() => {
         const role = isTb ? (block?.style || 'title') : rolDeEid
-        const notes = checkCopy(role, val, content)
+        const notes = [
+          ...checkCopy(role, val, content),
+          ...(String(val ?? '').trim() ? checkContrast({ role, template, content, block }) : []),
+        ]
         if (!notes.length) return null
         return <ul className="copy-notes">{notes.map((m, i) => <li key={i}>{m}</li>)}</ul>
       })()}

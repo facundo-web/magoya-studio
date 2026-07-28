@@ -127,10 +127,14 @@ function guardarMeta(list) {
 
 // kind: 'photo' (fotos subidas) | 'element' (logos, PNG recortados, gráficos)
 // `origin` = de dónde salió, cuando tiene una identidad estable fuera de los
-// bytes (ej: 'magoya:campo-soja', una foto de la biblioteca de marca). Sirve
+// bytes (ej: 'magoya:girasol', una foto de la biblioteca de marca). Sirve
 // para no guardar dos veces la MISMA foto de biblioteca sólo porque una vez
 // entró a 2048 px (fondo) y otra a 1400 px (encima): son bytes distintos,
 // pero para la persona es la misma foto.
+// OJO: hoy no llega nunca. El editor lo manda, pero addCustomElement() en
+// App.jsx desestructura sólo {name, src, kind} y lo pierde en el camino.
+// Mientras tanto la de-duplicación funciona igual por `ref` (bytes), que
+// cubre el caso normal: la misma foto entrando dos veces al mismo destino.
 //
 // Devuelve el elemento con `dup: true` si ya estaba: el caller usa eso para
 // no cantar "guardado" cada vez que volvés a tocar la misma foto.

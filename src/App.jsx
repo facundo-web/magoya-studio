@@ -216,7 +216,11 @@ export default function App() {
     } else {
       setSaveFail(false)
       setDirty(false)   // sin esto el chip decía "Guardando…" para siempre
-      collectGarbage(next).catch(() => {})
+      // `elementRefs()` NO es opcional: sin eso el recolector se lleva los
+      // blobs de todo lo que esta en la biblioteca y no esta puesto en una
+      // pieza guardada. Las fotos de "Mis elementos" quedaban en el indice
+      // con el blob borrado — el recorte que tardaste en hacer, perdido.
+      collectGarbage(next, elementRefs()).catch(() => {})
     }
     usage().then(setEspacio).catch(() => {})
   }
@@ -593,10 +597,12 @@ export default function App() {
     setUndoDelete({ kind: 'project', data: backup })
     showToast('Se eliminó «' + (backup?.name || 'el proyecto') + '»', true)
   }
-  async function addCustomElement({ name, src, kind }) {
+  async function addCustomElement({ name, src, kind, origin }) {
     // el `kind` se descartaba acá: las fotos subidas terminaban archivadas
-    // como logos y "Mis fotos" quedaba siempre vacío
-    const { el, saved } = await addElement({ name, src, kind })
+    // como logos y "Mis fotos" quedaba siempre vacío. Lo mismo pasaba con
+    // `origin`: sin él, la misma foto de la biblioteca traída una vez de
+    // fondo (2048 px) y otra encima (1400 px) entraba dos veces.
+    const { el, saved } = await addElement({ name, src, kind, origin })
     loadElements().then(setElements).catch(() => {})
     if (!saved) showToast('⚠ No se pudo guardar en tu biblioteca')
     return el
