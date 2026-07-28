@@ -2,6 +2,7 @@ import React, { useRef } from 'react'
 import { TEMPLATES, demoContent } from '../templates/index.js'
 import { CAROUSELS, buildCarousel } from '../templates/carousels.js'
 import { masUsadas } from '../project/uso.js'
+import { sugerirTodo } from '../lib/sugerir.js'
 import { FORMATS_BY_ID, formatsByNetwork } from '../formats/registry.js'
 import PiecePreview from './PiecePreview.jsx'
 import Icon from '../ui/Icon.jsx'
@@ -37,6 +38,11 @@ export default function Gallery({
   const [verTodos, setVerTodos] = React.useState(false)
   const [verTodasShares, setVerTodasShares] = React.useState(false)
   const [carruseles, setCarruseles] = React.useState(false)
+  // "¿No se podría hacer algo que la persona explique de qué va lo que
+  // quiere crear y la herramienta le proponga?" (Lucho). Se calcula en el
+  // navegador, sin red: son reglas sobre señales duras, no un modelo que
+  // adivina. Si no hay confianza devuelve vacío y la galería sigue ahí.
+  const [pedido, setPedido] = React.useState('')
   const fmt = galleryFormat
   const groups = formatsByNetwork()
   const byId = Object.fromEntries(templates.map((t) => [t.id, t]))
@@ -46,6 +52,11 @@ export default function Gallery({
   // Aparece recién cuando hay señal de verdad, para que la home no arranque
   // con una sección vacía.
   const usadas = React.useMemo(() => masUsadas(templates.filter((t) => !t.hidden)), [templates, filter])
+
+  const sug = React.useMemo(
+    () => sugerirTodo(pedido, { templates: templates.filter((t) => !t.hidden), formatos: Object.values(FORMATS_BY_ID), carruseles: CAROUSELS }),
+    [pedido, templates],
+  )
 
   const visible = templates.filter((t) => {
     if (t.hidden) return false        // es variante de otra, no plantilla propia
@@ -77,7 +88,10 @@ export default function Gallery({
       </div>
 
       <div className="h3-start">
-        <button className="start-card primary" onClick={() => onStartBlank(fmt)}>
+        {/* Sin `primary`: es el unico camino sin barandas. Pintarlo como
+            la accion recomendada era decirle a quien no disena que
+            arranque justo donde la marca se rompe. */}
+        <button className="start-card" onClick={() => onStartBlank(fmt)}>
           <span className="sc-ico"><Icon n="plus" size={24} /></span>
           <span className="sc-t">Empezar en blanco</span>
           <span className="sc-s">Armá la tuya desde cero</span>
@@ -93,6 +107,53 @@ export default function Gallery({
           <span className="sc-s">{visible.length} diseños ya resueltos</span>
         </button>
       </div>
+
+      {/* Contame qué querés hacer. No reemplaza a la galería: la acorta. */}
+      {/* en línea a propósito: styles.css lo está tocando otro cambio */}
+      <div className="h3-pedido" style={{ display: 'flex', gap: 10, alignItems: 'center', margin: '4px 0 18px' }}>
+        <input type="text" value={pedido} placeholder="¿Qué querés hacer? Ej: webinar de IA en campo el 11 de junio"
+          onChange={(e) => setPedido(e.target.value)} aria-label="Contá qué querés hacer"
+          style={{ flex: 1, padding: '11px 14px', fontSize: 14, borderRadius: 12,
+            border: '1.5px solid var(--ui-line)', background: '#fff', color: 'inherit', font: 'inherit', outline: 'none' }} />
+        {pedido && <button className="linklike" onClick={() => setPedido('')}>Borrar</button>}
+      </div>
+      {(sug.plantillas.length > 0 || sug.carrusel) && (
+        <div className="h3-recent">
+          <div className="h3-trow">
+            <span className="h3-label">Te sirven estas</span>
+            {sug.diceFormato && sug.formato && (
+              <button className="linklike" onClick={() => setGalleryFormat(sug.formato)}>
+                Usar {sug.formato.label}
+              </button>
+            )}
+          </div>
+          <div className="h3-grid">
+            {sug.carrusel?.carrusel && (() => {
+              const preset = sug.carrusel.carrusel
+              const portada = buildCarousel(preset)[0]
+              if (!portada) return null
+              return (
+                <div className="h3-card">
+                  <button className="h3-thumb" onClick={() => onStartCarousel(sug.formato || fmt, preset)}>
+                    <PiecePreview template={portada.template} content={portada.content} format={fmt} />
+                  </button>
+                  <div className="h3-name">{preset.name} · {preset.slides.length} slides</div>
+                  <div className="purpose">{sug.carrusel.motivo}</div>
+                </div>
+              )
+            })()}
+            {sug.plantillas.map(({ template: t, motivo }) => (
+              <div key={t.id} className="h3-card">
+                <button className="h3-thumb" onClick={() => onPick(t, sug.formato || fmt)} title={t.purpose}>
+                  <PiecePreview template={t} content={demoContent(t)} format={fmt} />
+                </button>
+                <div className="h3-name">{t.name}</div>
+                <div className="purpose">{motivo}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Elegir la ESTRUCTURA del carrusel, no las slides una por una.
           "Una portada, tres internos y un cierre" — Inés, textual. */}
