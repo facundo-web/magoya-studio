@@ -10,7 +10,10 @@
 import { supabase } from './supabase.js'
 
 const URL_ENTENDER = 'https://otdbwfoydofzwtkcgfqf.supabase.co/functions/v1/entender'
-const ESPERA_MAX = 3500 // más que esto y no vale la pena: las reglas ya contestaron
+// Medido contra la función ya desplegada: 3.2-3.5s incluso "en caliente"
+// (edge function + llamada al modelo). 3500 cortaba justo antes de tener
+// la respuesta — quedaba abortando siempre. 7000 da margen real.
+const ESPERA_MAX = 7000
 
 // Una frase escrita dos veces no se paga dos veces.
 const cache = new Map()
