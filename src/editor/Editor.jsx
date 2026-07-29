@@ -74,7 +74,7 @@ async function guardarYAvisar(onAddElement, onToast, item) {
 
 // "recorte de <lo que era>" — el nombre tiene que decir de dónde salió, si
 // no la biblioteca se llena de "Elemento", "Elemento", "Elemento".
-const nombreRecorte = (n) => (String(n || '').trim() ? `Recorte de ${String(n).trim()}` : 'Recorte (fondo quitado)')
+const nombreRecorte = (n) => (String(n || '').trim() ? `Recorte de ${String(n).trim()}` : 'Recorte')
 
 const ROLE_LABELS = {
   kicker: 'Etiqueta',
@@ -706,6 +706,9 @@ export default function Editor({
 
   // sólo reclama la foto si la pieza HOY es de foto: si sacaste la foto de
   // fondo a propósito (bg: 'color') no tiene que seguir pidiéndola
+  // ¿lo que hay DETRÁS es una foto? Es el fondo efectivo, no lo que trae la
+  // plantilla: `bg` manda desde que cualquier plantilla acepta foto.
+  const hayFotoDetras = (content.bg || (template.surface === 'photo' || template.defaults?.hasPhoto ? 'photo' : 'color')) === 'photo'
   const needsPhoto = template.surface === 'photo' && (content.bg || 'photo') !== 'color' && !content.photo?.src
   // Bloque B — variantes: misma plantilla, otra composición
   const variants = React.useMemo(() => variantsFor(template), [template])
@@ -715,13 +718,19 @@ export default function Editor({
   return (
     <div className={'editor' + (selObj != null || selText ? ' has-sel' : '') + (sheet ? ' sheet-open' : '')}>
       <nav className="insert-rail">
+        {/* El rail se reparte por POSICION, no por material. Antes había
+            "Fotos" y "Fondo" como dos entradas distintas, y una foto podía
+            ir de fondo o encima: había que aprender la distinción para
+            saber a cuál entrar. Facu: "lo que confunde es que foto sea
+            fondo y los fondos también es fondo".
+            Ahora la pregunta es la que la cabeza ya se hace mirando la
+            pieza: ¿esto va DETRÁS o ENCIMA? */}
         {[
           ['style', 'grid', 'Estilo'],
           ['text', 'text', 'Texto'],
-          ['photos', 'photo', 'Fotos'],
-          ['elements', 'sparkle', 'Elementos'],
+          ['settings', 'layers', 'Detrás'],
+          ['elements', 'sparkle', 'Encima'],
           ['brand', 'brand', 'Marca'],
-          ['settings', 'layers', 'Fondo'],
         ].map(([k, ico, label]) => (
           <button key={k} className={'rail-btn' + (panel === k ? ' on' : '')}
             onClick={() => { if (panel === k) setSheet((v) => !v); else { setPanel(k); setSheet(true) } }} title={label}>
@@ -788,28 +797,19 @@ export default function Editor({
           )
         )}
 
-        {panel === 'photos' && (
-          <>
-            <div className="panel-title">Fotos</div>
-            {/* Antes había DOS paneles con la misma biblioteca y dos
-                resultados distintos (fondo vs objeto encima): había que
-                aprender la distinción para saber a cuál entrar. Ahora es
-                uno solo y la pregunta se hace en el momento. */}
-            <FotosBody selBg={selBg} onSelectBg={() => { setSelBg(true); setSelObj(null); setSelText(null) }} content={content} template={template} set={set}
-              inputRef={photoInputRef} onPhotoFile={onPhotoFile}
-              objects={objects} setObjects={setObjects} setSelObj={setSelObj}
-              elements={elements} onAddElement={onAddElement} onDeleteElement={onDeleteElement} onToast={onToast} />
-          </>
-        )}
-
         {panel === 'elements' && (
           <>
-            <div className="panel-title">Elementos</div>
-            <p className="panel-help">Tocá o arrastrá a la pieza. Logos, trazos, dispositivos y los tuyos.</p>
+            <div className="panel-title">Encima de la pieza</div>
+            <p className="panel-help">Todo lo que se apoya arriba: logos, trazos, formas, dispositivos y fotos sueltas.</p>
             <ObjectsBody objects={objects} setObjects={setObjects}
               selObj={selObj} setSelObj={setSelObj} objRemove={objRemove} onToast={onToast}
               elements={elements} onAddElement={onAddElement} onDeleteElement={onDeleteElement}
               alwaysOpen />
+            <div className="panel-title" style={{ marginTop: 18 }}>Una foto encima</div>
+            <FotosBody destinoFijo="encima" content={content} template={template} set={set}
+              inputRef={photoInputRef}
+              objects={objects} setObjects={setObjects} setSelObj={setSelObj}
+              elements={elements} onAddElement={onAddElement} onDeleteElement={onDeleteElement} onToast={onToast} />
           </>
         )}
 
@@ -822,26 +822,39 @@ export default function Editor({
 
         {panel === 'settings' && (
           <>
-            {/* Aye buscó "el fondo" y estaba en un panel llamado Efectos.
-                El color es lo primero que se busca: va arriba de todo. */}
-            <div className="panel-title">Color de fondo</div>
-            <FondoBody content={content} template={template} set={set} />
-            <div className="panel-title" style={{ marginTop: 16 }}>Tono encima</div>
-            <p className="panel-help">Un velo de color sobre el fondo, para dar profundidad.</p>
-            <GradientBody content={content} set={set} />
-            <div className="panel-title" style={{ marginTop: 16 }}>Efectos</div>
-            <Ctl label="Oscurecer los bordes" value={Math.round((content.vignette ?? 0) * 100)} min={0} max={80} onChange={(v) => set({ vignette: v / 100 })} />
-            {/* Oscurecer y desenfocar sólo tocan la FOTO de fondo. Mostrarlos
-                sin foto era ofrecer dos sliders que no hacen nada: los movías
-                y la pieza no cambiaba, sin ninguna explicación. */}
-            {content.photo?.src && (template.surface === 'photo' || (template.freeform && (content.bg || 'color') === 'photo')) ? (
-              <>
-                <Ctl label="Oscurecer el fondo" value={Math.round((content.photoDim ?? 0) * 100)} min={0} max={70} onChange={(v) => set({ photoDim: v / 100 })} />
-                <Ctl label="Desenfocar el fondo" value={Math.round(content.photoBlur ?? 0)} min={0} max={30} onChange={(v) => set({ photoBlur: v })} />
-              </>
+            {/* DETRÁS es dueño de todo lo que está atrás de la pieza. Primero
+                la única decisión que importa —color o foto—, después lo que
+                corresponda. Los ajustes de la foto viven en el inspector de
+                la derecha, como los de cualquier otra cosa. */}
+            <div className="chips" style={{ marginBottom: 14 }}>
+              <button className={'chip' + (!hayFotoDetras ? ' on' : '')}
+                onClick={() => set({ bg: 'color' })}>Un color</button>
+              <button className={'chip' + (hayFotoDetras ? ' on' : '')}
+                onClick={() => { if (content.photo?.src) set({ bg: 'photo' }) }}
+                title={content.photo?.src ? 'Volver a la foto' : 'Elegí una foto abajo'}>Una foto</button>
+            </div>
+            {hayFotoDetras ? (
+              <FotosBody destinoFijo="fondo" selBg={selBg}
+                onSelectBg={() => { setSelBg(true); setSelObj(null); setSelText(null) }}
+                content={content} template={template} set={set}
+                inputRef={photoInputRef}
+                objects={objects} setObjects={setObjects} setSelObj={setSelObj}
+                elements={elements} onAddElement={onAddElement} onDeleteElement={onDeleteElement} onToast={onToast} />
             ) : (
-              <div className="hint">Oscurecer y desenfocar necesitan una foto de fondo. Ponela en <b>Fotos</b>.</div>
+              <>
+                <div className="panel-title">Color</div>
+                <FondoBody content={content} template={template} set={set} />
+                <div className="panel-title" style={{ marginTop: 18 }}>Una foto detrás</div>
+                <FotosBody destinoFijo="fondo" content={content} template={template} set={set}
+                  inputRef={photoInputRef}
+                  objects={objects} setObjects={setObjects} setSelObj={setSelObj}
+                  elements={elements} onAddElement={onAddElement} onDeleteElement={onDeleteElement} onToast={onToast} />
+              </>
             )}
+            <div className="panel-title" style={{ marginTop: 18 }}>Tono encima</div>
+            <p className="panel-help">Un velo de color sobre lo que hay detrás, para dar profundidad.</p>
+            <GradientBody content={content} set={set} />
+            <Ctl label="Oscurecer los bordes" value={Math.round((content.vignette ?? 0) * 100)} min={0} max={80} onChange={(v) => set({ vignette: v / 100 })} />
           </>
         )}
       </div>
@@ -1083,7 +1096,7 @@ export default function Editor({
           </>
         ) : selBg && content.photo?.src ? (
           <>
-            <div className="insp-kicker">Propiedades del fondo</div>
+            <div className="insp-kicker">Propiedades de la foto</div>
             <FondoProps content={content} set={set} onToast={onToast} onAddElement={onAddElement} />
           </>
         ) : (
@@ -1179,10 +1192,13 @@ function LogoSwatches({ content, template, set, logo }) {
    entiendas la diferencia entre fondo y objeto para elegir el panel: la
    pregunta se hace al elegir la foto, con el default correcto según la
    plantilla. */
-function FotosBody({ content, template, set, inputRef, onPhotoFile, objects, setObjects, setSelObj, elements, onAddElement, onDeleteElement, onToast, selBg, onSelectBg }) {
+function FotosBody({ content, template, set, inputRef, objects, setObjects, setSelObj, elements, onAddElement, onDeleteElement, onToast, selBg, onSelectBg, destinoFijo = 'fondo' }) {
   // toda plantilla admite foto de fondo (el motor la promueve con bg)
   const admiteFondo = true
-  const [destino, setDestino] = useState('fondo')
+  // El destino ya no se pregunta: lo dice el panel en el que estás. Detrás
+  // pone fondo, Encima pone objeto. Era una pregunta que había que contestar
+  // ANTES de haber elegido la foto, o sea en el peor momento.
+  const destino = destinoFijo
   const misFotos = (elements || []).filter((e) => e.kind === 'photo')
 
   // el nombre de la foto de fondo viaja CON la foto: sin esto, al recortarla
@@ -1229,15 +1245,6 @@ function FotosBody({ content, template, set, inputRef, onPhotoFile, objects, set
 
   return (
     <>
-      {admiteFondo && (
-        <div className="field">
-          <label>¿Dónde va la foto?</label>
-          <div className="chips">
-            <button className={'chip' + (destino === 'fondo' ? ' on' : '')} onClick={() => setDestino('fondo')}>De fondo</button>
-            <button className={'chip' + (destino === 'encima' ? ' on' : '')} onClick={() => setDestino('encima')}>Encima de la pieza</button>
-          </div>
-        </div>
-      )}
       <div className="dropzone" onClick={() => inputRef.current?.click()}
         onDragOver={(e) => e.preventDefault()}
         onDrop={(e) => { e.preventDefault(); e.dataTransfer.files[0] && subir(e.dataTransfer.files[0]) }}>
@@ -1274,7 +1281,9 @@ function FotosBody({ content, template, set, inputRef, onPhotoFile, objects, set
       </div>
 
       {/* ajustes de la foto de FONDO, sólo si hay una puesta */}
-      {content.photo?.src && admiteFondo && (
+      {/* la fila de la foto de atrás vive sólo en Detrás: en Encima sería
+          una cosa de otro panel */}
+      {destinoFijo === 'fondo' && content.photo?.src && admiteFondo && (
         <>
           {/* La foto de fondo es una fila, como un texto o un elemento:
               se toca acá y se edita a la derecha. Antes los ajustes estaban
@@ -1283,9 +1292,9 @@ function FotosBody({ content, template, set, inputRef, onPhotoFile, objects, set
           <div className="obj-list">
             <div className={'obj-row' + (selBg ? ' sel' : '')}>
               <button className="obj-row-name" onClick={() => onSelectBg && onSelectBg()}>
-                <span className={'row-dot' + (selBg ? ' on' : '')} />Foto de fondo
+                <span className={'row-dot' + (selBg ? ' on' : '')} />La foto
               </button>
-              <button className="obj-row-del" onClick={() => set({ photo: null, bg: 'color' })} title="Sacar la foto de fondo"><Icon n="close" size={13} /></button>
+              <button className="obj-row-del" onClick={() => set({ photo: null, bg: 'color' })} title="Sacar la foto"><Icon n="close" size={13} /></button>
             </div>
           </div>
           <div className="hint">Tocala para ajustarla a la derecha: color, desenfoque, encuadre.</div>
@@ -1306,23 +1315,23 @@ function CutoutButton({ src, onDone, onToast, nombre, onAddElement }) {
   const [pct, setPct] = useState(0)
   const run = async () => {
     setBusy(true); setPct(0)
-    onToast && onToast('Quitando el fondo… la primera vez tarda un poco')
+    onToast && onToast('Recortando… la primera vez tarda un poco')
     try {
       const out = await removeBackground(src, setPct)
       const natural = await imageSize(out)
       onDone(out, natural)
       // Un solo aviso, no dos: el recorte y su guardado son el mismo gesto.
       const el = await alBanco(onAddElement, { name: nombreRecorte(nombre), src: out, kind: 'element' })
-      onToast && onToast(el && !el.dup ? '✓ Fondo quitado — te queda en Mis elementos' : '✓ Fondo quitado')
+      onToast && onToast(el && !el.dup ? '✓ Recortada — te queda en Mis elementos' : '✓ Recortada')
     } catch (e) {
       console.error(e)
-      onToast && onToast('⚠ No se pudo quitar el fondo')
+      onToast && onToast('⚠ No se pudo recortar')
     } finally { setBusy(false) }
   }
   return (
     <button className="btn" style={{ marginTop: 8, width: '100%' }} onClick={run} disabled={busy}
-      title="Recorta la persona u objeto y deja el fondo transparente">
-      {busy ? `Quitando fondo… ${pct}%` : <><Icon n="scissors" size={15} /> Quitar fondo</>}
+      title="Deja sólo la persona o el objeto, sin lo que tenía atrás">
+      {busy ? `Recortando… ${pct}%` : <><Icon n="scissors" size={15} /> Recortar la persona</>}
     </button>
   )
 }
@@ -1737,7 +1746,7 @@ function ObjectProps({ o, i, updateObject, objRemove, objDuplicate, objBringFron
           {o.cutout && goToBg && (
             <div className="cutout-next">
               Recortado ✓ — ahora ponele un fondo
-              <button className="btn" onClick={goToBg}>Elegir fondo →</button>
+              <button className="btn" onClick={goToBg}>Poner una foto detrás →</button>
             </div>
           )}
         </>
@@ -1749,7 +1758,7 @@ function ObjectProps({ o, i, updateObject, objRemove, objDuplicate, objBringFron
       )}
       {o.kind === 'image' && !o.frame && (
         <>
-          <label>Efecto (para fotos con el fondo quitado)</label>
+          <label>Efecto (para fotos recortadas)</label>
           <div className="chips" style={{ marginBottom: 8 }}>
             {[['none', 'Ninguno'], ['outline', 'Contorno blanco'], ['glow', 'Resplandor'], ['hard', 'Sombra recortada']].map(([k, l]) => (
               <button key={k} className={'chip' + ((o.fx || 'none') === k ? ' on' : '')}
@@ -1806,7 +1815,7 @@ function ObjectProps({ o, i, updateObject, objRemove, objDuplicate, objBringFron
           marca no rompa una pieza donde su color no entra. */}
       {o.kind === 'icon' && !isMark && o.style !== 'plain' && (
         <>
-          <label>Fondo del cuadradito</label>
+          <label>Color del cuadradito</label>
           <div className="swatches" style={{ marginBottom: 8 }}>
             <button className={'sw' + (!o.tileColor ? ' on' : '')} title="El de la marca"
               style={{ background: objIcon?.color || '#0D0C0C' }} onClick={() => updateObject(i, { tileColor: undefined })} />
@@ -1955,7 +1964,7 @@ function objectName(o, icon) {
   if (o.kind === 'shape') return SHAPE_NAMES[o.shape] || 'Forma'
   if (o.kind === 'device') return icon?.label ? `Dispositivo · ${icon.label}` : 'Dispositivo'
   if (o.kind === 'image') {
-    if (o.cutout) return o.label ? `Recorte · ${o.label}` : 'Recorte (fondo quitado)'
+    if (o.cutout) return o.label ? `Recorte · ${o.label}` : 'Recorte'
     if (o.label) return o.label
     if (o.frame) return 'Imagen en marco'
     return o.elementId ? 'Elemento propio' : 'Imagen'
@@ -2008,7 +2017,7 @@ function BrandBody({ content, template, set, onlyColors = false, soloLogo = fals
   if (onlyColors) {
     return (
       <>
-        <div className="field"><label>Color de fondo</label>
+        <div className="field"><label>Color de la pieza</label>
           <div className="swatches">
             {Object.entries(COLOR_SCHEMES).map(([k, s]) => (
               <button key={k} className={'sw named' + (scheme === k ? ' on' : '')} onClick={() => set({ scheme: k })}><span className="sw-dot" style={{ background: s.surface }} /><span className="sw-name">{s.label}</span></button>
