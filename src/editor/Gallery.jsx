@@ -2,7 +2,7 @@ import React, { useRef } from 'react'
 import { TEMPLATES, demoContent, placeholderContent } from '../templates/index.js'
 import { CAROUSELS, buildCarousel } from '../templates/carousels.js'
 import { masUsadas } from '../project/uso.js'
-import { sugerirTodo, armar, aplicarArmado } from '../lib/sugerir.js'
+import { sugerirTodo, armar, aplicarArmado, ETIQUETA } from '../lib/sugerir.js'
 import { entender, combinar } from '../lib/entender.js'
 import { FORMATS_BY_ID, formatsByNetwork } from '../formats/registry.js'
 import PiecePreview from './PiecePreview.jsx'
@@ -57,13 +57,22 @@ export default function Gallery({
   // Lo que entendió el modelo, cuando contesta. `null` mientras no hay
   // respuesta — y `null` significa "seguí con las reglas", no "no hay nada".
   const [delModelo, setDelModelo] = React.useState(null)
+  // "No funciona como si tuviera un LLM detrás" — Facu tenía razón: la IA
+  // tarda hasta 7s y no había NINGÚN indicio visual mientras tanto, así
+  // que aunque funcionara no se notaba. `pensando` es esa señal.
+  const [pensando, setPensando] = React.useState(false)
   React.useEffect(() => {
     setDelModelo(null)
+    setPensando(false)
     if (pedido.trim().length < 6) return
     // 500ms: no se le pregunta al modelo en cada tecla
     const t = setTimeout(() => {
       let vivo = true
-      entender(pedido).then((r) => { if (vivo) setDelModelo(r) }).catch(() => {})
+      setPensando(true)
+      entender(pedido)
+        .then((r) => { if (vivo) setDelModelo(r) })
+        .catch(() => {})
+        .finally(() => { if (vivo) setPensando(false) })
       return () => { vivo = false }
     }, 500)
     return () => clearTimeout(t)
@@ -136,13 +145,34 @@ export default function Gallery({
 
       {/* Contame qué querés hacer. No reemplaza a la galería: la acorta. */}
       {/* en línea a propósito: styles.css lo está tocando otro cambio */}
-      <div className="h3-pedido" style={{ display: 'flex', gap: 10, alignItems: 'center', margin: '4px 0 18px' }}>
-        <input type="text" value={pedido} placeholder="¿Qué querés hacer? Ej: webinar de IA en campo el 11 de junio"
-          onChange={(e) => setPedido(e.target.value)} aria-label="Contá qué querés hacer"
-          style={{ flex: 1, padding: '11px 14px', fontSize: 14, borderRadius: 12,
-            border: '1.5px solid var(--ui-line)', background: '#fff', color: 'inherit', font: 'inherit', outline: 'none' }} />
+      <div className="h3-pedido" style={{ display: 'flex', gap: 10, alignItems: 'center', margin: '4px 0 6px' }}>
+        <div style={{ position: 'relative', flex: 1 }}>
+          <input type="text" value={pedido} placeholder="¿Qué querés hacer? Ej: webinar de IA en campo el 11 de junio"
+            onChange={(e) => setPedido(e.target.value)} aria-label="Contá qué querés hacer"
+            style={{ width: '100%', boxSizing: 'border-box', padding: '11px 14px', paddingRight: pensando ? 118 : 14,
+              fontSize: 14, borderRadius: 12, border: '1.5px solid var(--ui-line)', background: '#fff',
+              color: 'inherit', font: 'inherit', outline: 'none' }} />
+          {/* La señal que faltaba: sin esto, la IA tarda hasta 7s y no se
+              nota que está pensando — se ve idéntico a la búsqueda de
+              siempre, aunque funcione. */}
+          {pensando && (
+            <span style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
+              display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--ui-muted, #888)' }}>
+              <span className="ia-spinner" aria-hidden="true" />
+              Pensando con IA…
+            </span>
+          )}
+        </div>
         {pedido && <button className="linklike" onClick={() => setPedido('')}>Borrar</button>}
       </div>
+      {delModelo && delModelo.confianza >= 0.45 && delModelo.objetivo !== 'ninguno' && (
+        // Prueba de que la IA no es adorno: dice qué entendió, y se puede
+        // comparar con la frase de al lado.
+        <div style={{ fontSize: 12, color: 'var(--ui-muted, #888)', margin: '0 0 14px 2px' }}>
+          ✨ La IA entendió: <b>{ETIQUETA[delModelo.objetivo] || delModelo.objetivo}</b>
+          {delModelo.tema && <> · tema “{delModelo.tema}”</>}
+        </div>
+      )}
       {(sug.plantillas.length > 0 || sug.carrusel) && (
         <div className="h3-recent">
           <div className="h3-trow">
