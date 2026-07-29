@@ -52,6 +52,36 @@ export function variantsFor(template) {
   const tieneEtiqueta = (template.roles || []).includes('kicker')
     || (template.defaults?.textBlocks || []).some((b) => b.style === 'kicker')
   if (!tieneEtiqueta) list = list.filter((v) => v.id !== 'kickerline')
+
+  // No ofrecer lo que no hace NADA. El catálogo se emitía a ciegas y medirlo
+  // lo dejó a la vista: de 235 combinaciones plantilla × variante, 35 eran
+  // píxel a píxel idénticas al Original. Una opción que no cambia nada no es
+  // una opción: es la app diciéndole a alguien que no diseña que ya probó
+  // todo lo que había.
+  const propio = {
+    anchor: template.anchor || 'bottom-left',
+    plate: template.defaults?.plate ?? (template.zocalo ? 'band' : (template.surface === 'photo' ? 'scrim' : 'none')),
+    density: template.defaults?.density ?? 'normal',
+    scale: Number(template.defaults?.scale) || 1,
+    rule: template.defaults?.rule ?? 'top',
+  }
+  // Si TODOS los ejes que toca la variante ya son los de la plantilla, la
+  // pieza sale igual.
+  list = list.filter((v) => {
+    if (v.id === 'base') return true
+    const tocados = VARIANT_AXES.filter((k) => v.set[k] !== null && v.set[k] !== undefined)
+    if (!tocados.length) return true
+    return tocados.some((k) => v.set[k] !== propio[k])
+  })
+
+  // Si la plantilla fija a mano la posición de TODOS sus bloques, no queda
+  // stack: mover el ancla o la densidad no tiene sobre qué actuar y sólo
+  // sobrevive el tamaño. Le pasa a Fecha marcada, Collage y Celular.
+  const bloques = template.defaults?.textBlocks || []
+  const posFijas = Object.keys(template.defaults?.pos || {}).length
+  if (bloques.length && posFijas >= bloques.length) {
+    list = list.filter((v) => v.id === 'base' || v.set.scale !== null)
+  }
   return list
 }
 

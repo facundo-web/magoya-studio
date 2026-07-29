@@ -306,12 +306,27 @@ export function drawPiece(b, { template, content, format, sizeLock = null }) {
   let plateRect = null // si hay placa opaca, el logo entra ADENTRO (B4)
   // si moviste TODOS los bloques a mano no queda stack: la placa dibujaría
   // una tarjeta vacía de alto cero
+  // El color de la PLACA. Sobre foto, la superficie de marca contrasta sola.
+  // Sobre fondo sólido era `scheme.surface`, o sea EXACTAMENTE el color del
+  // fondo: "Texto en tarjeta" y "Texto en barra" dibujaban un rectángulo
+  // invisible. Medido: las dos variantes con el nombre que más promete no
+  // cambiaban nada en 19 plantillas sólidas. Acá la placa se despega del
+  // fondo lo justo para leerse como una placa.
+  const colorPlaca = onPhoto
+    ? p.scheme.surface
+    : separar(mix(p.scheme.surface, p.scheme.onSurface, 0.1), p.scheme.surface, 1.22, p.scheme.onSurface)
   if (!enStack.length) { /* sin stack no hay placa */ } else if (p.plate === 'band') {
     // banda de ancho completo que baja hasta el borde (el clásico zócalo)
     const pad = ref * 0.045
     const by = cursorY - pad
-    plateRect = { x: 0, y: by, w: W, h: H - by, textW: stackW }
-    b.rect({ ...plateRect, fill: p.scheme.surface, opacity: onPhoto ? 0.94 : 1 })
+    // La banda baja hasta el borde SÓLO si el texto está abajo. Con el
+    // ancla arriba iba desde el tope hasta el pie y se comía la pieza
+    // entera — en las plantillas con zócalo, elegir "Arriba" hacía
+    // desaparecer la foto. Ahí la banda envuelve el texto y nada más.
+    const alPie = vAnchor === 'bottom'
+    const alto = alPie ? H - by : stackH + pad * 2
+    plateRect = { x: 0, y: by, w: W, h: alto, textW: stackW }
+    b.rect({ ...plateRect, fill: colorPlaca, opacity: onPhoto ? 0.94 : 1 })
     if (p.rule !== 'none') b.rect({ x: safe.x, y: by, w: ref * 0.12, h: ruleH, fill: p.accent })
   } else if (p.plate === 'card') {
     // tarjeta ajustada al texto: la variante más "editorial"
@@ -321,7 +336,7 @@ export function drawPiece(b, { template, content, format, sizeLock = null }) {
       x: Math.max(ref * 0.02, cx0 - padX), y: cursorY - padY,
       w: Math.min(W - ref * 0.04, stackW + padX * 2), h: stackH + padY * 2,
     }
-    b.rect({ ...plateRect, rx: ref * 0.028, fill: p.scheme.surface, opacity: onPhoto ? 0.95 : 1 })
+    b.rect({ ...plateRect, rx: ref * 0.028, fill: colorPlaca, opacity: onPhoto ? 0.95 : 1 })
     if (!onPhoto) b.rect({ x: plateRect.x, y: plateRect.y, w: plateRect.w, h: ruleH, rx: ruleH / 2, fill: p.accent })
   } else if (p.plate === 'scrim' && onPhoto) {
     b.scrim({ x: 0, y: H * 0.4, w: W, h: H * 0.6, dir: 'bottom', to: 'rgba(0,0,0,0.68)' })
