@@ -255,6 +255,12 @@ export default function Editor({
   const [busy, setBusy] = useState(false)
   const [selObj, setSelObj] = useState(null)
   const [selText, setSelText] = useState(null) // eid del texto seleccionado
+  // El fondo es la tercera cosa editable de la pieza, y sus ajustes vivian en
+  // el panel IZQUIERDO — al lado de la biblioteca de fotos, a pantalla y media
+  // de scroll. Rompia la unica regla del editor: a la izquierda elegis, a la
+  // derecha editas. Ahora es una fila seleccionable como los textos y los
+  // elementos, y sus propiedades salen a la derecha con todo lo demas.
+  const [selBg, setSelBg] = useState(false)
   const [hoverObj, setHoverObj] = useState(null)
   const [editing, setEditing] = useState(null) // edición de texto in-place
   const [showSafe, setShowSafe] = useState(false)
@@ -552,7 +558,7 @@ export default function Editor({
     window.addEventListener('pointerup', up)
   }
 
-  const onSelectText = (eid) => { setSelText(eid); setSelObj(null) }
+  const onSelectText = (eid) => { setSelText(eid); setSelObj(null); setSelBg(false) }
   // posición libre de un bloque de texto. Arrastrar es un solo gesto, así
   // que Deshacer vuelve al lugar de antes de arrastrar, no píxel por píxel.
   const moverTexto = (eid, pt) => set({ pos: { ...(content.pos || {}), [eid]: pt } }, 'movetext:' + eid)
@@ -595,7 +601,7 @@ export default function Editor({
         idx = bajo[(pos + bajo.length - 1) % bajo.length]   // el siguiente hacia abajo
       }
     }
-    setSelObj(idx); setSelText(null); dragRef.current.i = idx
+    setSelObj(idx); setSelText(null); setSelBg(false); dragRef.current.i = idx
     // sin capturar el puntero, arrastrar rápido hacia el borde soltaba el
     // objeto a mitad de camino (en cualquier editor podés salir y volver)
     try { e.currentTarget.setPointerCapture(e.pointerId) } catch {}
@@ -634,7 +640,7 @@ export default function Editor({
     if (t) {
       const eid = t.getAttribute('data-eid')
       // segundo tap/click sobre el texto ya seleccionado → editar (touch-friendly)
-      if (selText === eid) { openTextEditor(t) } else { setSelText(eid); setSelObj(null) }
+      if (selText === eid) { openTextEditor(t) } else { setSelText(eid); setSelObj(null); setSelBg(false) }
       // el primer reflejo de cualquiera es arrastrar el texto. Se guarda
       // dónde lo agarraste DENTRO del bloque para que no salte al soltar.
       const fr = frameRef.current.getBoundingClientRect()
@@ -652,11 +658,11 @@ export default function Editor({
     // cualquier click que no caiga sobre un objeto o un texto DESELECCIONA:
     // sin esto nunca se ve la pieza limpia, siempre queda un marco encima.
     setCtxMenu(null)
-    if (!e.target.closest('.obj-hit') && !e.target.closest('.rs-handle')) { setSelObj(null); setSelText(null) }
+    if (!e.target.closest('.obj-hit') && !e.target.closest('.rs-handle')) { setSelObj(null); setSelText(null); setSelBg(false) }
   }
   const onStageDown = (e) => {
     if (e.target.closest('.piece-frame') || e.target.closest('.stage-tools') || e.target.closest('.strip')) return
-    setSelObj(null); setSelText(null); setEditing(null)
+    setSelObj(null); setSelText(null); setSelBg(false); setEditing(null)
   }
 
   // ---- editar texto tocándolo sobre la pieza ----
@@ -696,7 +702,7 @@ export default function Editor({
 
   // Cambiar de slide (o de diseño) con algo seleccionado hacía que el
   // inspector editara el objeto del MISMO índice en la slide nueva.
-  useEffect(() => { setSelObj(null); setSelText(null); setEditing(null) }, [activeSlide, template.id])
+  useEffect(() => { setSelObj(null); setSelText(null); setSelBg(false); setEditing(null) }, [activeSlide, template.id])
 
   // sólo reclama la foto si la pieza HOY es de foto: si sacaste la foto de
   // fondo a propósito (bg: 'color') no tiene que seguir pidiéndola
@@ -789,7 +795,7 @@ export default function Editor({
                 resultados distintos (fondo vs objeto encima): había que
                 aprender la distinción para saber a cuál entrar. Ahora es
                 uno solo y la pregunta se hace en el momento. */}
-            <FotosBody content={content} template={template} set={set}
+            <FotosBody selBg={selBg} onSelectBg={() => { setSelBg(true); setSelObj(null); setSelText(null) }} content={content} template={template} set={set}
               inputRef={photoInputRef} onPhotoFile={onPhotoFile}
               objects={objects} setObjects={setObjects} setSelObj={setSelObj}
               elements={elements} onAddElement={onAddElement} onDeleteElement={onDeleteElement} onToast={onToast} />
@@ -1075,6 +1081,11 @@ export default function Editor({
             <div className="insp-kicker">Propiedades del texto</div>
             <TextProps eid={selText} template={template} content={content} set={set} getText={getText} setText={setText} onVolverAlStack={volverAlStack} />
           </>
+        ) : selBg && content.photo?.src ? (
+          <>
+            <div className="insp-kicker">Propiedades del fondo</div>
+            <FondoProps content={content} set={set} onToast={onToast} onAddElement={onAddElement} />
+          </>
         ) : (
           <div className="insp-empty">
             <div className="insp-empty-ic"><Icon n="cursor" size={22} /></div>
@@ -1168,7 +1179,7 @@ function LogoSwatches({ content, template, set, logo }) {
    entiendas la diferencia entre fondo y objeto para elegir el panel: la
    pregunta se hace al elegir la foto, con el default correcto según la
    plantilla. */
-function FotosBody({ content, template, set, inputRef, onPhotoFile, objects, setObjects, setSelObj, elements, onAddElement, onDeleteElement, onToast }) {
+function FotosBody({ content, template, set, inputRef, onPhotoFile, objects, setObjects, setSelObj, elements, onAddElement, onDeleteElement, onToast, selBg, onSelectBg }) {
   // toda plantilla admite foto de fondo (el motor la promueve con bg)
   const admiteFondo = true
   const [destino, setDestino] = useState('fondo')
@@ -1265,30 +1276,20 @@ function FotosBody({ content, template, set, inputRef, onPhotoFile, objects, set
       {/* ajustes de la foto de FONDO, sólo si hay una puesta */}
       {content.photo?.src && admiteFondo && (
         <>
-          <div className="panel-title" style={{ marginTop: 18 }}>La foto de fondo</div>
-          <div className="field">
-            <label>Color de la foto</label>
-            <div className="chips">
-              <button className={'chip' + ((content.treatment || 'bw') === 'bw' ? ' on' : '')} onClick={() => set({ treatment: 'bw' })}>Blanco y negro</button>
-              <button className={'chip' + (content.treatment === 'color' ? ' on' : '')} onClick={() => set({ treatment: 'color' })}>Color</button>
+          {/* La foto de fondo es una fila, como un texto o un elemento:
+              se toca acá y se edita a la derecha. Antes los ajustes estaban
+              acá abajo, después de las 28 miniaturas de la biblioteca. */}
+          <div className="panel-title" style={{ marginTop: 18 }}>Lo que hay en la pieza</div>
+          <div className="obj-list">
+            <div className={'obj-row' + (selBg ? ' sel' : '')}>
+              <button className="obj-row-name" onClick={() => onSelectBg && onSelectBg()}>
+                <span className={'row-dot' + (selBg ? ' on' : '')} />Foto de fondo
+              </button>
+              <button className="obj-row-del" onClick={() => set({ photo: null, bg: 'color' })} title="Sacar la foto de fondo"><Icon n="close" size={13} /></button>
             </div>
           </div>
-          {/* "le faltaría también esto de si querés que sea en blanco y
-              negro, o querés que sea más blureada" */}
-          <Ctl label="Desenfoque" value={Math.round(content.photoBlur ?? 0)} min={0} max={24} suffix="px"
-            onChange={(v) => set({ photoBlur: v }, 'blur')} />
-          <Ctl label="Oscurecer" value={Math.round((content.photoDim ?? 0) * 100)} min={0} max={80} suffix="%"
-            onChange={(v) => set({ photoDim: v / 100 }, 'dim')} />
-          <label>Encuadre (arrastrá el punto)</label>
-          <Pad2D x={content.photo.focal?.x ?? 0.5} y={content.photo.focal?.y ?? 0.5}
-            onChange={(f) => set({ photo: { ...content.photo, focal: f } })} />
-          <CutoutButton src={content.photo.src} onToast={onToast}
-            nombre={content.photo.name} onAddElement={onAddElement}
-            onDone={(src, natural) => set({ photo: { ...content.photo, src, natural } })} />
+          <div className="hint">Tocala para ajustarla a la derecha: color, desenfoque, encuadre.</div>
         </>
-      )}
-      {admiteFondo && content.photo?.src && (
-        <button className="btn" style={{ marginTop: 10 }} onClick={() => set({ photo: null, bg: 'color' })}>Sacar la foto de fondo</button>
       )}
     </>
   )
@@ -2153,6 +2154,40 @@ function LogoBody({ content, template, set }) {
           <LogoPosition content={content} template={template} set={set} />
         </>
       )}
+    </>
+  )
+}
+
+
+/* ---------------- La foto de fondo, en el inspector de la derecha ---------------- */
+function FondoProps({ content, set, onToast, onAddElement }) {
+  const foto = content.photo
+  if (!foto?.src) return null
+  return (
+    <>
+      <div className="insp-head"><span className="insp-name">Foto de fondo</span>
+        <span className="insp-acts">
+          <button className="btn" style={{ padding: '2px 8px' }} onClick={() => set({ photo: null, bg: 'color' })}>Quitar</button>
+        </span>
+      </div>
+      <div className="field">
+        <label>Color de la foto</label>
+        <div className="chips">
+          <button className={'chip' + ((content.treatment || 'bw') === 'bw' ? ' on' : '')} onClick={() => set({ treatment: 'bw' })}>Blanco y negro</button>
+          <button className={'chip' + (content.treatment === 'color' ? ' on' : '')} onClick={() => set({ treatment: 'color' })}>Color</button>
+        </div>
+      </div>
+      {/* "le faltaría también esto de si querés que sea en blanco y negro,
+          o querés que sea más blureada" */}
+      <Ctl label="Desenfoque" value={Math.round(content.photoBlur ?? 0)} min={0} max={24} suffix="px"
+        onChange={(v) => set({ photoBlur: v }, 'blur')} />
+      <Ctl label="Oscurecer" value={Math.round((content.photoDim ?? 0) * 100)} min={0} max={80} suffix="%"
+        onChange={(v) => set({ photoDim: v / 100 }, 'dim')} />
+      <label>Encuadre (arrastrá el punto)</label>
+      <Pad2D x={foto.focal?.x ?? 0.5} y={foto.focal?.y ?? 0.5}
+        onChange={(f) => set({ photo: { ...foto, focal: f } })} />
+      <CutoutButton src={foto.src} onToast={onToast} nombre={foto.name} onAddElement={onAddElement}
+        onDone={(src, natural) => set({ photo: { ...foto, src, natural } })} />
     </>
   )
 }
