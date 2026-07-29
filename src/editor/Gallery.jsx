@@ -3,6 +3,7 @@ import { TEMPLATES, demoContent, placeholderContent } from '../templates/index.j
 import { CAROUSELS, buildCarousel } from '../templates/carousels.js'
 import { masUsadas } from '../project/uso.js'
 import { sugerirTodo, armar, aplicarArmado } from '../lib/sugerir.js'
+import { entender, combinar } from '../lib/entender.js'
 import { FORMATS_BY_ID, formatsByNetwork } from '../formats/registry.js'
 import PiecePreview from './PiecePreview.jsx'
 import Icon from '../ui/Icon.jsx'
@@ -53,10 +54,35 @@ export default function Gallery({
   // con una sección vacía.
   const usadas = React.useMemo(() => masUsadas(templates.filter((t) => !t.hidden)), [templates, filter])
 
-  const sug = React.useMemo(
-    () => sugerirTodo(pedido, { templates: templates.filter((t) => !t.hidden), formatos: Object.values(FORMATS_BY_ID), carruseles: CAROUSELS }),
-    [pedido, templates],
-  )
+  // Lo que entendió el modelo, cuando contesta. `null` mientras no hay
+  // respuesta — y `null` significa "seguí con las reglas", no "no hay nada".
+  const [delModelo, setDelModelo] = React.useState(null)
+  React.useEffect(() => {
+    setDelModelo(null)
+    if (pedido.trim().length < 6) return
+    // 500ms: no se le pregunta al modelo en cada tecla
+    const t = setTimeout(() => {
+      let vivo = true
+      entender(pedido).then((r) => { if (vivo) setDelModelo(r) }).catch(() => {})
+      return () => { vivo = false }
+    }, 500)
+    return () => clearTimeout(t)
+  }, [pedido])
+
+  const sug = React.useMemo(() => {
+    const base = sugerirTodo(pedido, { templates: templates.filter((t) => !t.hidden), formatos: Object.values(FORMATS_BY_ID), carruseles: CAROUSELS })
+    if (!delModelo) return base
+    // Las reglas ya corrieron y mandan sobre los datos duros; el modelo
+    // sólo llena el objetivo cuando ninguna palabra clave coincidió. Si
+    // aporta un objetivo nuevo, hay que volver a preguntar las plantillas.
+    const senales = combinar(base.senales, delModelo)
+    if (senales === base.senales) return base
+    const reintento = sugerirTodo(pedido, {
+      templates: templates.filter((t) => !t.hidden), formatos: Object.values(FORMATS_BY_ID),
+      carruseles: CAROUSELS, senalesBase: senales,
+    })
+    return reintento.plantillas.length ? { ...reintento, senales } : base
+  }, [pedido, templates, delModelo])
 
   const visible = templates.filter((t) => {
     if (t.hidden) return false        // es variante de otra, no plantilla propia

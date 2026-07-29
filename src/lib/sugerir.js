@@ -449,9 +449,13 @@ function indiceEco(templates) {
 //   → [{ template, id, score, motivo, motivos, reglas }]  (0 a 3)
 // Pura: mismas entradas, misma salida. Sin red.
 // ============================================================
-export function sugerir(texto, { templates = [], formatos = [] } = {}) {
-  const s = analizar(texto, formatos)
-  if (s.vacio) return []
+export function sugerir(texto, { templates = [], formatos = [], senalesBase = null } = {}) {
+  // `senalesBase` entra cuando el modelo entendió algo que las reglas no
+  // (ver lib/entender.js). No es un atajo: las señales que llegan por acá
+  // ya pasaron por la aduana de `validar()`, y los datos duros —fecha,
+  // hora, cifra— siguen siendo los que sacó la expresión regular.
+  const s = senalesBase || analizar(texto, formatos)
+  if (s.vacio && !senalesBase) return []
 
   // ---- qué reglas disparan ----
   const activas = []
@@ -585,10 +589,10 @@ export function sugerirCarrusel(texto, carruseles = [], formatos = []) {
 // ============================================================
 // Una sola llamada para la UI: plantillas + formato + carrusel.
 // ============================================================
-export function sugerirTodo(texto, { templates = [], formatos = [], carruseles = [] } = {}) {
-  const senales = analizar(texto, formatos)
+export function sugerirTodo(texto, { templates = [], formatos = [], carruseles = [], senalesBase = null } = {}) {
+  const senales = senalesBase || analizar(texto, formatos)
   return {
-    plantillas: sugerir(texto, { templates, formatos }),
+    plantillas: sugerir(texto, { templates, formatos, senalesBase }),
     formato: senales.formato,
     diceFormato: senales.diceFormato,
     carrusel: sugerirCarrusel(texto, carruseles, formatos),
