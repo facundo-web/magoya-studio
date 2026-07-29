@@ -406,3 +406,63 @@ no hay scroll horizontal y los seis paneles abren.
 
 Usuarios, roles, permisos y notificaciones de feedback: "sería como otro
 level". El link de revisión actual se queda como está hasta la Fase 3.
+
+---
+
+## BLOQUE S — Los estilos (medido, jul 2026)
+
+Facu: "los estilos de las piezas no parecen ajustar la pieza y son casi
+imperceptibles". Era cierto y se midió.
+
+**El número.** De 235 combinaciones plantilla × variante, **35 eran píxel a
+píxel idénticas** al Original y el **46,8% cambiaba menos del 1%** de la pieza.
+El mejor cambio de esquema de color mueve 263 sobre 441; el mejor cambio de
+Estilo movía 48. La palanca llamada "Estilo" era la más débil de todas.
+
+### ✅ Arreglado (Loop 28) — eran bugs, no diseño
+
+- **La placa se pintaba del color del fondo** (`fill: scheme.surface`, el mismo
+  del rectángulo de atrás). "Texto en tarjeta" y "Texto en barra" dibujaban un
+  rectángulo invisible en las 19 plantillas sólidas. Ahora "Texto en barra" en
+  Caso de cliente cambia el 51% de la pieza.
+- **La banda se comía la pieza**: iba del tope del texto al borde inferior, así
+  que con el ancla arriba tapaba todo y la foto desaparecía.
+- **Se ofrecían opciones que no hacen nada**: el catálogo se emitía sin
+  preguntarle a la plantilla qué es.
+
+Resultado: 235 → 178 opciones, idénticas 14,9% → 2,2%, bajo 1% 46,8% → 13,5%.
+
+### Pendiente — la dirección de arte
+
+El diagnóstico: los cinco ejes son **sub-layout**. Mueven el bloque de texto
+dentro de un marco que nunca cambia. Lo que el ojo usa para decir "esto es otra
+cosa" —dónde están las masas claras y oscuras, cuánta pieza es tinta y cuánta
+imagen— es exactamente lo que ninguna variante toca.
+
+**La regla que ordena la solución:** el esquema decide *qué* colores hay; el
+estilo decide *cuánto* de cada uno y *dónde*. Un estilo nunca introduce un color
+que el esquema no tenga. Probado: cambiar el esquema por slide rompe el
+carrusel en cinco marcas distintas y hace desaparecer el wordmark.
+
+**Set propuesto, seis estilos con silueta distinta:** A sangre · Media pieza ·
+Bloque de color · Titular gigante · Tarjeta · Recuadro. Medidos contra el
+primero a 128 px: 25,6% / 47,4% / 48,6% / 59,2%, contra el 0,2–16% de hoy.
+Criterio de aceptación para cualquier estilo nuevo: **si a 128 px no cambia al
+menos el 25% de los píxeles, no entra al panel.**
+
+**Lo que hay que arreglar antes**, todo verificado renderizando:
+1. `textColor` está cableado a dos casos (sobre foto / sobre superficie). Con
+   una placa de acento o una tarjeta invertida, miente. La función que elige
+   bien ya existe: `mejorTinta`, adentro de `chatPalette`.
+2. `mutedColor` sale del esquema, no del fondo real: 2,3:1 en la tarjeta crema.
+3. `acentoLegible()` mide contra `scheme.surface`, no contra el fondo real.
+4. El color elegido a mano desaparece sobre una placa clara.
+5. `metric` y `cta` se parten por caracteres cuando la columna se angosta
+   (`−70%` → `−7` / `0%`).
+6. El stack se sale por arriba con `density: roomy` — **ya pasa hoy**.
+7. Un estilo de foto sobre una pieza sin foto promete algo que no puede dar.
+8. Los objetos con `tint: accent` desaparecen sobre el bloque de acento.
+9. Guard de cierre: recorrer 30 plantillas × 6 estilos × 8 esquemas y fallar si
+   algún par baja de 4,5:1 (texto chico) o 3:1 (display).
+
+Las imágenes de la propuesta están renderizadas con el motor real.
