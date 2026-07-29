@@ -168,9 +168,25 @@ export default function Gallery({
       {delModelo && delModelo.confianza >= 0.45 && delModelo.objetivo !== 'ninguno' && (
         // Prueba de que la IA no es adorno: dice qué entendió, y se puede
         // comparar con la frase de al lado.
+        //
+        // "publicitar un webinar" entiende bien (webinar -> invitar a
+        // algo) pero sin fecha/hora ninguna regla dispara y el piso de
+        // "solo objetivo" (58) no lo pasa: quedaba el aviso solo, sin
+        // nada atrás. Facu: "lo mejor es que le traiga los modelos que
+        // puede usar". Si no hay 1-3 ganadoras, el aterrizaje es el
+        // filtro de ese objetivo, no una frase muerta.
         <div style={{ fontSize: 12, color: 'var(--ui-muted, #888)', margin: '0 0 14px 2px' }}>
           ✨ La IA entendió: <b>{ETIQUETA[delModelo.objetivo] || delModelo.objetivo}</b>
           {delModelo.tema && <> · tema “{delModelo.tema}”</>}
+          {sug.plantillas.length === 0 && !sug.carrusel && OBJETIVOS.has(delModelo.objetivo) && (
+            <>
+              {' · '}
+              <button className="linklike" style={{ fontSize: 12 }} onClick={() => {
+                setFilter(delModelo.objetivo)
+                requestAnimationFrame(() => document.querySelector('.h3-templates')?.scrollIntoView({ behavior: 'smooth' }))
+              }}>Ver todas las de {ETIQUETA[delModelo.objetivo]}</button>
+            </>
+          )}
         </div>
       )}
       {(sug.plantillas.length > 0 || sug.carrusel) && (
