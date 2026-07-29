@@ -383,7 +383,8 @@ export default function Editor({
     if (o.kind === 'device') {
       const dev = ICONS_BY_ID[o.deviceId]
       w = refDim * (o.scale || 0.5); h = w / (dev?.screen?.ratio || 1)
-    } else if (o.kind === 'image' && o.frame) { w = refDim * (o.scale || 0.4); h = w * (o.ratio || 0.6) }
+    } else if (o.kind === 'mockup') { w = refDim * (o.scale || 0.72); h = w * (o.ratio || 0.75) }
+    else if (o.kind === 'image' && o.frame) { w = refDim * (o.scale || 0.4); h = w * (o.ratio || 0.6) }
     else if (o.kind === 'shape') {
       // cada forma tiene su propia proporción; si la caja no la respeta,
       // el marco de selección no coincide con lo que se ve dibujado.
@@ -424,6 +425,10 @@ export default function Editor({
         ...(icon.shape === 'callout' ? { text: '¿Y si el dato ya lo tenías?', tint: '#FFFFFF', shadow: true } : {}),
         ...(icon.shape === 'window' ? { scale: 0.62, ratio: 0.62, shadow: true, text: 'panel.magoya.com', tint: '#FFFFFF', front: true } : {}),
         ...(icon.shape === 'panel' ? { scale: 0.34, ratio: 0.7, radius: 0.06 } : {}) }])
+      setSelObj(objects.length); return
+    }
+    if (icon.isMockup) {
+      setObjects([...objects, { kind: 'mockup', ...pos, scale: 0.72, ratio: 0.75, rotation: 0, opacity: 1, screen: { a: [0.33, 0.24], b: [0.67, 0.22], d: [0.35, 0.78] }, focal: { x: 0.5, y: 0.5 } }])
       setSelObj(objects.length); return
     }
     if (icon.isDevice) {
@@ -1381,6 +1386,10 @@ function ObjectsBody({ objects, setObjects, selObj, setSelObj, objRemove, onToas
         ...(icon.shape === 'panel' ? { scale: 0.34, ratio: 0.7, radius: 0.06 } : {}) })])
       setSelObj(objects.length); closePicker(); return
     }
+    if (icon.isMockup) {
+      setObjects([...objects, enCascada(objects, { kind: 'mockup', x: 0.5, y: 0.5, scale: 0.72, ratio: 0.75, rotation: 0, opacity: 1, screen: { a: [0.33, 0.24], b: [0.67, 0.22], d: [0.35, 0.78] }, focal: { x: 0.5, y: 0.5 } })])
+      setSelObj(objects.length); closePicker(); return
+    }
     if (icon.isDevice) {
       setObjects([...objects, enCascada(objects, { kind: 'device', deviceId: icon.id, x: 0.5, y: 0.5, scale: 0.55, rotation: 0, shadow: true, opacity: 1, focal: { x: 0.5, y: 0.5 }, zoom: 1 })])
       setSelObj(objects.length)
@@ -1608,6 +1617,14 @@ function ObjectProps({ o, i, updateObject, objRemove, objDuplicate, objBringFron
   const isMark = !!objIcon?.isMark
   const showTint = o.kind === 'icon' && (isMark || o.style === 'plain')
   const devPhotoRef = useRef(null)
+  const mockFotoRef = useRef(null)
+  // la foto base del mockup va a 2048: es el fondo del objeto, se ve grande
+  const onMockFoto = async (file) => {
+    if (!file || !file.type.startsWith('image/')) return
+    const foto = await compressImage(file, 2048)
+    const fotoNatural = await imageSize(foto)
+    updateObject(i, { foto, fotoNatural })
+  }
   const setDevPhoto = async (src) => {
     const natural = await imageSize(src)
     updateObject(i, { src, natural })
@@ -1634,6 +1651,47 @@ function ObjectProps({ o, i, updateObject, objRemove, objDuplicate, objBringFron
           <button className="btn" style={{ padding: '2px 8px' }} onClick={() => objRemove(i)}>Quitar</button>
         </span>
       </div>
+      {o.kind === 'mockup' && (
+        <>
+          {/* Dos fotos: la de la mano con el dispositivo, y lo que va
+              adentro de la pantalla. Las esquinas se marcan una vez. */}
+          <label>La foto (alguien con el dispositivo)</label>
+          <div className={'dropzone' + (o.foto ? ' has' : '')} onClick={() => mockFotoRef.current?.click()}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => { e.preventDefault(); e.dataTransfer.files[0] && onMockFoto(e.dataTransfer.files[0]) }}>
+            {o.foto ? '✓ Foto puesta — click para cambiarla' : 'Subí una foto de alguien sosteniendo un celular o tablet'}
+          </div>
+          <input ref={mockFotoRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => e.target.files[0] && onMockFoto(e.target.files[0])} />
+          {o.foto && (
+            <>
+              <label style={{ marginTop: 10 }}>Lo que va en la pantalla</label>
+              <div className={'dropzone' + (o.src ? ' has' : '')} onClick={() => devPhotoRef.current?.click()}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => { e.preventDefault(); e.dataTransfer.files[0] && onDevFile(e.dataTransfer.files[0]) }}>
+                {o.src ? '✓ Captura puesta — click para cambiarla' : 'Subí la captura que va adentro'}
+              </div>
+              <input ref={devPhotoRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => e.target.files[0] && onDevFile(e.target.files[0])} />
+              <div className="hint" style={{ marginTop: 10 }}>
+                Marcá las tres esquinas de la pantalla en la foto. Con esas tres la captura entra
+                con la misma inclinación que el dispositivo.
+              </div>
+              {[['a', 'Esquina de arriba a la izquierda'], ['b', 'Esquina de arriba a la derecha'], ['d', 'Esquina de abajo a la izquierda']].map(([k, etiqueta]) => (
+                <div key={k}>
+                  <label>{etiqueta}</label>
+                  <Pad2D x={o.screen?.[k]?.[0] ?? 0.5} y={o.screen?.[k]?.[1] ?? 0.5}
+                    onChange={(pt) => updateObject(i, { screen: { ...o.screen, [k]: [pt.x, pt.y] } })} />
+                </div>
+              ))}
+              <Ctl label="Reflejo de la pantalla" value={Math.round((o.glare ?? 0.14) * 100)} min={0} max={45} suffix="%"
+                onChange={(v) => updateObject(i, { glare: v / 100 }, 'glare')} />
+              <label>Encuadre de la captura</label>
+              <Pad2D x={o.focal?.x ?? 0.5} y={o.focal?.y ?? 0.5} onChange={(f) => updateObject(i, { focal: f })} />
+            </>
+          )}
+          <Ctl label="Proporción" value={Math.round((o.ratio ?? 0.75) * 100)} min={40} max={180} suffix="%"
+            onChange={(v) => updateObject(i, { ratio: v / 100 }, 'ratio')} />
+        </>
+      )}
       {o.kind === 'device' && (
         <>
           <label>Foto en la pantalla</label>
@@ -1891,6 +1949,7 @@ function ObjectProps({ o, i, updateObject, objRemove, objDuplicate, objBringFron
 
 // Nombre exacto de lo que hay seleccionado: antes casi todo decía "Logo".
 function objectName(o, icon) {
+  if (o.kind === 'mockup') return o.foto ? 'Mockup con foto' : 'Mockup (falta la foto)'
   if (!o) return 'Elemento'
   if (o.kind === 'shape') return SHAPE_NAMES[o.shape] || 'Forma'
   if (o.kind === 'device') return icon?.label ? `Dispositivo · ${icon.label}` : 'Dispositivo'

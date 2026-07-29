@@ -632,6 +632,26 @@ function drawObjects(b, { objects, W, H, ref, accent, scheme }) {
     }
     // panel de foto vacío: una plantilla puede declararlo y se ve el
     // esqueleto "acá va una foto" en vez de no dibujar nada
+    // MOCKUP: una foto tuya sosteniendo un dispositivo, con la captura
+    // adentro de la pantalla. "Eso de tener una mano teniendo un
+    // dispositivo o en uso" — las referencias de Canva que trajo el equipo.
+    // La foto la pone la persona: una foto de Magoya en el campo vale mas
+    // que una mano de stock, y ademas ya es de marca.
+    if (o.kind === 'mockup') {
+      const w = ref * (o.scale || 0.7)
+      const h = w * (o.ratio || 0.75)
+      if (!o.foto) {
+        b.imageCover({ x: cx - w / 2, y: cy - h / 2, w, h, href: null, rotation, radius: ref * 0.01 })
+        continue
+      }
+      b.pantallaEnFoto({
+        x: cx - w / 2, y: cy - h / 2, w, h,
+        foto: o.foto, natural: o.fotoNatural, screen: o.screen,
+        href: o.src, hrefNatural: o.natural, focal: o.focal || { x: 0.5, y: 0.5 },
+        opacity, brillo: o.glare ?? 0.14,
+      })
+      continue
+    }
     if (o.kind === 'image' && !o.src && o.frame) {
       const fw = ref * (o.scale || 0.4)
       const fh = fw * (o.ratio || 0.6)

@@ -140,6 +140,16 @@ export const DEVICES = Object.entries(deviceModules).map(([path, url]) => {
   return { id: `devices:${slug}`, slug, category: 'devices', label: DEVICE_NAMES[slug] || slug, url, color: '#1B1B1B', isDevice: true, screen: DEVICE_SCREENS[slug] }
 })
 
+// Mockup con foto propia: una foto de alguien de Magoya sosteniendo un
+// celular o una tablet, y la captura adentro de la pantalla. La foto la
+// pone el equipo — una mano de stock nunca va a ser de marca, y una foto
+// del campo de verdad sí. Las esquinas de la pantalla se marcan una vez y
+// quedan guardadas con el objeto.
+export const MOCKUP_FOTO = {
+  id: 'devices:mockup', slug: 'mockup', category: 'devices',
+  label: 'Mockup con tu foto', isMockup: true, color: '#1B1B1B',
+}
+
 // ---- FORMAS generativas (alto impacto "AI en campo") ----
 export const SHAPES = [
   { id: 'shape:arrow', slug: 'arrow', category: 'shapes', label: 'Flecha gruesa', shape: 'arrow', isShape: true, color: '#00DE68' },
@@ -157,7 +167,7 @@ export const SHAPES = [
   { id: 'shape:panel', slug: 'panel', category: 'shapes', label: 'Panel de color', shape: 'panel', isShape: true, color: '#00DE68' },
 ]
 
-export const ALL_OBJECTS = [...ICONS, ...MARKS, ...SHAPES, ...MAGOYA_OBJECTS, ...DEVICES]
+export const ALL_OBJECTS = [...ICONS, ...MARKS, ...SHAPES, ...MAGOYA_OBJECTS, ...DEVICES, MOCKUP_FOTO]
 export const ICONS_BY_ID = Object.fromEntries(ALL_OBJECTS.map((i) => [i.id, i]))
 export const ICON_CATEGORIES = { agro: 'Agro e IA', ai: 'Logos de IA', social: 'Redes sociales', trazos: 'Trazos', misc: 'Misceláneas', shapes: 'Formas', devices: 'Dispositivos', magoya: 'Logo Magoya' }
 export const ICON_URLS = ALL_OBJECTS.map((i) => i.url).filter(Boolean)

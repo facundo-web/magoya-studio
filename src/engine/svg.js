@@ -299,6 +299,56 @@ export function createBuilder() {
     // el cuerpo de la ventana debajo de la barra de título) ese centro NO es
     // el del objeto: el marco giraba alrededor del objeto y la foto alrededor
     // de sí misma, así que al rotar la foto se corría del encuadre.
+    // ---- PANTALLA DENTRO DE UNA FOTO (mockup con mano) ----
+    // Una foto de alguien sosteniendo un celular o una tablet, y ADENTRO de
+    // la pantalla la captura que subiste. Es lo que hace Canva y lo que
+    // pidio Facu: "eso de tener una mano teniendo un dispositivo o en uso".
+    //
+    // La pantalla se declara con TRES esquinas (a = arriba-izq, b = arriba-der,
+    // d = abajo-izq) en fracciones de la foto. Con esas tres sale la matriz
+    // afin exacta que lleva un rectangulo a ese paralelogramo, o sea que la
+    // captura entra con la misma inclinacion que el dispositivo real. La
+    // cuarta esquina no hace falta: la define el paralelogramo.
+    //
+    // Es afin, no perspectiva: si el dispositivo esta MUY escorzado los lados
+    // no convergen. Para las inclinaciones de una foto de producto alcanza, y
+    // es lo unico que SVG sabe hacer sin trucos.
+    pantallaEnFoto({ x, y, w, h, foto, natural, screen, href, hrefNatural, focal = { x: 0.5, y: 0.5 }, opacity = 1, brillo = 0.14 }) {
+      if (!foto) return
+      // 1 · la foto del mockup, entera
+      this.imageCover({ x, y, w, h, href: foto, natural })
+      if (!href || !screen) return
+      // 2 · la captura, deformada al cuadrilatero de la pantalla
+      const P = (p) => [x + p[0] * w, y + p[1] * h]
+      const [ax, ay] = P(screen.a), [bx, by] = P(screen.b), [dx, dy] = P(screen.d)
+      // matriz que manda (0,0)->a, (1,0)->b, (0,1)->d
+      const m = [bx - ax, by - ay, dx - ax, dy - ay, ax, ay].map(n).join(' ')
+      const clipId = id('pclip')
+      const cx4 = bx + dx - ax, cy4 = by + dy - ay   // la cuarta esquina
+      defs.push(`<clipPath id="${clipId}"><polygon points="${n(ax)},${n(ay)} ${n(bx)},${n(by)} ${n(cx4)},${n(cy4)} ${n(dx)},${n(dy)}"/></clipPath>`)
+      // la captura se dibuja en el cuadrado unidad y la matriz la ubica
+      let ix = 0, iy = 0, iw = 1, ih = 1
+      if (hrefNatural?.w && hrefNatural?.h) {
+        // cover dentro del rectangulo unidad, respetando el punto de encuadre
+        const lado = Math.hypot(bx - ax, by - ay), alto = Math.hypot(dx - ax, dy - ay)
+        const esc = Math.max(1 / (hrefNatural.w / hrefNatural.h) * (lado / alto), 1)
+        const escX = Math.max(1, (hrefNatural.w / hrefNatural.h) / (lado / alto))
+        iw = escX; ih = esc
+        ix = -(iw - 1) * focal.x; iy = -(ih - 1) * focal.y
+      }
+      const op = opacity < 1 ? ` opacity="${opacity}"` : ''
+      body.push(
+        `<g clip-path="url(#${clipId})"${op}><g transform="matrix(${m})">` +
+        `<image href="${href}" x="${n(ix)}" y="${n(iy)}" width="${n(iw)}" height="${n(ih)}" preserveAspectRatio="none"/>` +
+        `</g></g>`
+      )
+      // 3 · el reflejo de la pantalla, que es lo que la pega a la foto
+      if (brillo > 0) {
+        const gid = id('pbri')
+        defs.push(`<linearGradient id="${gid}" x1="0" y1="0" x2="0.85" y2="1"><stop offset="0" stop-color="#fff" stop-opacity="${brillo}"/><stop offset="0.45" stop-color="#fff" stop-opacity="0"/></linearGradient>`)
+        body.push(`<g clip-path="url(#${clipId})"><rect x="${n(x)}" y="${n(y)}" width="${n(w)}" height="${n(h)}" fill="url(#${gid})"/></g>`)
+      }
+    },
     framedImage({ cx, cy, w, h, rotation = 0, flipX = false, href, natural, focal = { x: 0.5, y: 0.5 }, radius = 0, zoom = 1, shadow = false, opacity = 1, rcx = null, rcy = null }) {
       if (!href) return
       const px = rcx ?? cx

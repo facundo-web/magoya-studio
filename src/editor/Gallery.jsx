@@ -1,8 +1,8 @@
 import React, { useRef } from 'react'
-import { TEMPLATES, demoContent } from '../templates/index.js'
+import { TEMPLATES, demoContent, placeholderContent } from '../templates/index.js'
 import { CAROUSELS, buildCarousel } from '../templates/carousels.js'
 import { masUsadas } from '../project/uso.js'
-import { sugerirTodo } from '../lib/sugerir.js'
+import { sugerirTodo, armar, aplicarArmado } from '../lib/sugerir.js'
 import { FORMATS_BY_ID, formatsByNetwork } from '../formats/registry.js'
 import PiecePreview from './PiecePreview.jsx'
 import Icon from '../ui/Icon.jsx'
@@ -142,15 +142,22 @@ export default function Gallery({
                 </div>
               )
             })()}
-            {sug.plantillas.map(({ template: t, motivo }) => (
-              <div key={t.id} className="h3-card">
-                <button className="h3-thumb" onClick={() => onPick(t, sug.formato || fmt)} title={t.purpose}>
-                  <PiecePreview template={t} content={demoContent(t)} format={fmt} />
-                </button>
-                <div className="h3-name">{t.name}</div>
-                <div className="purpose">{motivo}</div>
-              </div>
-            ))}
+            {sug.plantillas.map(({ template: t, motivo }) => {
+              // No sugerir: ARMAR. La vista previa ya muestra la pieza con
+              // el texto de la persona adentro, así que lo que ve antes de
+              // entrar es lo que va a tener.
+              const { campos, puestos } = armar(pedido, t, Object.values(FORMATS_BY_ID))
+              const contenido = aplicarArmado(placeholderContent(t), campos)
+              return (
+                <div key={t.id} className="h3-card">
+                  <button className="h3-thumb" onClick={() => onPick(t, sug.formato || fmt, contenido)} title={t.purpose}>
+                    <PiecePreview template={t} content={t.surface === 'photo' ? { ...demoContent(t), ...contenido } : contenido} format={fmt} />
+                  </button>
+                  <div className="h3-name">{t.name}</div>
+                  <div className="purpose">{puestos.length ? `Ya con ${puestos.join(' y ')}` : motivo}</div>
+                </div>
+              )
+            })}
           </div>
         </div>
       )}

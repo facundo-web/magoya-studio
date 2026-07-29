@@ -254,15 +254,18 @@ export default function App() {
   useEffect(() => { dirtyRef.current = dirty }, [dirty])
 
   // ---- iniciar desde template ----
-  function pickTemplate(template, chosenFormat) {
+  // `contenido` viene armado cuando la pieza sale del campo "¿qué querés
+  // hacer?": el titular y la fecha ya son los que escribió la persona.
+  function pickTemplate(template, chosenFormat, contenido) {
+    const inicial = contenido || freshContent(template)
     setProjectId(newProjectId())
     revRef.current = 0; conflictoRef.current = false; setConflicto(false)
     namedByHand.current = false
-    setProjectName(template.defaults?.title || template.name)
+    setProjectName(inicial.title || template.defaults?.title || template.name)
     setFormatId(chosenFormat?.id || galleryFormatId || DEFAULT_FORMAT)
     resetHistory()
-    piecesRef.current = [{ template, content: freshContent(template) }]
-    setPieces([{ template, content: freshContent(template) }])
+    piecesRef.current = [{ template, content: inicial }]
+    setPieces([{ template, content: inicial }])
     setActive(0)
     setCarousel(false)
     setDirty(false)

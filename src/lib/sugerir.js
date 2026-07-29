@@ -595,3 +595,101 @@ export function sugerirTodo(texto, { templates = [], formatos = [], carruseles =
     senales,
   }
 }
+
+// ============================================================
+// ARMAR LA PIEZA, NO SÓLO SUGERIRLA
+//
+// "El buscador tiene que ser algo más cercano a un prompt que en base al
+// pedido te devuelva un resultado dentro de la plataforma."
+//
+// La diferencia con un chatbot es la línea que este producto no cruza:
+// acá NO se escribe copy. Se REUBICA el que la persona ya escribió. Si
+// puso "webinar de IA en campo el 11 de junio", el titular dice "IA en
+// campo" y la línea de fecha dice "11 de junio" — dos pedazos textuales
+// de su frase, puestos donde van. Nada inventado, nada reescrito.
+//
+// Lo que la frase no dice, queda con el texto de muestra de la plantilla,
+// que es lo que pasa hoy al abrir cualquier plantilla.
+// ============================================================
+
+// El TEMA es un PEDAZO TEXTUAL de la frase, no una bolsa de palabras.
+// Primer intento: filtraba palabra por palabra y volvía a unir, y salía
+// "Webinar ia campo" — un titular que nadie escribiría. Eso es delirio en
+// miniatura, justo lo que esta herramienta viene a evitar. Ahora se le
+// recorta el andamiaje a los BORDES y el medio se respeta tal cual, con
+// sus preposiciones: "ia en campo".
+
+// Lo que sobra al principio: la intención, el tipo de pieza, la red.
+const BORDE_INICIO = /^(?:\s*(?:hola|che|quiero|queria|querria|necesito|dame|haceme|armame|generame|me\s+armas|podes|puedo|hacer|armar|crear|generar|un|una|unos|unas|el|la|los|las|algo|otro|otra|nuevo|nueva|pieza|piezas|placa|placas|posteo|posteos|post|publicacion|publicaciones|diseno|diseño|imagen|grafica|slide|slides|carrusel|carousel|story|stories|storie|reel|miniatura|thumbnail|para|de|del|sobre|en|con|a|al|que|contar|contando|mostrar|mostrando|avisar|anunciar|invitar|invitando|presentar|explicar|explicando|comunicar)\b\s*)+/i
+// Y lo que sobra al final: conectores colgados.
+const BORDE_FIN = /(?:\s*\b(?:de|del|para|por|con|en|y|e|o|a|al|que|sobre|nuestro|nuestra|mi|su|este|esta|el|la|los|las|un|una)\b\s*)+$/i
+
+// Siglas que la gente escribe en minúscula y son mayúscula en la pieza.
+const SIGLAS = { ia: 'IA', ai: 'AI', erp: 'ERP', roi: 'ROI', ceo: 'CEO', cto: 'CTO', pyme: 'PyME', fms: 'FMS', ndvi: 'NDVI' }
+
+export function temaDe(senales, original = '') {
+  // se trabaja sobre lo que ESCRIBIÓ la persona, no sobre la versión sin
+  // tildes: el titular tiene que salir con sus acentos
+  let t = String(original || senales.texto)
+  for (const re of [RE_FECHA, RE_HORA, RE_CARRUSEL]) t = t.replace(new RegExp(re.source, 'i'), ' ')
+  t = t.replace(/\b(?:instagram|linkedin|youtube|whatsapp|wsp|\big\b|\byt\b|redes)\b/gi, ' ')
+  t = t.replace(/\s+/g, ' ').trim()
+  t = t.replace(BORDE_INICIO, '').replace(BORDE_FIN, '').trim()
+  if (t.length < 4) return null
+  // una frase de una sola palabra rara vez es un titular
+  if (!/\s/.test(t) && t.length < 6) return null
+  const palabras = t.split(' ').map((w) => SIGLAS[w.toLowerCase()] || w)
+  const frase = palabras.join(' ')
+  return frase.charAt(0).toUpperCase() + frase.slice(1)
+}
+
+// La línea de cuándo: "11 de junio · 11 hs". Sólo con lo que dijo.
+function cuandoDe(senales) {
+  const partes = [senales.fecha, senales.hora].filter(Boolean)
+  return partes.length ? partes.join(' · ') : null
+}
+
+/**
+ * Devuelve los campos a completar en la plantilla, y de dónde salió cada
+ * uno, para poder mostrárselo a la persona.
+ * Nunca inventa: si no lo dijo, no va.
+ */
+export function armar(texto, template, formatos = []) {
+  const s = analizar(texto, formatos)
+  if (s.vacio || !template) return { campos: {}, puestos: [] }
+  const tema = temaDe(s, texto)
+  const cuando = cuandoDe(s)
+  const roles = template.roles || []
+  const estilos = (template.defaults?.textBlocks || []).map((b) => b.style)
+  const acepta = (r) => roles.includes(r) || estilos.includes(r)
+
+  const campos = {}
+  const puestos = []
+  // El tema va al titular. Es el único lugar donde va: es DE QUÉ se trata.
+  if (tema && acepta('title')) { campos.title = tema; puestos.push(`el titular dice “${tema}”`) }
+  else if (tema && acepta('quote')) { campos.quote = tema; puestos.push(`la cita dice “${tema}”`) }
+  // La fecha y la hora van a la bajada, que es donde estas plantillas la
+  // llevan. Si ya hay tema en el titular, no se pisan.
+  if (cuando && acepta('subtitle')) { campos.subtitle = cuando; puestos.push(`la fecha dice “${cuando}”`) }
+  // Una cifra que es noticia va al lugar de la cifra, no al titular.
+  if (s.cifra && acepta('metric')) {
+    campos.metric = s.cifra
+    if (campos.title === tema && tema) delete campos.title  // el tema pasa a ser la bajada del dato
+    if (tema && acepta('metricLabel')) campos.metricLabel = tema
+    puestos.push(`la cifra es ${s.cifra}`)
+  }
+  return { campos, puestos, senales: s, formato: s.formato }
+}
+
+/** Aplica lo que armó sobre el contenido inicial de una plantilla. */
+export function aplicarArmado(contenidoBase, campos) {
+  const out = { ...contenidoBase }
+  Object.entries(campos || {}).forEach(([k, v]) => {
+    if (!v) return
+    // en las piezas libres el texto vive en bloques, no en roles
+    const i = (out.textBlocks || []).findIndex((b) => (b.style || 'title') === k)
+    if (i >= 0) out.textBlocks = out.textBlocks.map((b, idx) => (idx === i ? { ...b, text: v } : b))
+    else out[k] = v
+  })
+  return out
+}
