@@ -1101,7 +1101,16 @@ export default function Editor({
                 <span>{objects.length ? 'Falta la foto de fondo' : 'Elegí la foto de fondo para empezar'}</span>
               </button>
             )}
-            {selObj != null && objects[selObj] && (
+            {seleccion.length > 1 ? (
+              // "El shift no me muestra que seleccioné más de un objeto" —
+              // el panel derecho SÍ decía "2 elementos seleccionados", pero
+              // ahí no es donde mirás mientras trabajás en el lienzo. Con
+              // un objeto chico (un destello, un ícono) el contorno
+              // punteado del segundo también pasaba desapercibido. Este
+              // aviso vive en el mismo lugar donde ya confiás que algo se
+              // seleccionó — el cartel de "Arrastrá para ubicar".
+              <div className="drag-hint group-hint">{seleccion.length} elementos seleccionados</div>
+            ) : selObj != null && objects[selObj] && (
               <div className="drag-hint">Arrastrá para ubicar el objeto</div>
             )}
             {selObj == null && selText && (
