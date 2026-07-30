@@ -57,26 +57,23 @@ export default function Gallery({
   // Lo que entendió el modelo, cuando contesta. `null` mientras no hay
   // respuesta — y `null` significa "seguí con las reglas", no "no hay nada".
   const [delModelo, setDelModelo] = React.useState(null)
-  // "No funciona como si tuviera un LLM detrás" — Facu tenía razón: la IA
-  // tarda hasta 7s y no había NINGÚN indicio visual mientras tanto, así
-  // que aunque funcionara no se notaba. `pensando` es esa señal.
   const [pensando, setPensando] = React.useState(false)
-  React.useEffect(() => {
-    setDelModelo(null)
-    setPensando(false)
-    if (pedido.trim().length < 6) return
-    // 500ms: no se le pregunta al modelo en cada tecla
-    const t = setTimeout(() => {
-      let vivo = true
-      setPensando(true)
-      entender(pedido)
-        .then((r) => { if (vivo) setDelModelo(r) })
-        .catch(() => {})
-        .finally(() => { if (vivo) setPensando(false) })
-      return () => { vivo = false }
-    }, 500)
-    return () => clearTimeout(t)
-  }, [pedido])
+  // Antes esto se disparaba solo, a los 500ms de dejar de escribir — sin
+  // que la persona hiciera nada. Facu: "queda como que tenés un tiempo
+  // para escribir y la interacción es rara". Tenía razón: un timer
+  // invisible no es una acción, y sin una acción no hay nada que
+  // entender que "pasó algo". Ahora se pregunta con Enter o la flecha,
+  // como cualquier prompt — la persona decide cuándo se envía.
+  const preguntarIA = React.useCallback((texto) => {
+    const limpio = texto.trim()
+    if (limpio.length < 6 || pensando) return
+    setPensando(true)
+    entender(limpio).then((r) => setDelModelo(r)).catch(() => {}).finally(() => setPensando(false))
+  }, [pensando])
+  // Si la persona sigue editando después de una respuesta, esa respuesta
+  // ya no es sobre este texto: se invalida, pero no se vuelve a preguntar
+  // sola — hace falta un nuevo Enter.
+  React.useEffect(() => { setDelModelo(null) }, [pedido])
 
   const sug = React.useMemo(() => {
     const base = sugerirTodo(pedido, { templates: templates.filter((t) => !t.hidden), formatos: Object.values(FORMATS_BY_ID), carruseles: CAROUSELS })
@@ -148,20 +145,27 @@ export default function Gallery({
       <div className="h3-pedido" style={{ display: 'flex', gap: 10, alignItems: 'center', margin: '4px 0 6px' }}>
         <div style={{ position: 'relative', flex: 1 }}>
           <input type="text" value={pedido} placeholder="¿Qué querés hacer? Ej: webinar de IA en campo el 11 de junio"
-            onChange={(e) => setPedido(e.target.value)} aria-label="Contá qué querés hacer"
-            style={{ width: '100%', boxSizing: 'border-box', padding: '11px 14px', paddingRight: pensando ? 118 : 14,
+            onChange={(e) => setPedido(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); preguntarIA(pedido) } }}
+            aria-label="Contá qué querés hacer"
+            style={{ width: '100%', boxSizing: 'border-box', padding: '11px 50px 11px 14px',
               fontSize: 14, borderRadius: 12, border: '1.5px solid var(--ui-line)', background: '#fff',
               color: 'inherit', font: 'inherit', outline: 'none' }} />
-          {/* La señal que faltaba: sin esto, la IA tarda hasta 7s y no se
-              nota que está pensando — se ve idéntico a la búsqueda de
-              siempre, aunque funcione. */}
-          {pensando && (
-            <span style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
-              display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--ui-muted, #888)' }}>
-              <span className="ia-spinner" aria-hidden="true" />
-              Pensando con IA…
-            </span>
-          )}
+          {/* El envío es explícito, como cualquier prompt: escribís y
+              apretás Enter o esta flecha. Antes se disparaba solo a los
+              500ms de dejar de escribir, sin ninguna acción de la
+              persona — de ahí que se sintiera raro. */}
+          <button type="button" aria-label={pensando ? 'Pensando' : 'Preguntarle a la IA'}
+            onClick={() => preguntarIA(pedido)} disabled={pedido.trim().length < 6 || pensando}
+            style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
+              width: 30, height: 30, borderRadius: '50%', border: 'none', padding: 0,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: pedido.trim().length < 6 ? 'var(--ui-line, #ddd)' : 'var(--emerald-700, #1a7a4c)',
+              color: '#fff', cursor: pedido.trim().length < 6 ? 'default' : 'pointer' }}>
+            {pensando
+              ? <span className="ia-spinner" aria-hidden="true" style={{ borderColor: '#fff', borderTopColor: 'transparent' }} />
+              : <Icon n="up" size={16} />}
+          </button>
         </div>
         {pedido && <button className="linklike" onClick={() => setPedido('')}>Borrar</button>}
       </div>
