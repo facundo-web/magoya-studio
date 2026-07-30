@@ -279,6 +279,28 @@ export default function Editor({
     setMultiSel(new Set(multiSel).add(idx))
   }
   const [selText, setSelText] = useState(null) // eid del texto seleccionado
+  // "Cuando es texto no me permite selección múltiple" — mismo modelo que
+  // los objetos (primario + resto del grupo), aplicado a textos. Es un
+  // grupo APARTE del de objetos a propósito: mezclar un texto y un logo
+  // en un mismo grupo no tiene una acción de conjunto clara (¿el borrado
+  // qué hace con cada uno?), así que se puede armar un grupo de varios
+  // objetos O de varios textos, no los dos mezclados.
+  const [multiSelText, setMultiSelText] = useState(() => new Set())
+  const textSeleccion = React.useMemo(
+    () => [...new Set([selText, ...multiSelText])].filter(Boolean),
+    [selText, multiSelText],
+  )
+  const toggleMultiSelText = (eid) => {
+    if (selText === eid) {
+      const resto = [...multiSelText]
+      setSelText(resto.shift() ?? null)
+      setMultiSelText(new Set(resto))
+      return
+    }
+    if (multiSelText.has(eid)) { const next = new Set(multiSelText); next.delete(eid); setMultiSelText(next); return }
+    if (selText == null) { setSelText(eid); return }
+    setMultiSelText(new Set(multiSelText).add(eid))
+  }
   // El fondo es la tercera cosa editable de la pieza, y sus ajustes vivian en
   // el panel IZQUIERDO — al lado de la biblioteca de fotos, a pantalla y media
   // de scroll. Rompia la unica regla del editor: a la izquierda elegis, a la
@@ -538,7 +560,7 @@ export default function Editor({
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
       // con un modal abierto los atajos del lienzo no tienen que responder
       if (document.querySelector('.mk-modal-ov, .chooser-ov')) return
-      if (e.key === 'Escape') { setCtxMenu(null); deselectAll(); setSelText(null); setEditing(null); return }
+      if (e.key === 'Escape') { setCtxMenu(null); deselectAll(); setSelText(null); setMultiSelText(new Set()); setEditing(null); return }
       if (e.metaKey || e.ctrlKey) {
         if (e.key === '0') { e.preventDefault(); setZoom(0); return }
         if (e.key === '+' || e.key === '=') { e.preventDefault(); setZoom((z) => Math.min(4, (z || fitZoom()) * 1.2)); return }
@@ -546,16 +568,35 @@ export default function Editor({
         // Copiar/pegar: si no hay nada que copiar o nada pegado todavía,
         // no se hace preventDefault — así el copy/paste normal del
         // navegador (por ej. texto seleccionado en un panel) sigue andando.
-        if (e.key.toLowerCase() === 'c' && seleccion.length) { e.preventDefault(); copySelection(seleccion); return }
-        if (e.key.toLowerCase() === 'v' && clipboardRef.current?.length) { e.preventDefault(); pasteClipboard(); return }
+        // Objetos y textos son grupos aparte (ver arriba): gana el que
+        // tenga algo seleccionado ahora mismo.
+        if (e.key.toLowerCase() === 'c') {
+          if (seleccion.length) { e.preventDefault(); copySelection(seleccion); return }
+          if (textSeleccion.length) { e.preventDefault(); textCopySelection(textSeleccion); return }
+        }
+        if (e.key.toLowerCase() === 'v') {
+          if (clipboardRef.current?.length) { e.preventDefault(); pasteClipboard(); return }
+          if (textClipboardRef.current?.length) { e.preventDefault(); textPasteClipboard(); return }
+        }
       }
-      if (!seleccion.length) return
-      if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); objRemoveMany(seleccion); return }
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'd') {
+      if (!seleccion.length && !textSeleccion.length) return
+      if (e.key === 'Delete' || e.key === 'Backspace') {
         e.preventDefault()
-        objDuplicateMany(seleccion)
+        if (seleccion.length) objRemoveMany(seleccion)
+        else textRemoveMany(textSeleccion)
         return
       }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'd') {
+        e.preventDefault()
+        if (seleccion.length) objDuplicateMany(seleccion)
+        else textDuplicateMany(textSeleccion)
+        return
+      }
+      // El nudge con flechas sigue siendo sólo para objetos: un texto
+      // suelto de la pieza (rol) no tiene x/y propio salvo que ya lo
+      // hayas sacado del stack arrastrándolo — mezclar ambos casos en un
+      // solo grupo queda para una vuelta aparte.
+      if (!seleccion.length) return
       const step = e.shiftKey ? 0.05 : 0.01
       const mv = { ArrowLeft: { x: -step }, ArrowRight: { x: step }, ArrowUp: { y: -step }, ArrowDown: { y: step } }[e.key]
       if (mv) {
@@ -634,7 +675,7 @@ export default function Editor({
     window.addEventListener('pointerup', up)
   }
 
-  const onSelectText = (eid) => { setSelText(eid); setSelObj(null); setMultiSel(new Set()); setSelBg(false) }
+  const onSelectText = (eid) => { setSelText(eid); setMultiSelText(new Set()); setSelObj(null); setMultiSel(new Set()); setSelBg(false) }
   // posición libre de un bloque de texto. Arrastrar es un solo gesto, así
   // que Deshacer vuelve al lugar de antes de arrastrar, no píxel por píxel.
   const moverTexto = (eid, pt) => set({ pos: { ...(content.pos || {}), [eid]: pt } }, 'movetext:' + eid)
@@ -643,24 +684,74 @@ export default function Editor({
     delete pos[eid]
     set({ pos: Object.keys(pos).length ? pos : undefined })
   }
+  // ---- acciones de GRUPO sobre texto ----
+  // Sólo tienen sentido sobre los bloques SUELTOS (tb:N, los que agregás
+  // vos con "+ Agregar texto"). Un rol como "Título" no se puede duplicar
+  // ni borrar — es parte fija de la plantilla, no un elemento que se
+  // agregó. Si el grupo mezcla rol y sueltos, se actúa sobre los sueltos
+  // y se avisa qué quedó afuera, en vez de fallar en silencio.
+  const textBlockIdx = (eid) => (eid.startsWith('tb:') ? +eid.slice(3) : null)
+  const textClipboardRef = useRef(null)
+  const textRemoveMany = (eids) => {
+    const idxs = eids.map(textBlockIdx).filter((i) => i != null)
+    if (!idxs.length) { onToast('Esos textos son parte de la plantilla: no se pueden quitar'); return }
+    const idxSet = new Set(idxs)
+    set({ textBlocks: (content.textBlocks || []).filter((_, i) => !idxSet.has(i)) })
+    setSelText(null); setMultiSelText(new Set())
+    const saltados = eids.length - idxs.length
+    onToast((idxs.length > 1 ? `Se quitaron ${idxs.length} textos` : 'Se quitó el texto') + (saltados ? ` · ${saltados} de la plantilla no se tocaron` : ''))
+  }
+  const textDuplicateMany = (eids) => {
+    const idxs = eids.map(textBlockIdx).filter((i) => i != null)
+    if (!idxs.length) { onToast('Esos textos son parte de la plantilla: no se pueden duplicar'); return }
+    const blocks = content.textBlocks || []
+    const nuevos = idxs.map((i) => ({ ...blocks[i] }))
+    const base = blocks.length
+    set({ textBlocks: [...blocks, ...nuevos] })
+    setSelText('tb:' + base)
+    setMultiSelText(new Set(nuevos.slice(1).map((_, k) => 'tb:' + (base + 1 + k))))
+  }
+  const textCopySelection = (eids) => {
+    const idxs = eids.map(textBlockIdx).filter((i) => i != null)
+    if (!idxs.length) { onToast('Esos textos son parte de la plantilla: no se pueden copiar'); return }
+    const blocks = content.textBlocks || []
+    textClipboardRef.current = idxs.map((i) => ({ ...blocks[i] }))
+    onToast(idxs.length > 1 ? `Copiados ${idxs.length} textos` : 'Copiado')
+  }
+  const textPasteClipboard = () => {
+    const src = textClipboardRef.current
+    if (!src?.length) return
+    const blocks = content.textBlocks || []
+    const base = blocks.length
+    set({ textBlocks: [...blocks, ...src.map((b) => ({ ...b }))] })
+    setSelText('tb:' + base)
+    setMultiSelText(new Set(src.slice(1).map((_, k) => 'tb:' + (base + 1 + k))))
+    onToast(src.length > 1 ? `Pegados ${src.length} textos` : 'Pegado')
+  }
   const [guides, setGuides] = useState({ v: false, h: false })
   // Un texto seleccionado no se veía seleccionado EN LA PIEZA: cambiaba el
   // panel de la derecha y en el lienzo no pasaba nada, así que no sabías si
   // le habías pegado al título o al subtítulo.
   const [ctxMenu, setCtxMenu] = useState(null)   // menú de click derecho
-  const [textBox, setTextBox] = useState(null)
+  // Una caja por cada texto seleccionado — antes era una sola (`textBox`),
+  // alcanzaba porque sólo se podía seleccionar uno.
+  const [textBoxes, setTextBoxes] = useState([])
   useEffect(() => {
-    if (!selText || !frameRef.current) { setTextBox(null); return }
-    const t = frameRef.current.querySelector(`text[data-eid="${CSS.escape(selText)}"]`)
-    if (!t) { setTextBox(null); return }
+    if (!textSeleccion.length || !frameRef.current) { setTextBoxes([]); return }
     const fr = frameRef.current.getBoundingClientRect()
-    const r = t.getBoundingClientRect()
     const pad = 6
-    setTextBox({
-      left: r.left - fr.left - pad, top: r.top - fr.top - pad,
-      width: r.width + pad * 2, height: r.height + pad * 2,
-    })
-  }, [selText, content, format.id, panelW.left, panelW.right, zoom])
+    const cajas = textSeleccion.map((eid) => {
+      const t = frameRef.current.querySelector(`text[data-eid="${CSS.escape(eid)}"]`)
+      if (!t) return null
+      const r = t.getBoundingClientRect()
+      return {
+        eid, primaria: eid === selText,
+        left: r.left - fr.left - pad, top: r.top - fr.top - pad,
+        width: r.width + pad * 2, height: r.height + pad * 2,
+      }
+    }).filter(Boolean)
+    setTextBoxes(cajas)
+  }, [textSeleccion, selText, content, format.id, panelW.left, panelW.right, zoom])
   const startDrag = (e, i) => {
     e.stopPropagation()
     // Alt+click cicla hacia lo que está DEBAJO: si dos objetos se pisan,
@@ -685,7 +776,7 @@ export default function Editor({
     // exactamente el comportamiento de antes cuando no había grupo.
     const yaEnGrupo = selObj === idx || multiSel.has(idx)
     if (!yaEnGrupo) { setSelObj(idx); setMultiSel(new Set()) }
-    setSelText(null); setSelBg(false)
+    setSelText(null); setMultiSelText(new Set()); setSelBg(false)
     dragRef.current.i = idx
     const grupo = yaEnGrupo ? seleccion : [idx]
     dragRef.current.group = grupo.length > 1
@@ -741,8 +832,14 @@ export default function Editor({
     const t = e.target.closest && e.target.closest('text[data-eid]')
     if (t) {
       const eid = t.getAttribute('data-eid')
-      // segundo tap/click sobre el texto ya seleccionado → editar (touch-friendly)
-      if (selText === eid) { openTextEditor(t) } else { setSelText(eid); setSelObj(null); setMultiSel(new Set()); setSelBg(false) }
+      // Shift+click arma el grupo de textos — igual que en los objetos,
+      // nunca arrastra ni edita en el mismo gesto.
+      if (e.shiftKey) { toggleMultiSelText(eid); return }
+      // segundo tap/click sobre el texto ya seleccionado → editar (touch-friendly).
+      // Si era parte de un grupo, el primer click sólo lo aísla — evita
+      // que un click para "soltar el grupo" te mande derecho a editar.
+      if (selText === eid && !multiSelText.size) { openTextEditor(t) }
+      else { setSelText(eid); setMultiSelText(new Set()); setSelObj(null); setMultiSel(new Set()); setSelBg(false) }
       // el primer reflejo de cualquiera es arrastrar el texto. Se guarda
       // dónde lo agarraste DENTRO del bloque para que no salte al soltar.
       const fr = frameRef.current.getBoundingClientRect()
@@ -760,11 +857,11 @@ export default function Editor({
     // cualquier click que no caiga sobre un objeto o un texto DESELECCIONA:
     // sin esto nunca se ve la pieza limpia, siempre queda un marco encima.
     setCtxMenu(null)
-    if (!e.target.closest('.obj-hit') && !e.target.closest('.rs-handle')) { setSelObj(null); setMultiSel(new Set()); setSelText(null); setSelBg(false) }
+    if (!e.target.closest('.obj-hit') && !e.target.closest('.rs-handle')) { setSelObj(null); setMultiSel(new Set()); setSelText(null); setMultiSelText(new Set()); setSelBg(false) }
   }
   const onStageDown = (e) => {
     if (e.target.closest('.piece-frame') || e.target.closest('.stage-tools') || e.target.closest('.strip')) return
-    setSelObj(null); setMultiSel(new Set()); setSelText(null); setSelBg(false); setEditing(null)
+    setSelObj(null); setMultiSel(new Set()); setSelText(null); setMultiSelText(new Set()); setSelBg(false); setEditing(null)
   }
 
   // ---- editar texto tocándolo sobre la pieza ----
@@ -804,7 +901,7 @@ export default function Editor({
 
   // Cambiar de slide (o de diseño) con algo seleccionado hacía que el
   // inspector editara el objeto del MISMO índice en la slide nueva.
-  useEffect(() => { setSelObj(null); setMultiSel(new Set()); setSelText(null); setSelBg(false); setEditing(null) }, [activeSlide, template.id])
+  useEffect(() => { setSelObj(null); setMultiSel(new Set()); setSelText(null); setMultiSelText(new Set()); setSelBg(false); setEditing(null) }, [activeSlide, template.id])
 
   // sólo reclama la foto si la pieza HOY es de foto: si sacaste la foto de
   // fondo a propósito (bg: 'color') no tiene que seguir pidiéndola
@@ -818,7 +915,7 @@ export default function Editor({
   // si la plantilla no tiene variantes (chat), el panel no existe
 
   return (
-    <div className={'editor' + (selObj != null || selText ? ' has-sel' : '') + (sheet ? ' sheet-open' : '') + (seleccion.length > 1 ? ' multi-sel' : '')}>
+    <div className={'editor' + (selObj != null || selText ? ' has-sel' : '') + (sheet ? ' sheet-open' : '') + (seleccion.length > 1 || textSeleccion.length > 1 ? ' multi-sel' : '')}>
       <nav className="insert-rail">
         {/* El rail se reparte por POSICION, no por material. Antes había
             "Fotos" y "Fondo" como dos entradas distintas, y una foto podía
@@ -873,7 +970,7 @@ export default function Editor({
             <>
               <div className="panel-title">Textos</div>
               <p className="panel-help">Sumá textos y tocalos para ajustarlos a la derecha.</p>
-              <TextBlocksBody content={content} set={set} onSelectText={onSelectText} selText={selText} />
+              <TextBlocksBody content={content} set={set} onSelectText={onSelectText} selText={selText} multiSelText={multiSelText} toggleMultiSelText={toggleMultiSelText} />
               <div className="panel-title" style={{ marginTop: 16 }}>Posición del bloque</div>
               <AnchorBody content={content} template={template} set={set} />
             </>
@@ -881,7 +978,7 @@ export default function Editor({
             <>
               <div className="panel-title">Textos</div>
               <p className="panel-help">Tocá un texto (acá o en la pieza) para editarlo a la derecha.</p>
-              <ContentBody template={template} content={content} onSelectText={onSelectText} selText={selText} />
+              <ContentBody template={template} content={content} onSelectText={onSelectText} selText={selText} multiSelText={multiSelText} toggleMultiSelText={toggleMultiSelText} />
               {(content.steps || template.defaults?.steps) && (
                 <>
                   <div className="panel-title" style={{ marginTop: 16 }}>Pasos</div>
@@ -894,7 +991,7 @@ export default function Editor({
                   "quiero agregar un texto y moverlo" (Aye). */}
               <div className="panel-title" style={{ marginTop: 16 }}>Textos sueltos</div>
               <p className="panel-help">Los que sumás vos. Arrastralos en la pieza para ubicarlos donde quieras.</p>
-              <TextBlocksBody content={content} set={set} onSelectText={onSelectText} selText={selText} />
+              <TextBlocksBody content={content} set={set} onSelectText={onSelectText} selText={selText} multiSelText={multiSelText} toggleMultiSelText={toggleMultiSelText} />
             </>
           )
         )}
@@ -940,7 +1037,7 @@ export default function Editor({
             </div>
             {hayFotoDetras ? (
               <FotosBody destinoFijo="fondo" selBg={selBg}
-                onSelectBg={() => { setSelBg(true); setSelObj(null); setMultiSel(new Set()); setSelText(null) }}
+                onSelectBg={() => { setSelBg(true); setSelObj(null); setMultiSel(new Set()); setSelText(null); setMultiSelText(new Set()) }}
                 content={content} template={template} set={set}
                 inputRef={photoInputRef}
                 objects={objects} setObjects={setObjects} setSelObj={setSelObj}
@@ -1081,7 +1178,10 @@ export default function Editor({
                 </button>
               </div>
             )}
-            {textBox && <div className="text-sel" style={{ left: textBox.left, top: textBox.top, width: textBox.width, height: textBox.height }} />}
+            {textBoxes.map((b) => (
+              <div key={b.eid} className={'text-sel' + (b.primaria ? '' : ' extra')}
+                style={{ left: b.left, top: b.top, width: b.width, height: b.height }} />
+            ))}
             {guides.v && <div className="guide-v" />}
             {guides.h && <div className="guide-h" />}
             {showSafe && (
@@ -1110,10 +1210,14 @@ export default function Editor({
               // aviso vive en el mismo lugar donde ya confiás que algo se
               // seleccionó — el cartel de "Arrastrá para ubicar".
               <div className="drag-hint group-hint">{seleccion.length} elementos seleccionados</div>
+            ) : textSeleccion.length > 1 ? (
+              // Mismo cartel, mismo motivo: shift+click en un segundo texto
+              // tampoco se notaba en el lienzo.
+              <div className="drag-hint group-hint">{textSeleccion.length} textos seleccionados</div>
             ) : selObj != null && objects[selObj] && (
               <div className="drag-hint">Arrastrá para ubicar el objeto</div>
             )}
-            {selObj == null && selText && (
+            {selObj == null && selText && !multiSelText.size && (
               <div className="drag-hint">Arrastrá para moverlo · doble clic para escribir</div>
             )}
           </div>
@@ -1204,12 +1308,17 @@ export default function Editor({
       <div className="col-resize" onPointerDown={(e) => startResize('right', e)} title="Arrastrá para ajustar el panel" />
 
       <aside className="inspector" style={{ width: panelW.right }}>
-        <button className="sheet-close" onClick={() => { setSelObj(null); setMultiSel(new Set()); setSelText(null) }} aria-label="Cerrar propiedades"><Icon n="down" size={18} /></button>
+        <button className="sheet-close" onClick={() => { setSelObj(null); setMultiSel(new Set()); setSelText(null); setMultiSelText(new Set()) }} aria-label="Cerrar propiedades"><Icon n="down" size={18} /></button>
         {seleccion.length > 1 ? (
           <MultiSelProps count={seleccion.length}
             onCopy={() => copySelection(seleccion)}
             onDuplicate={() => objDuplicateMany(seleccion)}
             onRemove={() => objRemoveMany(seleccion)} />
+        ) : textSeleccion.length > 1 ? (
+          <MultiSelProps count={textSeleccion.length} kind="textos"
+            onCopy={() => textCopySelection(textSeleccion)}
+            onDuplicate={() => textDuplicateMany(textSeleccion)}
+            onRemove={() => textRemoveMany(textSeleccion)} />
         ) : selObj != null && objects[selObj] ? (
           <>
             <div className="insp-kicker">Propiedades del elemento</div>
@@ -1258,7 +1367,7 @@ function FormatBody({ format, onChangeFormat }) {
 }
 
 /* ---------------- Content: lista de textos (selecciona → edita a la derecha) ---------------- */
-function ContentBody({ template, content, onSelectText, selText }) {
+function ContentBody({ template, content, onSelectText, selText, multiSelText, toggleMultiSelText }) {
   const roles = template.roles || []
   return (
     <>
@@ -1267,7 +1376,8 @@ function ContentBody({ template, content, onSelectText, selText }) {
           const eid = `role:${role}`
           const val = content[role] ?? template.defaults?.[role] ?? ''
           return (
-            <button key={role} className={'obj-row txt-row' + (selText === eid ? ' sel' : '')} onClick={() => onSelectText(eid)}>
+            <button key={role} className={'obj-row txt-row' + (selText === eid ? ' sel' : multiSelText?.has(eid) ? ' sel-extra' : '')}
+              onClick={(e) => (e.shiftKey && toggleMultiSelText ? toggleMultiSelText(eid) : onSelectText(eid))}>
               <span className="row-role">{ROLE_LABELS[role] || role}</span>
               <span className="row-preview">{String(val).trim() || '—'}</span>
             </button>
@@ -1758,11 +1868,18 @@ function ValoresInput({ valores, onChange }) {
 // Con más de un elemento agarrado no tiene sentido mostrar el panel de
 // propiedades de UNO solo (¿de cuál?) — esto reemplaza a ObjectProps
 // mientras dure la multiselección: las acciones son de grupo.
-function MultiSelProps({ count, onCopy, onDuplicate, onRemove }) {
+function MultiSelProps({ count, kind = 'elementos', onCopy, onDuplicate, onRemove }) {
+  // Los objetos se arrastran juntos; los textos todavía no (cada uno
+  // sigue atado a su lugar en el stack o a su propia posición libre) —
+  // el texto de acá no puede prometer lo mismo para los dos casos.
+  const puedeMover = kind === 'elementos'
   return (
     <>
-      <div className="insp-kicker">{count} elementos seleccionados</div>
-      <p className="panel-help">Se mueven, se copian y se borran juntos. Shift+click suma o saca uno del grupo; Escape lo suelta.</p>
+      <div className="insp-kicker">{count} {kind} seleccionados</div>
+      <p className="panel-help">
+        {puedeMover ? 'Se mueven, se copian y se borran juntos.' : 'Se copian y se borran juntos.'}
+        {' '}Shift+click suma o saca uno del grupo; Escape lo suelta.
+      </p>
       <div className="insp-head">
         <span className="insp-acts">
           <button className="btn" onClick={onCopy} title="Copiar (⌘C)"><Icon n="copy" size={13} /> Copiar</button>
@@ -2243,7 +2360,7 @@ const TEXT_STYLE_OPTS = [
 ]
 
 
-function TextBlocksBody({ content, set, onSelectText, selText }) {
+function TextBlocksBody({ content, set, onSelectText, selText, multiSelText, toggleMultiSelText }) {
   const blocks = content.textBlocks || []
   const add = () => { const n = blocks.length; set({ textBlocks: [...blocks, { style: 'title', text: 'Nuevo texto' }] }); onSelectText && onSelectText('tb:' + n) }
   const remove = (i) => set({ textBlocks: blocks.filter((_, idx) => idx !== i) })
@@ -2255,8 +2372,9 @@ function TextBlocksBody({ content, set, onSelectText, selText }) {
           const eid = 'tb:' + i
           const styleLabel = TEXT_STYLE_OPTS.find((o) => o.k === b.style)?.label || 'Texto'
           return (
-            <div key={i} className={'obj-row' + (selText === eid ? ' sel' : '')}>
-              <button className="obj-row-name txt-row" onClick={() => onSelectText && onSelectText(eid)}>
+            <div key={i} className={'obj-row' + (selText === eid ? ' sel' : multiSelText?.has(eid) ? ' sel-extra' : '')}>
+              <button className="obj-row-name txt-row"
+                onClick={(e) => (e.shiftKey && toggleMultiSelText ? toggleMultiSelText(eid) : onSelectText && onSelectText(eid))}>
                 <span className="row-role">{styleLabel}</span>
                 <span className="row-preview">{String(b.text).trim() || '—'}</span>
               </button>
