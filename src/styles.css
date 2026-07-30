@@ -198,6 +198,7 @@ button { font: inherit; cursor: pointer; }
 .obj-list { display: flex; flex-direction: column; gap: 4px; margin-bottom: 4px; }
 .obj-row { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-1); min-height: var(--h-ctl); border: 1px solid var(--ui-line); border-radius: var(--r-box); background: var(--ui-surface); }
 .obj-row.sel { border-color: var(--emerald-500); box-shadow: inset 0 0 0 1px var(--emerald-500); }
+.obj-row.sel-extra { border-color: var(--emerald-500); border-style: dashed; }
 .obj-row-name { flex: 1; text-align: left; background: transparent; border: 0; padding: var(--sp-1) var(--sp-2); font-size: var(--fs-3); font-weight: 600; cursor: pointer; }
 .obj-row-del { background: transparent; border: 0; color: #A79E92; padding: 6px 10px; font-size: 11px; cursor: pointer; }
 .obj-row-del:hover { color: var(--color-danger,#D8514E); }
@@ -444,6 +445,8 @@ button.obj-row { width: 100%; cursor: pointer; text-align: left; font: inherit; 
 .obj-hit:active { cursor: grabbing; }
 .obj-hit.hover { outline: 2px dashed rgba(0,222,104,.85); outline-offset: 1px; }
 .obj-hit.sel { outline: 2px solid var(--emerald-500); outline-offset: 1px; background: rgba(0,222,104,.06); }
+/* parte del grupo pero no el primario: mismo color, sin los tiradores */
+.obj-hit.sel-extra { outline: 2px dashed var(--emerald-500); outline-offset: 1px; background: rgba(0,222,104,.06); }
 /* texto editable in-place (doble-click) */
 .piece-frame svg text[data-eid] { cursor: text; }
 .inline-edit { position: absolute; z-index: 20; background: #fff; color: #0D0C0C; border: 2px solid var(--emerald-500); border-radius: 6px; padding: 3px 7px; font-family: var(--font-body); font-weight: 700; line-height: 1.1; resize: none; overflow: hidden; box-shadow: 0 8px 24px rgba(0,0,0,.28); min-height: 1.5em; }

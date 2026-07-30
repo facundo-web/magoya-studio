@@ -254,6 +254,30 @@ export default function Editor({
 }) {
   const [busy, setBusy] = useState(false)
   const [selObj, setSelObj] = useState(null)
+  // Multiselección: `selObj` sigue siendo el "primario" (el que muestra los
+  // tiradores de resize y el panel de propiedades de a uno), y `multiSel`
+  // son los demás objetos que también están agarrados en el grupo. Se
+  // arman con Shift+click, sin tocar ninguno de los flujos de selección
+  // simple que ya existían.
+  const [multiSel, setMultiSel] = useState(() => new Set())
+  const seleccion = React.useMemo(
+    () => [...new Set([selObj, ...multiSel])].filter((x) => x != null),
+    [selObj, multiSel],
+  )
+  const clipboardRef = useRef(null)
+  const deselectAll = () => { setSelObj(null); setMultiSel(new Set()) }
+  const toggleMultiSel = (idx) => {
+    if (selObj === idx) {
+      // el primario sale del grupo: si queda alguien más, ese pasa a ser el nuevo primario
+      const resto = [...multiSel]
+      setSelObj(resto.shift() ?? null)
+      setMultiSel(new Set(resto))
+      return
+    }
+    if (multiSel.has(idx)) { const next = new Set(multiSel); next.delete(idx); setMultiSel(next); return }
+    if (selObj == null) { setSelObj(idx); return }
+    setMultiSel(new Set(multiSel).add(idx))
+  }
   const [selText, setSelText] = useState(null) // eid del texto seleccionado
   // El fondo es la tercera cosa editable de la pieza, y sus ajustes vivian en
   // el panel IZQUIERDO — al lado de la biblioteca de fotos, a pantalla y media
@@ -348,7 +372,7 @@ export default function Editor({
   const updateObject = (i, patch, tag) => setObjects(objects.map((o, idx) => (idx === i ? { ...o, ...patch } : o)), tag)
   const objRemove = (i) => {
     const nombre = objectName(objects[i], ICONS_BY_ID[objects[i]?.iconId || objects[i]?.deviceId])
-    setObjects(objects.filter((_, idx) => idx !== i)); setSelObj(null)
+    setObjects(objects.filter((_, idx) => idx !== i)); deselectAll()
     // misma regla para TODO lo que se borra: aviso con Deshacer
     onToast('Se quitó «' + nombre + '»', true)
   }
@@ -356,10 +380,56 @@ export default function Editor({
     const o = objects[i]
     if (!o) return
     setObjects([...objects, enCascada(objects, { ...JSON.parse(JSON.stringify(o)) })])
-    setSelObj(objects.length)
+    setSelObj(objects.length); setMultiSel(new Set())
   }
   const objBringFront = (i) => { const a = [...objects]; const [it] = a.splice(i, 1); a.push(it); setObjects(a); setSelObj(a.length - 1) }
   const objSendBack = (i) => { const a = [...objects]; const [it] = a.splice(i, 1); a.unshift(it); setObjects(a); setSelObj(0) }
+  // ---- acciones de GRUPO: sobre toda la selección, no sólo el primario ----
+  const objRemoveMany = (idxs) => {
+    if (!idxs.length) return
+    if (idxs.length === 1) { objRemove(idxs[0]); return }
+    const set = new Set(idxs)
+    setObjects(objects.filter((_, idx) => !set.has(idx))); deselectAll()
+    onToast(`Se quitaron ${idxs.length} elementos`, true)
+  }
+  // Duplicar y pegar hacen lo mismo (una copia en cascada de cada uno,
+  // encadenadas para que no queden todas exactamente superpuestas) — por
+  // eso comparten esta función; sólo cambia de dónde sale la lista de origen.
+  const clonarEnCascada = (fuente) => {
+    let working = objects
+    const nuevos = []
+    for (const o of fuente) {
+      if (!o) continue
+      const copia = enCascada(working, JSON.parse(JSON.stringify(o)))
+      nuevos.push(copia)
+      working = [...working, copia]
+    }
+    const base = objects.length
+    setObjects(working)
+    setSelObj(nuevos.length ? base : null)
+    setMultiSel(new Set(nuevos.slice(1).map((_, k) => base + 1 + k)))
+    return nuevos.length
+  }
+  const objDuplicateMany = (idxs) => {
+    if (idxs.length <= 1) { if (idxs.length) objDuplicate(idxs[0]); return }
+    clonarEnCascada(idxs.map((i) => objects[i]))
+  }
+  // Ctrl/Cmd+C y Ctrl/Cmd+V — "sumar control C control V como parte de las
+  // funciones que puede realizar". El portapapeles es interno (un ref, no
+  // el del sistema): copiar un objeto de Magoya no tiene sentido fuera de
+  // Magoya, y así también funciona pegar entre formatos o entre slides.
+  const copySelection = (idxs) => {
+    const items = idxs.map((i) => objects[i]).filter(Boolean)
+    if (!items.length) return
+    clipboardRef.current = items.map((o) => JSON.parse(JSON.stringify(o)))
+    onToast(items.length > 1 ? `Copiados ${items.length} elementos` : 'Copiado')
+  }
+  const pasteClipboard = () => {
+    const src = clipboardRef.current
+    if (!src?.length) return
+    const n = clonarEnCascada(src)
+    if (n) onToast(n > 1 ? `Pegados ${n} elementos` : 'Pegado')
+  }
 
   // foto: subir → dataURL (compartido entre panel y overlay)
   const onPhotoFile = async (file) => {
@@ -468,28 +538,34 @@ export default function Editor({
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
       // con un modal abierto los atajos del lienzo no tienen que responder
       if (document.querySelector('.mk-modal-ov, .chooser-ov')) return
-      if (e.key === 'Escape') { setCtxMenu(null); setSelObj(null); setSelText(null); setEditing(null); return }
+      if (e.key === 'Escape') { setCtxMenu(null); deselectAll(); setSelText(null); setEditing(null); return }
       if (e.metaKey || e.ctrlKey) {
         if (e.key === '0') { e.preventDefault(); setZoom(0); return }
         if (e.key === '+' || e.key === '=') { e.preventDefault(); setZoom((z) => Math.min(4, (z || fitZoom()) * 1.2)); return }
         if (e.key === '-') { e.preventDefault(); setZoom((z) => Math.max(0.1, (z || fitZoom()) * 0.83)); return }
+        // Copiar/pegar: si no hay nada que copiar o nada pegado todavía,
+        // no se hace preventDefault — así el copy/paste normal del
+        // navegador (por ej. texto seleccionado en un panel) sigue andando.
+        if (e.key.toLowerCase() === 'c' && seleccion.length) { e.preventDefault(); copySelection(seleccion); return }
+        if (e.key.toLowerCase() === 'v' && clipboardRef.current?.length) { e.preventDefault(); pasteClipboard(); return }
       }
-      if (selObj == null || !objects[selObj]) return
-      const o = objects[selObj]
-      if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); objRemove(selObj); return }
+      if (!seleccion.length) return
+      if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); objRemoveMany(seleccion); return }
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'd') {
         e.preventDefault()
-        objDuplicate(selObj)
+        objDuplicateMany(seleccion)
         return
       }
       const step = e.shiftKey ? 0.05 : 0.01
       const mv = { ArrowLeft: { x: -step }, ArrowRight: { x: step }, ArrowUp: { y: -step }, ArrowDown: { y: step } }[e.key]
       if (mv) {
         e.preventDefault()
-        updateObject(selObj, {
+        const set = new Set(seleccion)
+        setObjects(objects.map((o, idx) => (set.has(idx) ? {
+          ...o,
           x: Math.min(1, Math.max(0, (o.x ?? 0.5) + (mv.x || 0))),
           y: Math.min(1, Math.max(0, (o.y ?? 0.5) + (mv.y || 0))),
-        }, 'nudge')
+        } : o)), 'nudge')
       }
     }
     window.addEventListener('keydown', onKey)
@@ -558,7 +634,7 @@ export default function Editor({
     window.addEventListener('pointerup', up)
   }
 
-  const onSelectText = (eid) => { setSelText(eid); setSelObj(null); setSelBg(false) }
+  const onSelectText = (eid) => { setSelText(eid); setSelObj(null); setMultiSel(new Set()); setSelBg(false) }
   // posición libre de un bloque de texto. Arrastrar es un solo gesto, así
   // que Deshacer vuelve al lugar de antes de arrastrar, no píxel por píxel.
   const moverTexto = (eid, pt) => set({ pos: { ...(content.pos || {}), [eid]: pt } }, 'movetext:' + eid)
@@ -601,7 +677,20 @@ export default function Editor({
         idx = bajo[(pos + bajo.length - 1) % bajo.length]   // el siguiente hacia abajo
       }
     }
-    setSelObj(idx); setSelText(null); setSelBg(false); dragRef.current.i = idx
+    // Shift+click arma o achica el grupo — nunca arrastra en el mismo
+    // gesto, para no mover algo sin querer mientras estás eligiendo.
+    if (e.shiftKey) { toggleMultiSel(idx); return }
+    // Un click normal sobre algo que YA es parte del grupo arrastra el
+    // GRUPO entero (como Figma/Canva); si es algo nuevo, lo aísla —
+    // exactamente el comportamiento de antes cuando no había grupo.
+    const yaEnGrupo = selObj === idx || multiSel.has(idx)
+    if (!yaEnGrupo) { setSelObj(idx); setMultiSel(new Set()) }
+    setSelText(null); setSelBg(false)
+    dragRef.current.i = idx
+    const grupo = yaEnGrupo ? seleccion : [idx]
+    dragRef.current.group = grupo.length > 1
+      ? { start: posFromEvent(e), orig: new Map(grupo.map((k) => [k, { x: objects[k]?.x ?? 0.5, y: objects[k]?.y ?? 0.5 }])) }
+      : null
     // sin capturar el puntero, arrastrar rápido hacia el borde soltaba el
     // objeto a mitad de camino (en cualquier editor podés salir y volver)
     try { e.currentTarget.setPointerCapture(e.pointerId) } catch {}
@@ -632,15 +721,28 @@ export default function Editor({
     if (snapV) pos.x = 0.5
     if (snapH) pos.y = 0.5
     setGuides({ v: snapV, h: snapH })
-    updateObject(dragRef.current.i, pos, 'drag')
+    const grp = dragRef.current.group
+    if (grp) {
+      // grupo: se mueve por DELTA desde donde arrancó cada uno, no a la
+      // posición absoluta del cursor (eso los hubiera apilado a todos en
+      // el mismo punto).
+      const dx = pos.x - grp.start.x, dy = pos.y - grp.start.y
+      setObjects(objects.map((o, idx) => {
+        const base = grp.orig.get(idx)
+        if (!base) return o
+        return { ...o, x: Math.min(1, Math.max(0, base.x + dx)), y: Math.min(1, Math.max(0, base.y + dy)) }
+      }), 'drag')
+    } else {
+      updateObject(dragRef.current.i, pos, 'drag')
+    }
   }
-  const endDrag = () => { dragRef.current.i = null; textDragRef.current = null; setGuides({ v: false, h: false }) }
+  const endDrag = () => { dragRef.current.i = null; dragRef.current.group = null; textDragRef.current = null; setGuides({ v: false, h: false }) }
   const onFrameDown = (e) => {
     const t = e.target.closest && e.target.closest('text[data-eid]')
     if (t) {
       const eid = t.getAttribute('data-eid')
       // segundo tap/click sobre el texto ya seleccionado → editar (touch-friendly)
-      if (selText === eid) { openTextEditor(t) } else { setSelText(eid); setSelObj(null); setSelBg(false) }
+      if (selText === eid) { openTextEditor(t) } else { setSelText(eid); setSelObj(null); setMultiSel(new Set()); setSelBg(false) }
       // el primer reflejo de cualquiera es arrastrar el texto. Se guarda
       // dónde lo agarraste DENTRO del bloque para que no salte al soltar.
       const fr = frameRef.current.getBoundingClientRect()
@@ -658,11 +760,11 @@ export default function Editor({
     // cualquier click que no caiga sobre un objeto o un texto DESELECCIONA:
     // sin esto nunca se ve la pieza limpia, siempre queda un marco encima.
     setCtxMenu(null)
-    if (!e.target.closest('.obj-hit') && !e.target.closest('.rs-handle')) { setSelObj(null); setSelText(null); setSelBg(false) }
+    if (!e.target.closest('.obj-hit') && !e.target.closest('.rs-handle')) { setSelObj(null); setMultiSel(new Set()); setSelText(null); setSelBg(false) }
   }
   const onStageDown = (e) => {
     if (e.target.closest('.piece-frame') || e.target.closest('.stage-tools') || e.target.closest('.strip')) return
-    setSelObj(null); setSelText(null); setSelBg(false); setEditing(null)
+    setSelObj(null); setMultiSel(new Set()); setSelText(null); setSelBg(false); setEditing(null)
   }
 
   // ---- editar texto tocándolo sobre la pieza ----
@@ -702,7 +804,7 @@ export default function Editor({
 
   // Cambiar de slide (o de diseño) con algo seleccionado hacía que el
   // inspector editara el objeto del MISMO índice en la slide nueva.
-  useEffect(() => { setSelObj(null); setSelText(null); setSelBg(false); setEditing(null) }, [activeSlide, template.id])
+  useEffect(() => { setSelObj(null); setMultiSel(new Set()); setSelText(null); setSelBg(false); setEditing(null) }, [activeSlide, template.id])
 
   // sólo reclama la foto si la pieza HOY es de foto: si sacaste la foto de
   // fondo a propósito (bg: 'color') no tiene que seguir pidiéndola
@@ -716,7 +818,7 @@ export default function Editor({
   // si la plantilla no tiene variantes (chat), el panel no existe
 
   return (
-    <div className={'editor' + (selObj != null || selText ? ' has-sel' : '') + (sheet ? ' sheet-open' : '')}>
+    <div className={'editor' + (selObj != null || selText ? ' has-sel' : '') + (sheet ? ' sheet-open' : '') + (seleccion.length > 1 ? ' multi-sel' : '')}>
       <nav className="insert-rail">
         {/* El rail se reparte por POSICION, no por material. Antes había
             "Fotos" y "Fondo" como dos entradas distintas, y una foto podía
@@ -802,7 +904,10 @@ export default function Editor({
             <div className="panel-title">Encima de la pieza</div>
             <p className="panel-help">Todo lo que se apoya arriba: logos, trazos, formas, dispositivos y fotos sueltas.</p>
             <ObjectsBody objects={objects} setObjects={setObjects}
-              selObj={selObj} setSelObj={setSelObj} objRemove={objRemove} onToast={onToast}
+              // envuelto: elegir un objeto de a uno (fila, biblioteca, foto
+              // nueva) suelta cualquier grupo que hubiera quedado armado
+              selObj={selObj} setSelObj={(i) => { setSelObj(i); setMultiSel(new Set()) }}
+              multiSel={multiSel} toggleMultiSel={toggleMultiSel} objRemove={objRemove} onToast={onToast}
               elements={elements} onAddElement={onAddElement} onDeleteElement={onDeleteElement}
               alwaysOpen />
             <div className="panel-title" style={{ marginTop: 18 }}>Una foto encima</div>
@@ -835,7 +940,7 @@ export default function Editor({
             </div>
             {hayFotoDetras ? (
               <FotosBody destinoFijo="fondo" selBg={selBg}
-                onSelectBg={() => { setSelBg(true); setSelObj(null); setSelText(null) }}
+                onSelectBg={() => { setSelBg(true); setSelObj(null); setMultiSel(new Set()); setSelText(null) }}
                 content={content} template={template} set={set}
                 inputRef={photoInputRef}
                 objects={objects} setObjects={setObjects} setSelObj={setSelObj}
@@ -942,7 +1047,7 @@ export default function Editor({
               const bx = objBox(o)
               return (
                 <div key={i}
-                  className={'obj-hit' + (selObj === i ? ' sel' : '') + (hoverObj === i ? ' hover' : '')}
+                  className={'obj-hit' + (selObj === i ? ' sel' : multiSel.has(i) ? ' sel-extra' : '') + (hoverObj === i ? ' hover' : '')}
                   style={{ left: bx.left + '%', top: bx.top + '%', width: bx.w + '%', height: bx.h + '%', transform: `rotate(${bx.rot}deg)` }}
                   onMouseEnter={() => setHoverObj(i)} onMouseLeave={() => setHoverObj(null)}
                   onPointerDown={(e) => startDrag(e, i)}>
@@ -961,10 +1066,19 @@ export default function Editor({
             {ctxMenu && selObj != null && (
               <div className="ctx-menu" style={{ left: ctxMenu.x, top: ctxMenu.y }}
                 onPointerDown={(e) => e.stopPropagation()}>
-                <button onClick={() => { objDuplicate(selObj); setCtxMenu(null) }}><Icon n="copy" size={14} /> Duplicar</button>
-                <button onClick={() => { objBringFront(selObj); setCtxMenu(null) }}><Icon n="up" size={14} /> Subir</button>
-                <button onClick={() => { objSendBack(selObj); setCtxMenu(null) }}><Icon n="down" size={14} /> Bajar</button>
-                <button className="del" onClick={() => { objRemove(selObj); setCtxMenu(null) }}><Icon n="close" size={14} /> Quitar</button>
+                {seleccion.length > 1 && (
+                  <button onClick={() => { copySelection(seleccion); setCtxMenu(null) }}><Icon n="copy" size={14} /> Copiar {seleccion.length}</button>
+                )}
+                <button onClick={() => { seleccion.length > 1 ? objDuplicateMany(seleccion) : objDuplicate(selObj); setCtxMenu(null) }}>
+                  <Icon n="copy" size={14} /> Duplicar{seleccion.length > 1 ? ` ${seleccion.length}` : ''}
+                </button>
+                {seleccion.length <= 1 && (<>
+                  <button onClick={() => { objBringFront(selObj); setCtxMenu(null) }}><Icon n="up" size={14} /> Subir</button>
+                  <button onClick={() => { objSendBack(selObj); setCtxMenu(null) }}><Icon n="down" size={14} /> Bajar</button>
+                </>)}
+                <button className="del" onClick={() => { seleccion.length > 1 ? objRemoveMany(seleccion) : objRemove(selObj); setCtxMenu(null) }}>
+                  <Icon n="close" size={14} /> Quitar{seleccion.length > 1 ? ` ${seleccion.length}` : ''}
+                </button>
               </div>
             )}
             {textBox && <div className="text-sel" style={{ left: textBox.left, top: textBox.top, width: textBox.width, height: textBox.height }} />}
@@ -1081,13 +1195,18 @@ export default function Editor({
       <div className="col-resize" onPointerDown={(e) => startResize('right', e)} title="Arrastrá para ajustar el panel" />
 
       <aside className="inspector" style={{ width: panelW.right }}>
-        <button className="sheet-close" onClick={() => { setSelObj(null); setSelText(null) }} aria-label="Cerrar propiedades"><Icon n="down" size={18} /></button>
-        {selObj != null && objects[selObj] ? (
+        <button className="sheet-close" onClick={() => { setSelObj(null); setMultiSel(new Set()); setSelText(null) }} aria-label="Cerrar propiedades"><Icon n="down" size={18} /></button>
+        {seleccion.length > 1 ? (
+          <MultiSelProps count={seleccion.length}
+            onCopy={() => copySelection(seleccion)}
+            onDuplicate={() => objDuplicateMany(seleccion)}
+            onRemove={() => objRemoveMany(seleccion)} />
+        ) : selObj != null && objects[selObj] ? (
           <>
             <div className="insp-kicker">Propiedades del elemento</div>
             <ObjectProps o={objects[selObj]} i={selObj} updateObject={updateObject} objRemove={objRemove} objDuplicate={objDuplicate} objBringFront={objBringFront} objSendBack={objSendBack} onToast={onToast}
               onAddElement={onAddElement}
-              goToBg={() => { setSelObj(null); setPanel('photos'); setSheet(true) }} />
+              goToBg={() => { setSelObj(null); setMultiSel(new Set()); setPanel('photos'); setSheet(true) }} />
           </>
         ) : selText ? (
           <>
@@ -1370,7 +1489,7 @@ function GradientBody({ content, set }) {
 }
 
 /* ---------------- Objects: insertar + lista (izquierda) ---------------- */
-function ObjectsBody({ objects, setObjects, selObj, setSelObj, objRemove, onToast, elements = [], onAddElement, onDeleteElement, alwaysOpen = false }) {
+function ObjectsBody({ objects, setObjects, selObj, setSelObj, multiSel, toggleMultiSel, objRemove, onToast, elements = [], onAddElement, onDeleteElement, alwaysOpen = false }) {
   const [picking, setPicking] = useState(alwaysOpen)
   const [cat, setCat] = useState('ai')
   const fileRef = useRef(null)
@@ -1436,8 +1555,13 @@ function ObjectsBody({ objects, setObjects, selObj, setSelObj, objRemove, onToas
           {objects.map((o, i) => {
             const oi = (o.kind === 'icon' || o.kind === 'device') ? ICONS_BY_ID[o.iconId || o.deviceId] : null
             return (
-              <div key={i} className={'obj-row' + (selObj === i ? ' sel' : '')}>
-                <button className="obj-row-name" onClick={() => setSelObj(i)}><span className={'row-dot' + (selObj === i ? ' on' : '')} />{objectName(o, oi)}</button>
+              <div key={i} className={'obj-row' + (selObj === i ? ' sel' : multiSel?.has(i) ? ' sel-extra' : '')}>
+                {/* Shift+click acá arma el mismo grupo que Shift+click en el
+                    lienzo — es la otra puerta a lo mismo, no una cosa aparte. */}
+                <button className="obj-row-name"
+                  onClick={(e) => (e.shiftKey && toggleMultiSel ? toggleMultiSel(i) : setSelObj(i))}>
+                  <span className={'row-dot' + (selObj === i || multiSel?.has(i) ? ' on' : '')} />{objectName(o, oi)}
+                </button>
                 <button className="obj-row-del" onClick={() => objRemove(i)} title="Quitar"><Icon n="close" size={13} /></button>
               </div>
             )
@@ -1622,6 +1746,25 @@ function ValoresInput({ valores, onChange }) {
 }
 
 /* ---------------- Object properties (panel derecho / inspector) ---------------- */
+// Con más de un elemento agarrado no tiene sentido mostrar el panel de
+// propiedades de UNO solo (¿de cuál?) — esto reemplaza a ObjectProps
+// mientras dure la multiselección: las acciones son de grupo.
+function MultiSelProps({ count, onCopy, onDuplicate, onRemove }) {
+  return (
+    <>
+      <div className="insp-kicker">{count} elementos seleccionados</div>
+      <p className="panel-help">Se mueven, se copian y se borran juntos. Shift+click suma o saca uno del grupo; Escape lo suelta.</p>
+      <div className="insp-head">
+        <span className="insp-acts">
+          <button className="btn" onClick={onCopy} title="Copiar (⌘C)"><Icon n="copy" size={13} /> Copiar</button>
+          <button className="btn" onClick={onDuplicate} title="Duplicar (⌘D)"><Icon n="copy" size={13} /> Duplicar</button>
+          <button className="btn" onClick={onRemove}>Quitar</button>
+        </span>
+      </div>
+    </>
+  )
+}
+
 function ObjectProps({ o, i, updateObject, objRemove, objDuplicate, objBringFront, objSendBack, onToast, goToBg, onAddElement }) {
   const objIcon = (o.kind === 'icon' || o.kind === 'device') ? ICONS_BY_ID[o.iconId || o.deviceId] : null
   const isMark = !!objIcon?.isMark
