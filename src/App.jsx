@@ -22,6 +22,35 @@ const DEFAULT_FORMAT = 'ig-post'
 
 export default function App() {
   const [view, setView] = useState('gallery')
+  // "Al navegar no cambia la URL, entonces no puede usar las flechas
+  // nativas del explorer" — cambiar de pantalla (Crear pieza / Kit de
+  // marca / editor) no tocaba la URL, así que las flechas atrás/adelante
+  // del navegador no volvían a donde venías; la única forma de volver
+  // era el botón de la propia app. `navigate` empuja un estado de
+  // historial en cada cambio, y `popstate` escucha esas flechas — sin
+  // tocar el resto del enrutado (el hash `#r=` de los links de revisión
+  // sigue exactamente igual, es un mecanismo aparte).
+  function navigate(next) {
+    setView((prev) => {
+      if (prev === next) return prev
+      history.pushState({ magoyaView: next }, '', location.pathname + '#' + next)
+      return next
+    })
+  }
+  useEffect(() => {
+    // deja la entrada inicial coherente, sin pisar un link de revisión
+    // (`#r=...`) que haya traído la pestaña
+    if (!location.hash.startsWith('#r=')) {
+      history.replaceState({ magoyaView: view }, '', location.pathname + '#' + view)
+    }
+    const onPop = (e) => {
+      const next = e.state?.magoyaView || (location.hash.match(/^#(gallery|editor|brandkit)$/) || [])[1] || 'gallery'
+      setView(next)
+    }
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   const [projects, setProjects] = useState([])
   const [elements, setElements] = useState([])
   const [customTemplates, setCustomTemplates] = useState([])
@@ -269,7 +298,7 @@ export default function App() {
     setActive(0)
     setCarousel(false)
     setDirty(false)
-    setView('editor')
+    navigate('editor')
   }
 
   // ---- abrir proyecto guardado / serializado ----
@@ -318,7 +347,7 @@ export default function App() {
     setActive(0)
     setCarousel(!!p.carousel)
     setDirty(false)
-    setView('editor')
+    navigate('editor')
   }
 
   function serialize() {
@@ -471,7 +500,7 @@ export default function App() {
     resetHistory()
     piecesRef.current = [{ template: BLANK_TEMPLATE, content: freshContent(BLANK_TEMPLATE) }]
     setPieces([{ template: BLANK_TEMPLATE, content: freshContent(BLANK_TEMPLATE) }])
-    setActive(0); setCarousel(false); setDirty(false); setView('editor')
+    setActive(0); setCarousel(false); setDirty(false); navigate('editor')
   }
   // `preset` = carrusel armado (portada + internos + cierre). Sin preset,
   // las tres slides en blanco de siempre.
@@ -490,7 +519,7 @@ export default function App() {
     setActive(0)
     setCarousel(true)
     setDirty(false)
-    setView('editor')
+    navigate('editor')
   }
   function convertToCarousel() {
     endGesture(); pushHistory(snapshot())
@@ -806,16 +835,16 @@ export default function App() {
   return (
     <div className={'app ' + (view === 'editor' ? 'app--fixed' : 'app--scroll')}>
       <div className="topbar">
-        <button className="brand" onClick={() => setView('gallery')} title="Ir al inicio">Magoya <b>Studio</b></button>
+        <button className="brand" onClick={() => navigate('gallery')} title="Ir al inicio">Magoya <b>Studio</b></button>
         {view !== 'editor' && (
           <nav className="topnav">
-            <button className={view === 'gallery' ? 'on' : ''} onClick={() => setView('gallery')}>Crear pieza</button>
-            <button className={view === 'brandkit' ? 'on' : ''} onClick={() => setView('brandkit')}>Kit de marca</button>
+            <button className={view === 'gallery' ? 'on' : ''} onClick={() => navigate('gallery')}>Crear pieza</button>
+            <button className={view === 'brandkit' ? 'on' : ''} onClick={() => navigate('brandkit')}>Kit de marca</button>
           </nav>
         )}
         {view === 'editor' && current && (
           <nav className="crumbs" aria-label="Ubicación">
-            <button className="crumb-link" onClick={() => setView('gallery')}>Inicio</button>
+            <button className="crumb-link" onClick={() => navigate('gallery')}>Inicio</button>
             <span className="crumb-sep">›</span>
             {/* C3 · el nombre del proyecto es editable acá (antes mostraba,
                 sin poder cambiarlo, el nombre de la plantilla) */}
@@ -836,7 +865,7 @@ export default function App() {
             {conflicto && <button className="btn ghost-light" onClick={() => exportProjectFile(serialize())}>Bajar esta versión</button>}
             {conflicto && <button className="btn ghost-light" onClick={() => location.reload()}>Recargar</button>}
             {saveFail && <button className="btn ghost-light" onClick={() => exportProjectFile(serialize())}>Descargar ahora</button>}
-            <button className="btn ghost-light" onClick={() => setView('gallery')}>‹ Volver al inicio</button>
+            <button className="btn ghost-light" onClick={() => navigate('gallery')}>‹ Volver al inicio</button>
           </>
         )}
       </div>
@@ -933,7 +962,7 @@ export default function App() {
             Bajá la pieza para no perderla, o hacé lugar borrando proyectos viejos desde Inicio.
           </div>
           <button className="btn primary" onClick={() => exportProjectFile(serialize())}>Bajar la pieza</button>
-          <button className="btn ghost-light" onClick={() => setView('gallery')}>Hacer lugar</button>
+          <button className="btn ghost-light" onClick={() => navigate('gallery')}>Hacer lugar</button>
         </div>
       )}
 
