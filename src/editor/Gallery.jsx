@@ -193,6 +193,21 @@ export default function Gallery({
           )}
         </div>
       )}
+      {/* "El buscador de LLM no funciona, ¿lo podés solucionar?" — no
+          estaba roto: probé con una frase genuinamente vaga ("necesito
+          algo para el jueves que viene", sin decir de qué) y la IA
+          contesta honesto que no entendió (confianza 0.15). Correcto que
+          no invente nada ahí — pero la pantalla quedaba en silencio
+          total, indistinguible de que el buscador no hiciera nada. Esto
+          le pone voz al "lo intenté y no encontré": sólo aparece cuando
+          la IA YA contestó (no mientras `pensando`) y ni las reglas ni
+          el modelo encontraron un objetivo con confianza suficiente. */}
+      {!pensando && delModelo && (delModelo.confianza < 0.45 || delModelo.objetivo === 'ninguno')
+        && sug.plantillas.length === 0 && !sug.carrusel && (
+        <div style={{ fontSize: 12, color: 'var(--ui-muted, #888)', margin: '0 0 14px 2px' }}>
+          No encontré nada con esa frase — probá contar más (qué es, para qué red, si tiene fecha).
+        </div>
+      )}
       {(sug.plantillas.length > 0 || sug.carrusel) && (
         <div className="h3-recent">
           <div className="h3-trow">
