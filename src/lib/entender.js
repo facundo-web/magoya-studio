@@ -33,18 +33,20 @@ const plano = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀
  * La aduana. Todo lo que vuelve del modelo pasa por acá antes de tocar la
  * pieza, y lo que no cumple se descarta en silencio.
  *
- * La regla que más importa: el `tema` tiene que estar CONTENIDO en lo que
- * la persona escribió. Si el modelo devuelve algo que ella no dijo —por
- * bien redactado que esté— es exactamente el delirio que la herramienta
- * viene a evitar, y lo tiramos.
+ * La regla que más importa: el `tema` tiene que estar CONTENIDO en algo
+ * que la persona escribió — la frase actual, o una anterior de la MISMA
+ * conversación (`historial`). Eso es lo que permite "ahora para
+ * LinkedIn" sin abrir la puerta a que el modelo invente: sigue sin poder
+ * devolver una palabra que nadie tipeó nunca en esta sesión.
  */
-export function validar(crudo, textoOriginal) {
+export function validar(crudo, textoOriginal, historial = []) {
   if (!crudo || typeof crudo !== 'object') return VACIO
   const objetivo = OBJETIVOS.includes(crudo.objetivo) ? crudo.objetivo : 'ninguno'
 
   let tema = String(crudo.tema || '').trim().slice(0, 80)
   if (tema) {
-    const dentro = plano(textoOriginal).includes(plano(tema))
+    const pool = plano([textoOriginal, ...historial.map((h) => h.texto)].join(' '))
+    const dentro = pool.includes(plano(tema))
     // dos o tres palabras sueltas tampoco: el tema tiene que ser un tramo
     if (!dentro) tema = ''
   }
@@ -57,11 +59,21 @@ export function validar(crudo, textoOriginal) {
 /**
  * Le pregunta al modelo. Devuelve null si no se pudo — y null significa
  * "usá las reglas", no "no hay nada".
+ *
+ * `historial` son los turnos anteriores de ESTA sesión: [{texto,
+ * resultado}]. Sin esto, cada búsqueda era una isla — "webinar de IA en
+ * campo" y después "ahora para LinkedIn" no tenían forma de conectarse,
+ * y la segunda por sí sola no dice nada. Con historial, el modelo ve la
+ * conversación completa, igual que vos.
  */
-export async function entender(texto) {
+export async function entender(texto, historial = []) {
   const clave = plano(texto)
   if (clave.length < 4) return null
-  if (cache.has(clave)) return cache.get(clave)
+  // La caché sólo sirve para el primer turno (sin contexto): con
+  // historial, la MISMA frase puede significar algo distinto según de
+  // dónde vengas ("y con fecha" después de "webinar" no es lo mismo que
+  // después de "caso de cliente").
+  if (!historial.length && cache.has(clave)) return cache.get(clave)
   if (disponible === false) return null
 
   const corte = new AbortController()
@@ -77,12 +89,15 @@ export async function entender(texto) {
         // vive del lado del servidor y nunca baja al navegador
         Authorization: `Bearer ${data?.session?.access_token || supabase.supabaseKey}`,
       },
-      body: JSON.stringify({ texto }),
+      body: JSON.stringify({
+        texto,
+        historial: historial.slice(-6).map((h) => ({ texto: h.texto, resultado: h.resultado })),
+      }),
     })
     if (!r.ok) { if (r.status === 404) disponible = false; return null }
     disponible = true
-    const salida = validar(await r.json(), texto)
-    cache.set(clave, salida)
+    const salida = validar(await r.json(), texto, historial)
+    if (!historial.length) cache.set(clave, salida)
     return salida
   } catch {
     return null // abortado, sin internet, o la función no existe

@@ -54,20 +54,40 @@ const SISTEMA = `Trabajás para Magoya, un product studio de AgTech argentino. A
 
 Reglas, en orden de importancia:
 1. NO escribas copy. No inventes títulos, no mejores la frase, no completes lo que falta.
-2. El "tema" son palabras COPIADAS de la frase. Si la persona no dijo el tema, devolvé vacío.
+2. El "tema" son palabras COPIADAS de la frase — de la ACTUAL, o de una anterior en esta misma conversación si el pedido de ahora es una continuación. Si no hay tema claro en ninguna de las dos, devolvé vacío.
 3. Si no entendés qué quiere, objetivo "ninguno" y confianza baja. Preferí no saber antes que adivinar mal: una sugerencia equivocada es peor que ninguna.
 4. Escribí en español rioplatense, sin voseo forzado.
+5. Esta conversación puede tener mensajes anteriores tuyos y de la persona. Si el pedido actual es una continuación o un ajuste de uno anterior ("ahora para LinkedIn", "mejor que sea una guía", "con fecha del 15"), usá ese contexto — no le pidas a la persona que repita lo que ya dijo. Si el pedido actual es un tema nuevo y sin relación, ignorá lo anterior.
 
 El vocabulario del rubro: lote, rinde, siembra, cosecha, agronomía, productor, cooperativa, nitrógeno, suelo, campaña, hectárea.`
+
+// Cuánto de la conversación se manda de vuelta al modelo. Cada turno son
+// dos mensajes (lo que escribió + lo que devolviste), así que 6 turnos
+// son 12 mensajes — bastante para "ahora para LinkedIn" tres pedidos
+// después, sin que el costo por búsqueda crezca sin límite.
+const MAX_HISTORIAL = 6
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
   try {
-    const { texto } = await req.json()
+    const { texto, historial } = await req.json()
     if (typeof texto !== 'string' || texto.trim().length < 4) {
       return new Response(JSON.stringify({ objetivo: 'ninguno', tema: '', carrusel: false, red: 'ninguna', confianza: 0 }),
         { headers: { ...CORS, 'Content-Type': 'application/json' } })
     }
+
+    // La memoria son los turnos anteriores de ESTA sesión, tal como el
+    // cliente los guardó: lo que la persona escribió + lo que el modelo
+    // contestó en su momento (el propio JSON, re-emitido como si fuera su
+    // respuesta — porque literalmente lo fue). Nunca texto inventado acá.
+    const turnos = Array.isArray(historial) ? historial.slice(-MAX_HISTORIAL) : []
+    const mensajes = []
+    for (const t of turnos) {
+      if (!t || typeof t.texto !== 'string' || !t.resultado) continue
+      mensajes.push({ role: 'user', content: String(t.texto).slice(0, 500) })
+      mensajes.push({ role: 'assistant', content: JSON.stringify(t.resultado) })
+    }
+    mensajes.push({ role: 'user', content: String(texto).slice(0, 500) })
 
     const r = await anthropic.messages.create({
       model: 'claude-opus-5',
@@ -76,7 +96,7 @@ Deno.serve(async (req) => {
       // Salida estructurada: el modelo no puede devolver prosa aunque quiera.
       // Es la garantía técnica de que "no escribe copy", no una promesa.
       output_config: { format: { type: 'json_schema', schema: ESQUEMA }, effort: 'low' },
-      messages: [{ role: 'user', content: String(texto).slice(0, 500) }],
+      messages: mensajes,
     })
 
     // Un rechazo del clasificador no es un error: es "no sé".

@@ -58,6 +58,13 @@ export default function Gallery({
   // respuesta — y `null` significa "seguí con las reglas", no "no hay nada".
   const [delModelo, setDelModelo] = React.useState(null)
   const [pensando, setPensando] = React.useState(false)
+  // "¿Cómo sé que está interactuando conmigo?" — quería memoria de
+  // conversación, no un clasificador que trata cada búsqueda como una
+  // isla. Esto es la conversación de ESTA sesión: lo que escribiste +
+  // lo que contestó, en orden. Se manda de vuelta en cada pregunta para
+  // que "ahora para LinkedIn" (que sola no dice nada) se entienda como
+  // la continuación de la de antes.
+  const [historialIA, setHistorialIA] = React.useState([])
   // Antes esto se disparaba solo, a los 500ms de dejar de escribir — sin
   // que la persona hiciera nada. Facu: "queda como que tenés un tiempo
   // para escribir y la interacción es rara". Tenía razón: un timer
@@ -68,8 +75,17 @@ export default function Gallery({
     const limpio = texto.trim()
     if (limpio.length < 6 || pensando) return
     setPensando(true)
-    entender(limpio).then((r) => setDelModelo(r)).catch(() => {}).finally(() => setPensando(false))
-  }, [pensando])
+    entender(limpio, historialIA)
+      .then((r) => {
+        setDelModelo(r)
+        // Sólo queda en la memoria lo que de verdad se pudo preguntar
+        // (con la función andando) — un intento fallido no debe
+        // ensuciar la conversación con un "no entendí" que no fue tal.
+        if (r) setHistorialIA((h) => [...h, { texto: limpio, resultado: r }].slice(-6))
+      })
+      .catch(() => {})
+      .finally(() => setPensando(false))
+  }, [pensando, historialIA])
   // Si la persona sigue editando después de una respuesta, esa respuesta
   // ya no es sobre este texto: se invalida, pero no se vuelve a preguntar
   // sola — hace falta un nuevo Enter.
@@ -167,8 +183,20 @@ export default function Gallery({
               : <Icon n="up" size={16} />}
           </button>
         </div>
-        {pedido && <button className="linklike" onClick={() => setPedido('')}>Borrar</button>}
+        {pedido && (
+          <button className="linklike" onClick={() => { setPedido(''); setHistorialIA([]) }}>
+            {/* Borrar también arranca conversación nueva: es la acción que
+                la persona ya reconoce como "empezar de nuevo". */}
+            Borrar
+          </button>
+        )}
       </div>
+      {historialIA.length > 0 && (
+        <div style={{ fontSize: 11, color: 'var(--ui-muted, #999)', margin: '0 0 6px 2px' }}>
+          🧠 {historialIA.length === 1 ? 'Recuerda tu búsqueda anterior' : `Recuerda tus últimas ${historialIA.length} búsquedas`} en esta sesión ·{' '}
+          <button className="linklike" style={{ fontSize: 11 }} onClick={() => setHistorialIA([])}>Empezar de nuevo</button>
+        </div>
+      )}
       {delModelo && delModelo.confianza >= 0.45 && delModelo.objetivo !== 'ninguno' && (
         // Prueba de que la IA no es adorno: dice qué entendió, y se puede
         // comparar con la frase de al lado.
