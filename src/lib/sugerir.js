@@ -130,8 +130,13 @@ const LEX = {
   ensenar: ['tip', 'tips', 'como', 'guia*', 'explic*', 'ensenar', 'paso a paso', 'pasos', 'metodo*',
     'aprend*', 'truco*', 'error*', 'mito*', 'realidad', 'pregunta*', 'duda*', 'consulta*', 'checklist',
     'educativo', 'tutorial', 'consejo*', 'clave*', 'que es', 'por que', 'para que'],
+  // "promoción" no tenía casa: no es novedad (no lanza nada nuevo) ni
+  // cierre (no es un aviso operativo), así que el modelo devolvía
+  // confianza baja con razón. Una oferta ES un anuncio — se agrega acá en
+  // vez de inventar un objetivo sin plantilla propia detrás.
   anuncio: ['lanzamos', 'lanzamiento', 'novedad*', 'anunci*', 'presentamos', 'ya esta', 'disponible',
-    'estrenamos', 'salio', 'comunicar', 'nueva version', 'lanzar'],
+    'estrenamos', 'salio', 'comunicar', 'nueva version', 'lanzar', 'promo*', 'oferta*', 'descuento*',
+    'liquidacion', 'bonific*', 'aprovecha*', '2x1', 'gratis'],
   equipo: ['equipo*', 'sumamos', 'se suma', 'bienvenid*', 'integrante*', 'contratamos', 'se une',
     'cultura', 'oficina', 'estuvimos', 'fuimos', 'participamos', 'recap', 'resumen', 'retrato*',
     'nuestra gente', 'quienes somos', 'buscamos', 'hiring', 'colega*'],

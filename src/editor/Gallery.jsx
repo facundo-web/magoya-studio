@@ -23,7 +23,18 @@ const FILTERS = [
   { k: 'ensenar', label: 'Explicar algo' },
   { k: 'anuncio', label: 'Anunciar' },
   { k: 'equipo', label: 'Equipo y cultura' },
+  { k: 'cierre', label: 'Cerrar un carrusel' },
   { k: 'mine', label: 'Mías' },
+]
+
+// Frases reales que SÍ encuentran algo — para cuando el buscador no
+// entendió nada. Mejor mostrar 2-3 caminos que sí andan que dejar a la
+// persona adivinando qué contar distinto (Lucho: que la herramienta
+// siempre acerque algo, nunca una pantalla muerta).
+const EJEMPLOS = [
+  'webinar de IA en campo el 11 de junio',
+  'caso de un cliente que bajó costos 20%',
+  '3 tips para elegir semillas',
 ]
 const OBJETIVOS = new Set(['webinar', 'prueba', 'ensenar', 'anuncio', 'equipo', 'cierre'])
 
@@ -89,22 +100,41 @@ export default function Gallery({
   // Si la persona sigue editando después de una respuesta, esa respuesta
   // ya no es sobre este texto: se invalida, pero no se vuelve a preguntar
   // sola — hace falta un nuevo Enter.
-  React.useEffect(() => { setDelModelo(null) }, [pedido])
+  React.useEffect(() => { setDelModelo(null); setConfirmado(null) }, [pedido])
+
+  // Antes era todo o nada: 0.45 para arriba se usaba, para abajo se
+  // tiraba. Pero el modelo devuelve un número, no un booleano — hay una
+  // banda del medio (0.20 a 0.45) donde no está seguro pero tampoco está
+  // perdido. Ahí no se adivina: se pregunta. `confirmado` es null (sin
+  // contestar todavía), true (dijo que sí) o false (dijo que no), y sólo
+  // vale para ESTA respuesta — cambiar el pedido lo borra.
+  const [confirmado, setConfirmado] = React.useState(null)
+  const UMBRAL_MEDIO = 0.20
+
+  // Lo que de verdad se usa para armar la sugerencia: la respuesta segura
+  // tal cual, o la de la banda media SÓLO si la persona la confirmó. Si
+  // dijo que no, es como si el modelo no hubiera contestado nada.
+  const efectivo = React.useMemo(() => {
+    if (!delModelo) return null
+    if (delModelo.confianza >= 0.45) return delModelo
+    if (delModelo.confianza >= UMBRAL_MEDIO && confirmado === true) return { ...delModelo, confianza: 0.45 }
+    return null
+  }, [delModelo, confirmado])
 
   const sug = React.useMemo(() => {
     const base = sugerirTodo(pedido, { templates: templates.filter((t) => !t.hidden), formatos: Object.values(FORMATS_BY_ID), carruseles: CAROUSELS })
-    if (!delModelo) return base
+    if (!efectivo) return base
     // Las reglas ya corrieron y mandan sobre los datos duros; el modelo
     // sólo llena el objetivo cuando ninguna palabra clave coincidió. Si
     // aporta un objetivo nuevo, hay que volver a preguntar las plantillas.
-    const senales = combinar(base.senales, delModelo)
+    const senales = combinar(base.senales, efectivo)
     if (senales === base.senales) return base
     const reintento = sugerirTodo(pedido, {
       templates: templates.filter((t) => !t.hidden), formatos: Object.values(FORMATS_BY_ID),
       carruseles: CAROUSELS, senalesBase: senales,
     })
     return reintento.plantillas.length ? { ...reintento, senales } : base
-  }, [pedido, templates, delModelo])
+  }, [pedido, templates, efectivo])
 
   const visible = templates.filter((t) => {
     if (t.hidden) return false        // es variante de otra, no plantilla propia
@@ -221,6 +251,34 @@ export default function Gallery({
           )}
         </div>
       )}
+      {/* Banda media (0.20-0.45): ni tan seguro como para usarlo solo, ni
+          tan perdido como para callarse. Antes esto cortaba directo al
+          "no encontré nada" — una conjetura razonable se tiraba entera
+          por no llegar al piso. Ahora se la ofrece para confirmar, sin
+          forzar la decisión. */}
+      {delModelo && confirmado === null && delModelo.confianza >= UMBRAL_MEDIO && delModelo.confianza < 0.45
+        && delModelo.objetivo !== 'ninguno' && OBJETIVOS.has(delModelo.objetivo) && (
+        <div style={{ fontSize: 12, color: 'var(--ui-muted, #888)', margin: '0 0 14px 2px' }}>
+          🤔 ¿Es para <b>{ETIQUETA[delModelo.objetivo]}</b>{delModelo.tema && <> · tema “{delModelo.tema}”</>}?{' '}
+          <button className="linklike" style={{ fontSize: 12 }} onClick={() => setConfirmado(true)}>Sí</button>
+          {' · '}
+          <button className="linklike" style={{ fontSize: 12 }} onClick={() => setConfirmado(false)}>No</button>
+        </div>
+      )}
+      {delModelo && confirmado === true && delModelo.confianza >= UMBRAL_MEDIO && delModelo.confianza < 0.45 && (
+        <div style={{ fontSize: 12, color: 'var(--ui-muted, #888)', margin: '0 0 14px 2px' }}>
+          👍 Vamos por <b>{ETIQUETA[delModelo.objetivo]}</b>
+          {sug.plantillas.length === 0 && !sug.carrusel && (
+            <>
+              {' · '}
+              <button className="linklike" style={{ fontSize: 12 }} onClick={() => {
+                setFilter(delModelo.objetivo)
+                requestAnimationFrame(() => document.querySelector('.h3-templates')?.scrollIntoView({ behavior: 'smooth' }))
+              }}>Ver todas las de {ETIQUETA[delModelo.objetivo]}</button>
+            </>
+          )}
+        </div>
+      )}
       {/* "El buscador de LLM no funciona, ¿lo podés solucionar?" — no
           estaba roto: probé con una frase genuinamente vaga ("necesito
           algo para el jueves que viene", sin decir de qué) y la IA
@@ -229,11 +287,23 @@ export default function Gallery({
           total, indistinguible de que el buscador no hiciera nada. Esto
           le pone voz al "lo intenté y no encontré": sólo aparece cuando
           la IA YA contestó (no mientras `pensando`) y ni las reglas ni
-          el modelo encontraron un objetivo con confianza suficiente. */}
-      {!pensando && delModelo && (delModelo.confianza < 0.45 || delModelo.objetivo === 'ninguno')
-        && sug.plantillas.length === 0 && !sug.carrusel && (
+          el modelo encontraron un objetivo con confianza suficiente —
+          o la persona misma descartó la conjetura de la banda media.
+          Nunca deja a la persona en un silencio indistinguible de un
+          buscador roto: siempre hay 2-3 frases que SÍ funcionan al lado. */}
+      {!pensando && delModelo && sug.plantillas.length === 0 && !sug.carrusel
+        && (confirmado === false || delModelo.confianza < UMBRAL_MEDIO || delModelo.objetivo === 'ninguno') && (
         <div style={{ fontSize: 12, color: 'var(--ui-muted, #888)', margin: '0 0 14px 2px' }}>
-          No encontré nada con esa frase — probá contar más (qué es, para qué red, si tiene fecha).
+          <div style={{ marginBottom: 6 }}>No encontré nada con esa frase — probá contar más (qué es, para qué red, si tiene fecha), o mirá un ejemplo:</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {EJEMPLOS.map((ej) => (
+              <button key={ej} type="button" onClick={() => { setPedido(ej); preguntarIA(ej) }}
+                style={{ fontSize: 11.5, padding: '5px 10px', borderRadius: 999, border: '1px solid var(--ui-line)',
+                  background: '#fff', color: 'inherit', cursor: 'pointer' }}>
+                {ej}
+              </button>
+            ))}
+          </div>
         </div>
       )}
       {(sug.plantillas.length > 0 || sug.carrusel) && (

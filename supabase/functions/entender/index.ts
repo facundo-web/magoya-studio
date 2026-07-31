@@ -32,7 +32,7 @@ const ESQUEMA = {
     objetivo: {
       type: 'string',
       enum: ['webinar', 'prueba', 'ensenar', 'anuncio', 'equipo', 'cierre', 'ninguno'],
-      description: 'webinar=invitar a algo con fecha · prueba=mostrar un resultado o caso · ensenar=explicar o dar tips · anuncio=novedad o lanzamiento · equipo=cultura y personas · cierre=aviso operativo · ninguno=no se entiende qué quiere',
+      description: 'webinar=invitar a algo con fecha · prueba=mostrar un resultado o caso · ensenar=explicar o dar tips · anuncio=novedad, lanzamiento, promoción u oferta · equipo=cultura y personas · cierre=aviso operativo · ninguno=no se entiende qué quiere',
     },
     tema: {
       type: 'string',
