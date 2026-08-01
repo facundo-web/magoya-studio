@@ -1,10 +1,23 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useMemo } from 'react'
 import Gallery from './editor/Gallery.jsx'
 import Editor from './editor/Editor.jsx'
 import BrandKit from './editor/BrandKit.jsx'
+import Pulso from './editor/Pulso.jsx'
+import Copiloto, { useCopiloto, ROL as ROL_TEXTO } from './editor/Copiloto.jsx'
 import MockupPreview from './editor/MockupPreview.jsx'
+import Icon from './ui/Icon.jsx'
+// Namespace a propósito, igual que en Copiloto.jsx: un import nombrado que
+// no existe se lleva puesto el bundle entero, y esa pantalla muerta es
+// justo lo que el invariante 3 prohíbe.
+import * as copmotor from './lib/copiloto.js'
+import { CAPACIDADES } from './lib/capabilities.js'
+// Namespace en el import a propósito: un import nombrado que no existe
+// rompe el bundle, que es exactamente la pantalla muerta que el invariante
+// 3 prohíbe. Pero al copiloto NO le llega el namespace entero: abajo, en
+// ctxCopiloto, se le pasan sólo las dos funciones de lectura.
+import * as memoria from './lib/memoria.js'
 import { createShare, loadShare, listComments, addComment, countComments, setVerdict, getVerdicts } from './lib/supabase.js'
-import { TEMPLATES, TEMPLATES_BY_ID, BLANK_TEMPLATE, placeholderContent, applyDesign } from './templates/index.js'
+import { TEMPLATES, BLANK_TEMPLATE, placeholderContent, applyDesign, rolesDePieza } from './templates/index.js'
 import { buildCarousel } from './templates/carousels.js'
 import { tamanoComun } from './engine/layouts.js'
 import { FORMATS_BY_ID, CAROUSEL_FORMATS, isKnownFormat, formatLabel } from './formats/registry.js'
@@ -44,7 +57,7 @@ export default function App() {
       history.replaceState({ magoyaView: view }, '', location.pathname + '#' + view)
     }
     const onPop = (e) => {
-      const next = e.state?.magoyaView || (location.hash.match(/^#(gallery|editor|brandkit)$/) || [])[1] || 'gallery'
+      const next = e.state?.magoyaView || (location.hash.match(/^#(gallery|editor|brandkit|pulso)$/) || [])[1] || 'gallery'
       setView(next)
     }
     window.addEventListener('popstate', onPop)
@@ -595,6 +608,278 @@ export default function App() {
     setActive((a) => Math.max(0, a - (i <= a ? 1 : 0)))
     showToast('Slide borrada', true)
   }
+  // Vivía suelto en el JSX del Editor. Ahora también lo dispara el copiloto
+  // ("ahora para Instagram"), y las dos puertas tienen que dejar el mismo
+  // paso de historial: si no, ⌘Z deshace una y la otra no.
+  // Y como el chat vive en la home, esta puerta se puede disparar con la
+  // persona mirando otra pantalla. Un cambio que no se ve es un cambio que
+  // no pidió: se la lleva a la pieza, igual que hace Aceptar. Desde el
+  // Editor la línea no hace nada, que es lo que corresponde.
+  function cambiarFormato(f) {
+    if (!f || !FORMATS_BY_ID[f.id]) return
+    endGesture(); pushHistory(snapshot())
+    fmtRef.current = f.id; setFormatId(f.id); setDirty(true)
+    if (view !== 'editor') navigate('editor')
+  }
+
+  // ============================================================
+  // EL COPILOTO — lo que ve y lo que puede tocar.
+  //
+  // Invariante 1: el texto que escribe el modelo NO llega acá. Llega una
+  // PROPUESTA, que se guarda y espera. `aplicarPropuesta` es lo único de
+  // este bloque que escribe en una pieza, y sólo lo llama Aceptar.
+  // ============================================================
+  const [propuesta, setPropuesta] = useState(null)
+  // Por qué NO se pudo aplicar la propuesta del modal. Vive acá y no
+  // adentro de `aplicarPropuesta` porque el que pide es el que muestra: la
+  // card del chat dibuja su propio error, y un toast además sería el mismo
+  // reto dos veces.
+  const [propFalla, setPropFalla] = useState(null)
+
+  // Poner los textos de una propuesta sobre un `content`. Devuelve el
+  // contenido nuevo y QUÉ roles entraron: sin esa lista, quien llama no
+  // tiene con qué decidir si decir "listo" o decir por qué no.
+  //
+  // Y "entraron" es literal: un rol que la plantilla no tiene NO se escribe
+  // y NO se cuenta. Antes se escribía igual —`next[t.rol] = t.texto`, siempre—
+  // y como el motor sólo dibuja los roles que la plantilla declara, ese texto
+  // quedaba en el objeto sin aparecer en ningún lado: la card decía "Aceptada"
+  // sobre una pieza que no cambió un píxel. Un puestos inflado es la forma
+  // más barata de romper el invariante 1, porque nadie lo ve romperse.
+  function escribirTextos(template, base, textos) {
+    const next = { ...(base || {}) }
+    const bloques = Array.isArray(next.textBlocks) ? [...next.textBlocks] : null
+    const existe = new Set(rolesDePieza(template, next))
+    const puestos = []
+    const ignorados = []
+    for (const t of textos) {
+      // En una pieza libre el texto vive en un bloque suelto y el "rol" es
+      // su estilo: escribir content[rol] ahí no se ve en ningún lado.
+      const i = bloques ? bloques.findIndex((b) => (b.style || 'title') === t.rol) : -1
+      if (i >= 0) { bloques[i] = { ...bloques[i], text: t.texto }; puestos.push(t.rol); continue }
+      if (!existe.has(t.rol)) { ignorados.push(t.rol); continue }
+      next[t.rol] = t.texto
+      puestos.push(t.rol)
+    }
+    if (bloques) next.textBlocks = bloques
+    return { content: next, puestos, ignorados }
+  }
+
+  // Los roles se nombran con las palabras del inspector, nunca con el id:
+  // "Dato no tiene title" no le dice nada a nadie.
+  const nombrarRoles = (roles) => roles.map((r) => (ROL_TEXTO[r] || r).toLowerCase()).join(', ')
+  // Qué contarle a la persona cuando la plantilla se comió algo. Se arma acá
+  // porque acá está el nombre de la plantilla; la card sólo lo muestra.
+  const notaIgnorados = (tpl, ignorados) =>
+    `«${tpl?.name || 'Esta pieza'}» no tiene ${nombrarRoles(ignorados)}: ${ignorados.length === 1 ? 'ese texto no se puso' : 'esos textos no se pusieron'}.`
+
+  // El texto propuesto pisa el contenido de la slide en la que está parada
+  // la persona, por el MISMO camino que el inspector (changeContent sin tag
+  // = paso discreto de historial). O sea: se deshace con ⌘Z como cualquier
+  // otra edición. Aceptar no es un modo especial, es escribir.
+  //
+  // EL CONTRATO: esto SIEMPRE devuelve un resultado. Nunca un `return`
+  // mudo. Del otro lado la card del chat pone "Aceptada." sólo si acá
+  // salió ok, así que un fallo callado le hace decir que aplicó un texto
+  // que se perdió — y eso es exactamente lo que el invariante 1 promete
+  // que no pasa.
+  //   { ok: true,  puestos: ['title', …], ignorados?: ['quote'],
+  //                nota?: 'frase para mostrar tal cual',
+  //                abrio?: 'Nombre de la plantilla' }
+  //   { ok: false, motivo: 'frase para mostrar tal cual',
+  //                abrirCon?: { plantillaId, nombre } }
+  // `abrirCon` es la salida del caso más común (la persona está en la home,
+  // no hay ninguna pieza abierta): la propuesta trae plantilla, así que hay
+  // dónde ponerla si alguien lo pide. Se pide con `{ abrir: true }` y no se
+  // hace solo: aceptar un texto no puede crear un proyecto por su cuenta.
+  //
+  // Y `ok` es sobre lo que SE VE, no sobre lo que se ejecutó sin romperse.
+  // Si de la propuesta no entró nada porque la plantilla no tiene esos
+  // lugares, eso es un ok:false con el motivo en criollo: "«Dato / métrica»
+  // no tiene titular". Si entró parte, es ok:true con la `nota` de lo que
+  // quedó afuera — la card la muestra al lado del "Aceptada.", porque
+  // aceptada a medias no es aceptada entera.
+  function aplicarPropuesta(p, { abrir = false } = {}) {
+    const textos = (p?.textos || [])
+      .map((t) => ({ rol: t?.rol, texto: String(t?.texto ?? '').trim() }))
+      .filter((t) => t.rol && t.texto)
+    if (!textos.length) return { ok: false, motivo: 'Esa propuesta no trae ningún texto para poner.' }
+
+    const pieza = piecesRef.current[active]
+    if (!pieza) {
+      const tpl = p?.plantillaId ? allById[p.plantillaId] : null
+      if (!tpl) {
+        return { ok: false, motivo: 'No hay ninguna pieza abierta donde poner ese texto. Abrí una plantilla desde Crear pieza y volvé a aceptar: la propuesta queda acá.' }
+      }
+      // Se escribe ANTES de decidir si ofrecer "Abrir y aplicar": es una
+      // función pura, y ofrecer abrir una plantilla que no tiene dónde poner
+      // el texto sería prometer el mismo Aceptar vacío con un paso más.
+      const previo = escribirTextos(tpl, freshContent(tpl), textos)
+      if (!previo.puestos.length) {
+        return { ok: false, motivo: `${notaIgnorados(tpl, previo.ignorados)} Pedile al copiloto un texto para los lugares que sí tiene, o elegí otra plantilla.` }
+      }
+      if (!abrir) {
+        return { ok: false, motivo: 'No hay ninguna pieza abierta donde poner ese texto.', abrirCon: { plantillaId: tpl.id, nombre: tpl.name } }
+      }
+      // Abrir y escribir en el mismo paso: si abriéramos primero y
+      // aplicáramos después, `active` todavía sería el de la pieza anterior
+      // y el texto caería en cualquier lado (o en ninguno).
+      const { content, puestos, ignorados } = previo
+      const nota = ignorados.length ? notaIgnorados(tpl, ignorados) : null
+      setPropuesta(null); setPropFalla(null)
+      // Si aceptar te muda al editor, el chat se va con vos: la card tiene
+      // que poder decir "Aceptada." en la pantalla donde caés.
+      setCopAbierto(true)
+      pickTemplate(tpl, null, content)
+      showToast(`Listo: abrimos «${tpl.name}» con ${puestos.length === 1 ? 'el texto' : 'los textos'} adentro${nota ? `. ${nota}` : ''}`)
+      return { ok: true, puestos, ignorados, nota, abrio: tpl.name }
+    }
+
+    const { content, puestos, ignorados } = escribirTextos(pieza.template, pieza.content || {}, textos)
+    // Nada entró: no se toca la pieza, no se cierra la propuesta y no se
+    // dice "listo". El motivo nombra la plantilla y el rol con las palabras
+    // del inspector, así la persona entiende que el problema es dónde iba a
+    // caer el texto, no el texto.
+    if (!puestos.length) {
+      return { ok: false, motivo: `${notaIgnorados(pieza.template, ignorados)} Pedile al copiloto un texto para los lugares que sí tiene, o cambiá el diseño de la slide.` }
+    }
+    const nota = ignorados.length ? notaIgnorados(pieza.template, ignorados) : null
+    changeContent(content)
+    setPropuesta(null); setPropFalla(null)
+    // El copiloto vive en la home: aceptar desde ahí escribiría en una pieza
+    // que no está en pantalla. Si aceptás, te llevamos a verla — nadie
+    // acepta un texto para que desaparezca.
+    if (view !== 'editor') { setCopAbierto(true); navigate('editor') }
+    const hecho = puestos.length === 1 ? 'Listo, texto aplicado' : `Listo, ${puestos.length} textos aplicados`
+    showToast(`${hecho} — ⌘Z lo deshace${nota ? `. ${nota}` : ''}`)
+    return { ok: true, puestos, ignorados, nota }
+  }
+
+  const ctxCopiloto = useMemo(() => ({
+    plantillas: allTemplates,
+    // La pieza que va acá es LA QUE VA A RECIBIR EL TEXTO, no la que se ve
+    // en pantalla. Son dos cosas distintas y confundirlas dejaba muerto el
+    // control más caro de todos: `aplicarPropuesta` escribe en
+    // piecesRef.current[active] mire donde mire la persona, pero el chat
+    // vive en la home, así que con el filtro `view === 'editor'` esto era
+    // null SIEMPRE que el copiloto estaba a la vista. Consecuencias, todas
+    // en silencio: el cruce de roles de proponer_textos —el que impide
+    // encolar un titular para la plantilla Dato, que no tiene— no corría
+    // nunca; la card no podía mostrar el "antes" de lo que iba a pisar; y
+    // el modelo leía "no hay ninguna pieza abierta" mientras el Aceptar
+    // escribía en una pieza de verdad.
+    //
+    // El miedo original era bueno y sigue en pie: no se puede hablar de "la
+    // pieza que tenés abierta" con la persona parada en la home. Por eso
+    // viaja `enPantalla`. El estado dice las dos cosas que son ciertas a la
+    // vez: la pieza existe y va a recibir el texto, y ahora mismo no la
+    // está mirando.
+    proyecto: pieces.length
+      ? {
+        nombre: projectName,
+        formatId,
+        carousel,
+        pieces: pieces.map((p) => ({ templateId: p.template.id, content: p.content })),
+        slideActual: active,
+        enPantalla: view === 'editor',
+      }
+      : null,
+    // Lo que NO esté acá, para el copiloto no existe: estadoActual() le
+    // lista exactamente estas claves como "lo que podés disparar".
+    acciones: {
+      abrirPlantilla: pickTemplate,
+      abrirCarrusel: startBlankCarousel,
+      abrirEnBlanco: startBlank,
+      cambiarFormato,
+      proponer: (p) => { setPropuesta(p); setPropFalla(null); return { encolada: true } },
+    },
+    // Sólo las funciones de LECTURA, enumeradas a mano. Acá iba el
+    // namespace entero de memoria.js, y eso dejaba registrarPieza,
+    // registrarPublicacion, registrarMetricas e importarCSV —las cuatro
+    // escriben en Supabase— al alcance de cualquier capacidad, hoy o la que
+    // se agregue el mes que viene, sin pasar por `acciones`. Lo que no está
+    // en `acciones` no se lista en el estado ni aparece en pantalla: sería
+    // un efecto que la persona no pidió, no vio y no puede deshacer. Lo que
+    // se escribe en la bitácora, se escribe desde la app.
+    memoria: {
+      listarBitacora: memoria.listarBitacora,
+      resumenParaCopiloto: memoria.resumenParaCopiloto,
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [customTemplates, view, pieces, projectName, formatId, carousel, active])
+
+  // ============================================================
+  // EL COPILOTO VIVE ACÁ, NO EN LA HOME.
+  //
+  // El chat estaba adentro de Gallery, o sea adentro de la vista
+  // "gallery". Pero el flujo más común del copiloto TERMINA abriendo una
+  // pieza: `abrir_plantilla` llama a pickTemplate, que navega al editor y
+  // desmonta la home. Resultado, verificado: le pedías "quiero invitar a
+  // algo", el copiloto abría la plantilla Evento y el chat se esfumaba en
+  // el medio de su propia respuesta. El texto de cierre —el que explica
+  // qué hizo y qué sigue— no se veía nunca, y lo que pasaba después del
+  // desmontaje ni se guardaba (el efecto de sessionStorage no corre
+  // desmontado): la sesión quedaba con agujeros.
+  //
+  // Ahora el hilo es estado de App, que no se desmonta nunca. Abajo se
+  // dibuja en dos lugares —integrado en la home, y como panel lateral en
+  // el editor— y es LA MISMA conversación: mismos turnos, mismas
+  // propuestas pendientes, mismo fetch en curso.
+  // ============================================================
+  const [copAbierto, setCopAbierto] = useState(false)
+  // Invariante 3, movido para arriba junto con el resto: el copiloto se
+  // puede apagar con la persona editando, y el buscador de reglas tiene
+  // que estar puesto cuando vuelva al inicio. Vacío significa "acá nunca
+  // hubo copiloto": esa home es la de ayer y no tiene nada que explicar.
+  const habiaCopRef = useRef(typeof copmotor.hayCopiloto === 'function' ? copmotor.hayCopiloto() : false)
+  const [hayCop, setHayCop] = useState(habiaCopRef.current)
+  const [avisoCaida, setAvisoCaida] = useState('')
+  const [semillaPedido, setSemillaPedido] = useState('')
+  const alCaerCopiloto = React.useCallback(({ texto, motivo, explicado } = {}) => {
+    if (habiaCopRef.current) {
+      const suyo = String(texto || '').trim()
+      if (suyo) setSemillaPedido(suyo)
+      // `explicado` = el chat quedó en pantalla con su propia línea; decir
+      // lo mismo diez píxeles más abajo sería repetirse.
+      setAvisoCaida(explicado ? '' : String(motivo || '').trim())
+    }
+    habiaCopRef.current = false
+    setHayCop(false)
+  }, [])
+  const alVolverCopiloto = React.useCallback(() => {
+    habiaCopRef.current = true
+    setAvisoCaida(''); setSemillaPedido(''); setHayCop(true)
+  }, [])
+
+  const cop = useCopiloto({
+    ctx: ctxCopiloto,
+    onPropuesta: aplicarPropuesta,
+    onSinCopiloto: alCaerCopiloto,
+    onVuelveCopiloto: alVolverCopiloto,
+  })
+
+  // Cuando el copiloto se pone a trabajar, su panel se abre. Es la regla
+  // que arregla el defecto: si el pedido termina abriendo una pieza, la
+  // persona llega al editor con la conversación a la vista y lee el cierre
+  // en vez de encontrarse con el chat desaparecido. Cerrarlo a mano gana
+  // hasta el próximo pedido — mientras piensa no se reabre solo.
+  const pensandoRef = useRef(cop.pensando)
+  useEffect(() => {
+    if (cop.pensando && !pensandoRef.current) setCopAbierto(true)
+    pensandoRef.current = cop.pensando
+  }, [cop.pensando])
+
+  // Las frases de arranque del panel del editor. Salen de lo que el
+  // copiloto PUEDE hacer, igual que las de la home: si mañana se cae una
+  // capacidad, se cae su chip solo. Acá la persona ya tiene una pieza
+  // abierta, así que hablan de esa pieza y no de cuál elegir.
+  const chipsEditor = useMemo(() => {
+    const puede = new Set(CAPACIDADES.map((c) => c.nombre))
+    const out = []
+    if (puede.has('proponer_textos')) out.push('Mejorá el titular de esta pieza', 'Dame una bajada más corta')
+    if (puede.has('revisar_copy')) out.push('Revisá el texto de esta pieza')
+    return out.slice(0, 3)
+  }, [])
 
   // ---- acciones ----
 
@@ -840,6 +1125,9 @@ export default function App() {
           <nav className="topnav">
             <button className={view === 'gallery' ? 'on' : ''} onClick={() => navigate('gallery')}>Crear pieza</button>
             <button className={view === 'brandkit' ? 'on' : ''} onClick={() => navigate('brandkit')}>Kit de marca</button>
+            {/* Sin Pulso el copiloto no tiene qué leer: es la puerta por
+                donde entran los datos que después cita. */}
+            <button className={view === 'pulso' ? 'on' : ''} onClick={() => navigate('pulso')}>Pulso</button>
           </nav>
         )}
         {view === 'editor' && current && (
@@ -865,6 +1153,18 @@ export default function App() {
             {conflicto && <button className="btn ghost-light" onClick={() => exportProjectFile(serialize())}>Bajar esta versión</button>}
             {conflicto && <button className="btn ghost-light" onClick={() => location.reload()}>Recargar</button>}
             {saveFail && <button className="btn ghost-light" onClick={() => exportProjectFile(serialize())}>Descargar ahora</button>}
+            {/* El copiloto también acá. Es un panel más del editor, no un
+                widget flotante: se abre y se cierra desde la barra, como
+                cualquier otra cosa de esta app. Si no está disponible, el
+                botón no existe — no se ofrece lo que no anda. */}
+            {hayCop && (
+              <button className={'btn ghost-light cop-toggle' + (copAbierto ? ' on' : '')}
+                aria-pressed={copAbierto}
+                onClick={() => setCopAbierto((v) => !v)}
+                title={copAbierto ? 'Cerrar el copiloto' : 'Abrir el copiloto'}>
+                <Icon n="sparkle" size={14} /> Copiloto
+              </button>
+            )}
             <button className="btn ghost-light" onClick={() => navigate('gallery')}>‹ Volver al inicio</button>
           </>
         )}
@@ -872,6 +1172,8 @@ export default function App() {
 
       {view === 'brandkit' ? (
         <BrandKit onToast={showToast} />
+      ) : view === 'pulso' ? (
+        <Pulso onVolver={() => navigate('gallery')} />
       ) : view === 'gallery' ? (
         <Gallery
           galleryFormat={FORMATS_BY_ID[galleryFormatId] || FORMATS_BY_ID[DEFAULT_FORMAT]}
@@ -893,8 +1195,14 @@ export default function App() {
           onOpenShare={openShare}
           onCopyShare={copyShareLink}
           onForgetShare={removeShare}
+          cop={cop}
+          hayCop={hayCop}
+          avisoCaida={avisoCaida}
+          semillaPedido={semillaPedido}
+          onVerPieza={pieces.length ? () => navigate('editor') : null}
         />
       ) : current ? (
+        <div className="ed-wrap">
         <Editor
           template={current.template}
           content={current.content}
@@ -902,7 +1210,7 @@ export default function App() {
           slides={carousel ? pieces : null}
           activeSlide={active}
           onChangeContent={changeContent}
-          onChangeFormat={(f) => { endGesture(); pushHistory(snapshot()); fmtRef.current = f.id; setFormatId(f.id); setDirty(true) }}
+          onChangeFormat={cambiarFormato}
           onSelectSlide={setActive}
           onAddSlide={addSlide}
           onDuplicateSlide={duplicateSlide}
@@ -924,6 +1232,20 @@ export default function App() {
           onAddElement={addCustomElement}
           onDeleteElement={removeCustomElement}
         />
+        {/* El panel del copiloto es una columna más, hermana del lienzo:
+            el stage es flex:1, así que la pieza se reacomoda y se sigue
+            pudiendo trabajar con el chat abierto. No tapa nada. */}
+        {/* Si el copiloto se apagó no se OFRECE (el botón de la barra
+            desaparece), pero un hilo que ya está en pantalla no se evapora
+            con el pedido adentro: se queda hasta que lo cierren, con su
+            línea de qué pasó. Sin conversación, el componente devuelve
+            null solo y acá no queda una columna vacía. */}
+        {(hayCop || cop.turnos.length > 0) && copAbierto && (
+          <aside className="cop-lateral" aria-label="Copiloto">
+            <Copiloto cop={cop} sugerenciasIniciales={chipsEditor} onCerrar={() => setCopAbierto(false)} />
+          </aside>
+        )}
+        </div>
       ) : (
         <div className="center-note">Cargando…</div>
       )}
@@ -939,6 +1261,47 @@ export default function App() {
             <div className="share-foot">
               <button className="btn primary" disabled={!tplName.trim()}
                 onClick={() => { const n = tplName.trim(); setTplName(null); saveAsTemplate(n) }}>Guardar plantilla</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Una propuesta que llegó por fuera del chat (el chat dibuja la suya
+          adentro del hilo). Se muestra igual y con las mismas dos salidas:
+          nada del modelo entra a una pieza sin que alguien apriete Aceptar. */}
+      {propuesta && (
+        <div className="mk-modal-ov" onClick={() => { setPropuesta(null); setPropFalla(null) }}>
+          <div className="share-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="share-head">
+              <strong>El copiloto propone un texto</strong>
+              <button className="btn" onClick={() => { setPropuesta(null); setPropFalla(null) }}>Cerrar</button>
+            </div>
+            <div className="cop-prop">
+              {propuesta.motivo && <p className="cop-prop-why">{propuesta.motivo}</p>}
+              {(propuesta.textos || []).map((t, i) => (
+                <div key={i} className="cop-campo">
+                  <div className="cop-campo-rol">{ROL_TEXTO[t.rol] || t.rol}</div>
+                  {t.antes && <p className="cop-antes">{t.antes}</p>}
+                  <p className="cop-despues">{t.texto}</p>
+                </div>
+              ))}
+              {/* Si no se pudo aplicar, el modal NO se cierra: se dice por
+                  qué y los botones siguen ahí. Cerrarlo callado sería tirar
+                  el texto y hacer de cuenta que entró. */}
+              {propFalla && <p className="cop-warn">{propFalla.motivo}</p>}
+              <div className="cop-prop-acts">
+                {propFalla?.abrirCon && (
+                  <button className="btn primary" onClick={() => {
+                    const r = aplicarPropuesta(propuesta, { abrir: true })
+                    if (!r.ok) setPropFalla(r)
+                  }}>Abrir «{propFalla.abrirCon.nombre}» y aplicar</button>
+                )}
+                <button className={'btn' + (propFalla?.abrirCon ? '' : ' primary')} onClick={() => {
+                  const r = aplicarPropuesta(propuesta)
+                  setPropFalla(r.ok ? null : r)
+                }}>{propFalla ? 'Reintentar' : 'Aceptar'}</button>
+                <button className="btn" onClick={() => { setPropuesta(null); setPropFalla(null) }}>Descartar</button>
+              </div>
             </div>
           </div>
         </div>

@@ -5,7 +5,9 @@ import { masUsadas } from '../project/uso.js'
 import { sugerirTodo, armar, aplicarArmado, ETIQUETA } from '../lib/sugerir.js'
 import { entender, combinar } from '../lib/entender.js'
 import { FORMATS_BY_ID, formatsByNetwork } from '../formats/registry.js'
+import { CAPACIDADES } from '../lib/capabilities.js'
 import PiecePreview from './PiecePreview.jsx'
+import Copiloto from './Copiloto.jsx'
 import Icon from '../ui/Icon.jsx'
 
 // La home resuelve UNA cosa: cómo arrancás. Tres caminos, siempre visibles.
@@ -42,6 +44,12 @@ export default function Gallery({
   galleryFormat, setGalleryFormat, templates = TEMPLATES, onDeleteTemplate,
   onPick, onStartCarousel, onStartBlank, projects, onOpenProject, onImport, onDeleteProject, onDuplicateProject,
   shares = [], shareCounts = {}, shareVerdicts = {}, onOpenShare, onCopyShare, onForgetShare, thumbs = {},
+  // La conversación ya no nace acá: la maneja App.jsx (useCopiloto) para
+  // que no se desmonte al navegar al editor. Esta home sólo la DIBUJA.
+  // `hayCop` y `avisoCaida` también vienen de arriba por la misma razón:
+  // el copiloto se puede caer con la persona editando, y el buscador de
+  // reemplazo tiene que estar puesto cuando vuelva al inicio.
+  cop = null, hayCop = false, avisoCaida = '', semillaPedido = '', onVerPieza,
 }) {
   const fileRef = useRef(null)
   const [filter, setFilter] = React.useState('all')
@@ -144,6 +152,51 @@ export default function Gallery({
     return true
   })
 
+  // ============================================================
+  // EL COPILOTO — reemplaza al buscador de una línea CUANDO está.
+  //
+  // Invariante 3, y acá es donde se cumple o no se cumple: si la función
+  // no está desplegada o se cae, `hayCop` llega en false y abajo se dibuja
+  // exactamente el buscador de reglas de siempre. El peor caso es el
+  // producto de ayer, nunca una home sin dónde escribir.
+  //
+  // El estado de la caída lo lleva App.jsx: el copiloto puede apagarse con
+  // la persona en el editor, o sea con esta home desmontada, y el buscador
+  // de reemplazo tiene que estar puesto igual cuando vuelva.
+  // ============================================================
+  // Lo que la persona había escrito en el chat cuando se cayó va derecho al
+  // campo del buscador: volver a tipearlo es la clase de castigo que esta
+  // herramienta no reparte. `|| p` para no pisar lo que ya esté escrito acá.
+  React.useEffect(() => {
+    const suyo = String(semillaPedido || '').trim()
+    if (suyo) setPedido((p) => p || suyo)
+  }, [semillaPedido])
+
+  // Las frases de arranque NO son un array escrito a mano. Salen de cruzar
+  // lo que el copiloto puede hacer de verdad (capabilities) con lo que esta
+  // home ya tiene: los filtros por objetivo, los carruseles armados, el
+  // formato elegido. Si mañana se cae una capacidad, se cae su chip solo;
+  // si entra una plantilla, el conteo se mueve solo. Nada que sincronizar.
+  const chips = React.useMemo(() => {
+    const puede = new Set(CAPACIDADES.map((c) => c.nombre))
+    const ofrecibles = templates.filter((t) => !t.hidden && t.id !== 'blank')
+    const out = []
+    // el objetivo con más plantillas detrás: es el camino que llega más lejos
+    const porObjetivo = FILTERS
+      .filter((f) => OBJETIVOS.has(f.k))
+      .map((f) => ({ f, n: ofrecibles.filter((t) => t.objetivo === f.k).length }))
+      .sort((a, b) => b.n - a.n)
+    if (puede.has('sugerir_plantillas') && porObjetivo[0]?.n) {
+      out.push(`Quiero ${porObjetivo[0].f.label.toLowerCase()} — ¿qué plantilla me conviene?`)
+    }
+    if (puede.has('abrir_carrusel') && CAROUSELS[0]) {
+      out.push(`Armame el carrusel "${CAROUSELS[0].name}" para ${fmt.label}`)
+    }
+    if (puede.has('memoria_equipo')) out.push('¿Qué publicamos últimamente y cómo nos fue?')
+    if (puede.has('listar_plantillas')) out.push(`¿Qué puedo armar con las ${ofrecibles.length} plantillas que hay?`)
+    return out.slice(0, 4)
+  }, [templates, fmt])
+
   return (
     <div className="home3">
       {/* 1 · CÓMO ARRANCÁS — la única decisión de la home */}
@@ -186,8 +239,27 @@ export default function Gallery({
         </button>
       </div>
 
-      {/* Contame qué querés hacer. No reemplaza a la galería: la acorta. */}
+      {/* Contame qué querés hacer. No reemplaza a la galería: la acorta.
+          Con copiloto es una conversación; sin copiloto, el buscador de
+          reglas de siempre — el mismo campo, la misma tecla, el mismo
+          resultado. Los dos caminos terminan en la galería de abajo. */}
+      {/* Va montado siempre, incluso con `hayCop` en false: cuando el
+          copiloto se cae con una conversación arriba, el componente se
+          queda mostrando el hilo apagado y la explicación. Desmontarlo en
+          el mismo commit era lo que hacía desaparecer el chat con el
+          pedido adentro. Si no hay nada que mostrar, devuelve null solo. */}
+      {cop && (
+        <Copiloto cop={cop} onAbrirPieza={onVerPieza} sugerenciasIniciales={chips} />
+      )}
+
+      {/* La caída se explica una vez, arriba del campo que la reemplaza:
+          sin esta línea aparecía un input distinto de la nada. */}
+      {!hayCop && avisoCaida && (
+        <p className="cop-aviso" style={{ margin: '4px 0 8px', fontSize: 12.5 }}>{avisoCaida}</p>
+      )}
+
       {/* en línea a propósito: styles.css lo está tocando otro cambio */}
+      {!hayCop && (
       <div className="h3-pedido" style={{ display: 'flex', gap: 10, alignItems: 'center', margin: '4px 0 6px' }}>
         <div style={{ position: 'relative', flex: 1 }}>
           <input type="text" value={pedido} placeholder="¿Qué querés hacer? Ej: webinar de IA en campo el 11 de junio"
@@ -221,7 +293,8 @@ export default function Gallery({
           </button>
         )}
       </div>
-      {historialIA.length > 0 && (
+      )}
+      {!hayCop && historialIA.length > 0 && (
         <div style={{ fontSize: 11, color: 'var(--ui-muted, #999)', margin: '0 0 6px 2px' }}>
           🧠 {historialIA.length === 1 ? 'Recuerda tu búsqueda anterior' : `Recuerda tus últimas ${historialIA.length} búsquedas`} en esta sesión ·{' '}
           <button className="linklike" style={{ fontSize: 11 }} onClick={() => setHistorialIA([])}>Empezar de nuevo</button>

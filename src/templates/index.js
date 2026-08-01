@@ -124,6 +124,35 @@ export function placeholderContent(t) {
 }
 
 // ============================================================
+// QUÉ TEXTOS ENTRAN DE VERDAD EN ESTA PIEZA
+//
+// Una pieza lleva texto de dos formas y hay que mirar las dos:
+//   · la clásica → los roles que la plantilla DECLARA. El motor dibuja
+//                  `for (role of STACK_ORDER) if (p.roles.includes(role))`,
+//                  así que un rol no declarado no se dibuja nunca.
+//   · la libre   → el texto vive en bloques sueltos y el "rol" es el
+//                  estilo del bloque (textBlocks[i].style).
+// Escribir `content.title` en la plantilla Dato no rompe nada, y eso es lo
+// malo: no se ve. Algo que no se ve se puede dar por aplicado, y ésa es
+// justo la mentira que el Aceptar del copiloto no se puede permitir.
+//
+// `contenido` es opcional y manda cuando está: los bloques que la persona
+// sumó sobre la marcha viven ahí, no en los defaults de la plantilla. El
+// `||` en cascada es el MISMO que usa resolvePiece para elegir bloques; si
+// un día cambia allá, tiene que cambiar acá.
+//
+// `step` queda afuera a propósito: los pasos son un array (`content.steps`),
+// no un rol, así que no hay ningún `content.step` que el motor mire.
+// ============================================================
+export function rolesDePieza(template, contenido = null) {
+  const t = template || {}
+  const roles = new Set(t.roles || (t.freeform ? [] : ['kicker', 'title', 'subtitle']))
+  const bloques = contenido?.textBlocks || t.defaults?.textBlocks || []
+  bloques.forEach((b) => roles.add(b?.style || 'title'))
+  return [...roles]
+}
+
+// ============================================================
 // CAMBIAR EL DISEÑO SIN PERDER LO ESCRITO
 //
 // Aye eligió otro diseño para su slide y no pasó nada visible: "¿ahí

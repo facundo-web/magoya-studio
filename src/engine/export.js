@@ -6,6 +6,7 @@
 
 import { renderPieceSVG } from './render.js'
 import { registrarUso } from '../project/uso.js'
+import { registrarPieza } from '../lib/memoria.js'
 
 // woff2 de @fontsource (Vite los resuelve a URLs)
 import w400 from '@fontsource/manrope/files/manrope-latin-400-normal.woff2'
@@ -128,10 +129,27 @@ export function setProjectExportName(name) {
   _projectName = String(name || '').trim()
 }
 
+// La misma señal que alimenta uso.js —bajarla es decir que sirvió— es la
+// que le da al copiloto algo para leer. uso.js cuenta en localStorage,
+// para esta pestaña; la bitácora es del equipo. Falla en silencio: la
+// memoria es un lujo y descargar una pieza no puede depender de la red.
+function anotarEnBitacora({ template, content, format, carrusel = false }) {
+  try {
+    registrarPieza({
+      templateId: template?.id,
+      formatId: format?.id,
+      objetivo: template?.objetivo,
+      titulo: content?.title || _projectName || template?.name,
+      carrusel,
+    })?.catch?.(() => {})
+  } catch { /* la bitácora nunca frena una descarga */ }
+}
+
 // export de UNA pieza
 export async function exportPiece({ template, content, format, kind = 'png', scale = 2, sizeLock = null }) {
   // bajarla ES la señal de que la plantilla sirvió (ver project/uso.js)
   registrarUso(template?.id)
+  anotarEnBitacora({ template, content, format })
   const name = slugify((content && content.title) || template.name) + '-' + format.id
   if (kind === 'svg') {
     const fontFaceCss = await buildFontFaceCss()
@@ -153,6 +171,9 @@ export async function exportCarousel({ slides, format, kind = 'zip', scale = 2, 
   // un carrusel usa varias plantillas: cuentan todas, cada una una vez
   const contadas = new Set()
   ;(slides || []).forEach((s) => { const id = s?.template?.id; if (id && !contadas.has(id)) { contadas.add(id); registrarUso(id) } })
+  // En la bitácora un carrusel es UNA pieza, no cinco: lo que después se
+  // publica y se mide es el carrusel entero. Se anota por su portada.
+  if (slides?.[0]) anotarEnBitacora({ template: slides[0].template, content: slides[0].content, format, carrusel: true })
   const fontFaceCss = await buildFontFaceCss()
   // nombre explícito → nombre del proyecto abierto → título de la portada
   const base = slugify(name || _projectName || slides?.[0]?.content?.title || 'carrusel')

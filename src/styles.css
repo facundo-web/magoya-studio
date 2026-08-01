@@ -983,3 +983,210 @@ button.obj-row { width: 100%; cursor: pointer; text-align: left; font: inherit; 
 
 /* aviso cuando la pieza no tiene la medida de ninguna red con mockup */
 .mk-nota { font-size: 12px; color: #8A9389; align-self: center; padding-left: 4px; }
+
+/* ============================================================
+   T · EL COPILOTO
+   Es una parte más de la home, no un widget pegado encima: mismo papel
+   (--ui-surface sobre --ui-sunken), mismos radios (--r-card / --r-box),
+   misma escala tipográfica. Nada de burbujas de colores ni avatares —
+   la conversación se lee como el resto de la app.
+   ============================================================ */
+.cop { border: 1px solid var(--ui-line); border-radius: var(--r-card); background: var(--ui-surface);
+  padding: var(--sp-3); margin: 0 0 var(--sp-4); display: flex; flex-direction: column; gap: var(--sp-2); }
+.cop-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); }
+.cop-title { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-1); font-weight: 800;
+  text-transform: uppercase; letter-spacing: .1em; color: var(--ui-fg-3); }
+.cop-title .u-ico { color: var(--ui-accent); }
+.cop-reset { font-size: var(--fs-2); }
+
+/* El hilo. Alto acotado con scroll propio: la conversación no puede
+   empujar la galería fuera de la pantalla. */
+.cop-hilo { display: flex; flex-direction: column; gap: var(--sp-2);
+  max-height: 46vh; overflow-y: auto; padding-right: 4px; }
+.cop-vos { align-self: flex-end; max-width: 82%; font-size: var(--fs-3); line-height: 1.45;
+  background: var(--ui-sunken); border: 1px solid var(--ui-line); border-radius: var(--r-box);
+  padding: 8px 12px; white-space: pre-wrap; }
+.cop-dice { font-size: var(--fs-3); line-height: 1.55; color: var(--ui-fg); white-space: pre-wrap; max-width: 62ch; }
+.cop-aviso { font-size: var(--fs-2); color: var(--ui-fg-3); line-height: 1.45; }
+.cop-pensando { display: flex; align-items: center; gap: 7px; font-size: var(--fs-2); color: var(--ui-fg-3); }
+
+/* Las funciones, mientras pasan. Una línea por acción, alineadas por el
+   ícono: se leen como una lista de tareas, no como un log. */
+.cop-accion { display: flex; align-items: flex-start; gap: 8px; font-size: var(--fs-2);
+  color: var(--ui-fg-2); line-height: 1.4; padding-left: 2px; }
+.cop-acc-ico { flex: none; width: 15px; height: 18px; display: inline-flex; align-items: center; justify-content: center; }
+.cop-accion.is-ok .cop-acc-ico { color: var(--ui-focus); }
+.cop-accion.is-falla .cop-acc-ico, .cop-accion.is-cortada .cop-acc-ico { color: var(--ui-danger); }
+.cop-accion.is-corriendo .cop-acc-txt { color: var(--ui-fg); }
+.cop-acc-res { color: var(--ui-fg-3); }
+
+/* La propuesta. Es la pieza más importante de la pantalla: el único lugar
+   donde un texto escrito por el modelo puede entrar al diseño. Por eso
+   tiene borde propio y el antes/después bien separados. */
+.cop-prop { border: 1px solid var(--ui-line-strong); border-radius: var(--r-box);
+  background: var(--ui-sunken); padding: var(--sp-2) 12px; display: flex; flex-direction: column; gap: var(--sp-1); }
+.cop-prop.ok { border-color: var(--ui-accent-line); background: var(--ui-accent-soft); }
+.cop-prop.off { opacity: .55; }
+.cop-prop-head { display: flex; align-items: center; gap: 8px; }
+.cop-prop-tag { font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: .1em;
+  background: var(--ui-selected-ink); color: var(--ui-surface); border-radius: 4px; padding: 2px 6px; }
+.cop-prop-donde { font-size: var(--fs-1); color: var(--ui-fg-3); }
+.cop-prop-ver { font-size: var(--fs-2); margin-left: auto; }
+.cop-prop-why { font-size: var(--fs-2); color: var(--ui-fg-2); line-height: 1.45; }
+.cop-campo { display: flex; flex-direction: column; gap: 3px; padding-top: var(--sp-1); }
+.cop-campo + .cop-campo { border-top: 1px solid var(--ui-line); }
+.cop-campo-rol { display: flex; align-items: baseline; gap: 8px; font-size: var(--fs-1); font-weight: 800;
+  text-transform: uppercase; letter-spacing: .08em; color: var(--ui-fg-3); }
+.cop-campo-n { font-family: var(--font-mono); font-size: 10.5px; font-weight: 500; letter-spacing: 0; text-transform: none; }
+.cop-campo-n.over { color: var(--ui-danger); font-weight: 700; }
+/* lo que se pisa, tachado y apagado: nadie acepta a ciegas */
+.cop-antes { font-size: var(--fs-2); color: var(--ui-fg-3); text-decoration: line-through; line-height: 1.4; }
+.cop-despues { font-size: var(--fs-3); font-weight: 600; color: var(--ui-fg); line-height: 1.45; }
+.cop-warn { font-size: var(--fs-1); color: #6B5320; background: #FDF6E7; border: 1px solid #EFE0BE;
+  border-radius: var(--r-sm); padding: 5px 8px; line-height: 1.4; }
+.cop-prop-acts { display: flex; flex-wrap: wrap; gap: var(--sp-1); margin-top: 3px; }
+.cop-prop-acts .btn { min-height: 30px; padding: 5px 14px; font-size: var(--fs-2); }
+.cop-prop-cerrada { font-size: var(--fs-2); font-weight: 700; color: var(--ui-fg-2); }
+
+/* La barra de escribir. El textarea crece con Shift+Enter hasta un tope. */
+.cop-barra { display: flex; align-items: flex-end; gap: var(--sp-1); }
+.cop-input { flex: 1; min-width: 0; resize: none; font: inherit; font-size: var(--fs-3); line-height: 1.45;
+  min-height: 42px; max-height: 132px; padding: 11px 14px; border: 1.5px solid var(--ui-line);
+  border-radius: 12px; background: var(--ui-surface); color: var(--ui-fg); field-sizing: content; }
+.cop-input:focus { outline: none; border-color: var(--ui-accent); }
+.cop-enviar { flex: none; width: 34px; height: 34px; margin-bottom: 4px; border: 0; border-radius: var(--r-pill);
+  padding: 0; display: inline-flex; align-items: center; justify-content: center;
+  background: var(--ui-focus); color: #fff; }
+.cop-enviar:disabled { background: var(--ui-line); color: var(--ui-fg-3); cursor: not-allowed; }
+.cop-parar { flex: none; margin-bottom: 4px; min-height: 34px; padding: 6px 14px; font-size: var(--fs-2); }
+
+/* Los caminos de arranque, cuando todavía no dijiste nada. */
+.cop-chips { display: flex; flex-wrap: wrap; gap: var(--sp-1); }
+.cop-chip { border: 1px solid var(--ui-line); background: var(--ui-surface); color: var(--ui-fg-2);
+  border-radius: var(--r-pill); padding: 6px 12px; font-size: var(--fs-2); font-weight: 600; text-align: left; }
+.cop-chip:hover { border-color: var(--ui-line-strong); color: var(--ui-fg); }
+
+/* ---- El copiloto adentro del editor ----
+   Mismo lenguaje que el inspector de la derecha (papel #FBFAF7, línea a la
+   izquierda, scroll propio): es un panel más del editor, no un widget
+   pegado encima. El lienzo sigue siendo flex:1, así que la pieza se
+   reacomoda sola y se puede seguir trabajando con el chat abierto. */
+.ed-wrap { flex: 1; display: flex; min-height: 0; position: relative; }
+.ed-wrap .editor { min-width: 0; }
+.cop-lateral { flex: none; width: 340px; border-left: 1px solid var(--paper-200,#E6E1D8);
+  background: #FBFAF7; overflow: hidden; display: flex; flex-direction: column; }
+/* adentro del panel el chat no lleva caja propia: la caja es el panel */
+.cop-lateral .cop { border: 0; border-radius: 0; background: transparent; margin: 0; flex: 1; min-height: 0; }
+/* El hilo se come el alto que sobra en vez de un porcentaje del viewport:
+   así la barra de escribir queda siempre abajo, a la vista. */
+.cop-lateral .cop-hilo { max-height: none; flex: 1; min-height: 0; }
+.cop-cerrar { border: 0; background: transparent; color: var(--ui-fg-3); padding: 2px 4px;
+  cursor: pointer; display: inline-flex; align-items: center; }
+.cop-cerrar:hover { color: var(--ui-fg); }
+.cop-lateral .cop-barra { padding-top: 2px; }
+.topbar .cop-toggle { display: inline-flex; align-items: center; gap: 6px; }
+.topbar .cop-toggle.on { background: rgba(255,255,255,.24); }
+
+/* Pantallas del medio: el rail, los dos paneles del editor y una columna
+   más no entran sin dejar el lienzo en nada — y el lienzo es el trabajo.
+   Ahí el copiloto se apoya SOBRE el inspector (un panel, no la pieza) en
+   vez de robarle ancho al lienzo. La sombra dice que está encima y la ×
+   del cabezal lo saca. */
+@media (max-width: 1080px) {
+  .cop-lateral { position: absolute; top: 0; right: 0; bottom: 0; z-index: 8;
+    width: min(340px, 62vw); box-shadow: -14px 0 40px rgba(0,0,0,.13); }
+}
+
+@media (max-width: 700px) {
+  .cop { padding: var(--sp-2); }
+  .cop-hilo { max-height: 52vh; }
+  .cop-vos { max-width: 92%; }
+  /* En el teléfono el editor es una columna y los paneles son hojas que
+     suben desde abajo. El copiloto sigue esa misma forma: se apoya arriba
+     del rail (68px), tiene alto acotado y se cierra con la × de su cabezal
+     — el lienzo queda debajo, usable, no tapado para siempre. */
+  .ed-wrap { display: block; }
+  /* `top: auto` no es decorativo: el tramo de arriba (≤1080px) fija top y
+     bottom para que el panel cubra el inspector, y sin resetearlo acá la
+     hoja se estiraba desde el borde de arriba y tapaba la pieza entera. */
+  .cop-lateral { position: fixed; top: auto; left: 0; right: 0; bottom: 68px; z-index: 61;
+    width: auto; max-height: 56vh; border: 1px solid var(--paper-200,#E6E1D8);
+    border-radius: 18px 18px 0 0; box-shadow: 0 -18px 50px rgba(0,0,0,.16); }
+}
+
+/* ============================================================
+   T6 · PULSO — la bitácora y los números
+   Nada de tablero: es una lista de filas que se abren. Los estados
+   "no sé" (muestra chica, sin números, no reconocí el CSV) tienen
+   tanto lugar visual como los datos, porque son la mitad del punto.
+   ============================================================ */
+.pulso-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sp-3); }
+
+.pulso-error { margin-top: var(--sp-2); padding: 11px 14px; border-radius: var(--r-box);
+  background: #FDECEC; border: 1px solid #F3CFCE; color: #7A2B2A; font-size: var(--fs-3); }
+.pulso-aviso { margin-top: var(--sp-2); padding: 11px 14px; border-radius: var(--r-box);
+  background: #FDF6E7; border: 1px solid #EFE0BE; color: #6B5320; font-size: var(--fs-3); }
+.pulso-aviso.ok { background: var(--ui-accent-soft); border-color: var(--ui-accent-line); color: #06301B; }
+
+.pulso-saber { background: var(--ui-surface); border: 1px solid var(--ui-line);
+  border-radius: var(--r-card); padding: var(--sp-3); }
+.pulso-resumen { font-size: var(--fs-4); line-height: 1.5; color: var(--ui-fg); white-space: pre-wrap; }
+.pulso-resumen.apagado { color: var(--ui-fg-2); }
+.pulso-muestra { margin-top: var(--sp-2); padding-top: var(--sp-2); border-top: 1px dashed var(--ui-line);
+  font-size: var(--fs-2); color: var(--ui-fg-3); line-height: 1.45; }
+
+.pulso-lista { display: flex; flex-direction: column; gap: var(--sp-1); }
+.pulso-fila { background: var(--ui-surface); border: 1px solid var(--ui-line); border-radius: var(--r-card);
+  padding: 12px 14px; display: grid; grid-template-columns: 1fr auto; gap: var(--sp-2); align-items: center; }
+.pulso-f-main { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.pulso-f-t { font-size: var(--fs-4); font-weight: 700; color: var(--ui-fg);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pulso-f-meta { font-size: var(--fs-2); color: var(--ui-fg-3); }
+.pulso-f-acts { display: flex; align-items: center; gap: var(--sp-2); }
+.pulso-badge { font-size: var(--fs-1); font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
+  color: var(--ui-fg-3); background: var(--ui-sunken); border: 1px solid var(--ui-line);
+  padding: 3px 9px; border-radius: var(--r-pill); }
+
+/* las publicaciones cuelgan de la pieza: se lee que son de ella */
+.pulso-pubs { grid-column: 1 / -1; display: flex; flex-direction: column; gap: var(--sp-1);
+  margin-left: 2px; padding-left: 12px; border-left: 2px solid var(--ui-line); }
+.pulso-pub { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); font-size: var(--fs-2); }
+.pulso-pub-red { font-weight: 700; color: var(--ui-fg); }
+.pulso-pub-fecha { color: var(--ui-fg-3); }
+.pulso-nums { color: var(--ui-fg-2); }
+.pulso-nums b { color: var(--ui-fg); font-weight: 700; }
+.pulso-nums.apagado { color: var(--ui-fg-3); font-style: italic; }
+
+.pulso-form { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--sp-2);
+  background: var(--ui-sunken); border: 1px solid var(--ui-line); border-radius: var(--r-box);
+  padding: 12px; margin-top: 2px; }
+.pulso-pub .pulso-form { width: 100%; }
+.pulso-campo { display: flex; flex-direction: column; gap: 4px; min-width: 140px; }
+.pulso-campo.ancho { flex: 1; min-width: 200px; }
+.pulso-campo.chico { min-width: 92px; width: 92px; }
+.pulso-campo > span { font-size: var(--fs-2); color: var(--ui-fg-2); }
+.pulso-campo input, .pulso-campo select {
+  min-height: var(--h-ctl); padding: 6px 10px; font: inherit; font-size: var(--fs-3);
+  border: 1px solid var(--ui-line); border-radius: var(--r-sm); background: var(--ui-surface); color: var(--ui-fg); }
+.pulso-campo input:focus, .pulso-campo select:focus { outline: none; border-color: var(--ui-accent); }
+.pulso-form-acts { display: flex; align-items: center; gap: var(--sp-2); }
+.pulso-form .hint { flex-basis: 100%; margin: 0; }
+
+.pulso-vacio { background: var(--ui-surface); border: 1px dashed var(--ui-line-strong); border-radius: var(--r-card);
+  padding: 26px; display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center;
+  font-size: var(--fs-3); color: var(--ui-fg-2); }
+.pulso-vacio span { max-width: 58ch; color: var(--ui-fg-3); line-height: 1.5; }
+
+.pulso-csv { background: var(--ui-surface); border: 1px solid var(--ui-line); border-radius: var(--r-card);
+  padding: var(--sp-3); display: flex; flex-direction: column; gap: var(--sp-2); }
+.pulso-csv-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--sp-2); }
+.pulso-csv-res { font-size: var(--fs-3); padding: 10px 12px; border-radius: var(--r-box);
+  background: #FDF6E7; border: 1px solid #EFE0BE; color: #6B5320; }
+.pulso-csv-res.ok { background: var(--ui-accent-soft); border-color: var(--ui-accent-line); color: #06301B; }
+
+@media (max-width: 700px) {
+  .pulso-head { flex-direction: column; }
+  .pulso-fila { grid-template-columns: 1fr; }
+  .pulso-f-acts { justify-content: flex-start; }
+  .pulso-campo, .pulso-campo.chico { width: 100%; min-width: 0; }
+}

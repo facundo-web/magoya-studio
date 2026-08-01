@@ -466,3 +466,156 @@ menos el 25% de los píxeles, no entra al panel.**
    algún par baja de 4,5:1 (texto chico) o 3:1 (display).
 
 Las imágenes de la propuesta están renderizadas con el motor real.
+
+---
+
+# BLOQUE T — El copiloto (jul 2026)
+
+Facu: *"el buscador o espacio para prompt es muy limitado. Quiero que sea casi
+una LLM: que recomiende, que si le hablás te responda, que si le pedís ideas te
+dé ideas — pero todo desde las posibilidades que tiene la herramienta. Que sea
+más smart, que te muestre las funciones como cuando interactúo acá con vos. Y
+que recuerde qué hizo, qué no, qué sirvió, qué puede mejorar, qué salió la
+última vez, qué está pasando en las redes de Magoya, si algunas piezas tienen
+más impacto."*
+
+Es un cambio de categoría, no una mejora del buscador: de **clasificador**
+(una frase → un objetivo) a **copiloto** (una conversación → acciones sobre la
+herramienta).
+
+## La tensión que hay que resolver primero
+
+El producto nació de "diseñar sin que la AI delire". El buscador de hoy tiene
+una aduana que garantiza que el modelo **no puede escribir una sola palabra**
+que la persona no haya tipeado. Facu ahora pide justo lo contrario: que dé
+ideas.
+
+**La resolución no es sacar la aduana, es cambiar su regla:**
+
+> Antes: el modelo **no puede inventar**.
+> Ahora: el modelo **puede proponer, no puede imponer**.
+
+En concreto, tres invariantes que no se negocian:
+
+1. **Nada entra a una pieza sin un sí.** Todo texto que escriba el modelo llega
+   como propuesta con Aceptar / Descartar, y se ve el antes/después. Nunca se
+   escribe solo en el lienzo.
+2. **Sólo puede ofrecer lo que existe.** Las acciones del copiloto son un
+   contrato cerrado generado del código real (`capabilities.js`). Si una función
+   no está en el contrato, el modelo no la puede nombrar ni prometer.
+3. **Los datos duros los siguen leyendo las reglas.** Fecha, hora, cifra, red:
+   una expresión regular no se equivoca leyendo "11 de junio", un modelo sí.
+   `sugerir.js` no se jubila — pasa a ser una herramienta que el copiloto llama.
+
+## Lo que NO se puede hacer hoy, dicho de frente
+
+**Las métricas de las redes de Magoya no están conectadas.** No hay API de
+LinkedIn ni de Instagram en este entorno, y fingir que sí sería exactamente el
+delirio que el producto viene a evitar. El bloque T6 se diseña con carga real
+pero manual (y pegado de export), con la costura lista para enchufar una API
+cuando exista. El copiloto va a decir "no tengo datos de esta pieza" cuando no
+los tenga, en vez de inventar un número.
+
+---
+
+## T1 · El contrato de capacidades
+
+Un solo archivo, `src/lib/capabilities.js`, que es **la fuente de verdad de lo
+que el copiloto puede hacer**. Cada capacidad declara: nombre, para qué sirve
+en castellano, parámetros con su enum real, y el ejecutor del lado del cliente.
+
+Se genera contra el inventario real del motor: 29 plantillas con sus roles, 13
+formatos, 8 esquemas, 5 acentos, 9 estilos, 3 carruseles, 26 fotos, ~55 objetos
+colocables, 8 degradés.
+
+Por qué un archivo y no prompt suelto: cuando mañana se agregue una plantilla,
+el copiloto se entera sola. Un prompt escrito a mano se desactualiza el primer
+martes.
+
+## T2 · El agente
+
+`supabase/functions/copiloto` reemplaza a `entender`. Deja de ser un
+clasificador de un tiro y pasa a ser un **loop de tool-use partido entre
+servidor y cliente**: el modelo pide una acción → el servidor la devuelve → el
+cliente la ejecuta contra el estado real (que vive en el navegador, no en la
+nube) → se le devuelve el resultado → sigue.
+
+El estado vive en el cliente por diseño (localStorage + IndexedDB, sin login),
+así que el loop tiene que cruzar. No es un rodeo: es la única forma de que el
+copiloto vea de verdad el proyecto abierto.
+
+Modelo `claude-opus-5`, salida en streaming, y la aduana v2 corriendo sobre
+cada tool-call antes de tocar nada.
+
+## T3 · La conversación (y que se vean las funciones)
+
+El input de una línea se convierte en un panel de conversación:
+- **Turnos** con lo que dijo cada uno, y persistencia de la sesión.
+- **Las acciones se ven mientras pasan** — "Buscando plantillas de webinar…",
+  "Armando la pieza…" — igual que las herramientas acá. Facu pidió esto
+  textual: *"que te muestre las funciones"*.
+- **Sugerencias de arranque** cuando está vacío, tomadas de las capacidades
+  reales, no de un texto escrito a mano.
+- **Las piezas se previsualizan adentro de la conversación** y se abren de ahí.
+
+## T4 · La aduana v2 — propone, no impone
+
+- Todo texto generado llega como **propuesta**: card con Aceptar / Descartar /
+  Pedir otra, y el antes/después visible.
+- Aceptar es lo único que escribe en el proyecto.
+- Se marca de dónde salió cada texto: lo escribió la persona, lo reubicó una
+  regla, o lo propuso el modelo. Esa procedencia se guarda con la pieza.
+- El copy propuesto pasa por `copyCheck.js` antes de mostrarse (sin emojis, sin
+  signos de exclamación, contraste, etc.): las reglas editoriales de la marca
+  valen igual para el modelo que para una persona.
+
+## T5 · La memoria del equipo
+
+Hoy la memoria es un contador de descargas en localStorage — muere con el
+navegador y no cruza personas. Lucho pidió lo contrario: *"un historial, y que
+puedas volver sobre las piezas que más te sirvieron"* y *"una especie de
+entrenamiento de curaduría"*.
+
+Tablas nuevas en Supabase:
+- `bitacora` — qué pieza se hizo, con qué plantilla, para qué red, cuándo, quién.
+- `publicaciones` — cuál de esas efectivamente salió, dónde y qué día.
+- `metricas` — el impacto de las que salieron (T6).
+- `conversaciones` — los turnos del copiloto, para que la memoria cruce sesiones.
+
+El copiloto las lee antes de recomendar. "La última vez que hiciste un webinar
+usaste Evento sobre foto y tuvo el doble de guardados que el promedio" sólo se
+puede decir si eso está guardado.
+
+## T6 · El pulso de las redes
+
+- **Carga manual, treinta segundos**: después de publicar, la pieza pregunta
+  dónde salió y más tarde cuántos likes/comentarios/guardados tuvo.
+- **Pegar un export**: aceptar el CSV que bajan de LinkedIn/Meta y matchear por
+  fecha + red.
+- **Lectura honesta**: el copiloto compara contra el promedio del equipo y dice
+  el n de la muestra. Con 3 piezas medidas dice "con 3 piezas todavía no puedo
+  afirmar nada", no "esto funciona mejor".
+- **La costura para la API** queda hecha: un adaptador por red, hoy con una
+  sola implementación (manual).
+
+## T7 · Ideas con foco de marketing
+
+Lo que Facu pidió al final: *"que permita construir piezas con ese foco de
+marketing y diseño y sobre todo de redes"*. El copiloto puede:
+- proponer **ángulos** para un tema (el caso, el dato, el mito, la pregunta) y
+  mostrar qué plantilla sirve para cada uno;
+- proponer una **secuencia** (esto da para carrusel de 5, o para tres piezas en
+  la semana);
+- decir **qué le falta** a un pedido para que la pieza salga bien (no hay cifra,
+  no hay fecha, el titular tiene 140 caracteres y entran 90);
+- **repetir lo que funcionó** — pero sólo cuando hay datos que lo respalden.
+
+## Criterios de aceptación del bloque
+
+1. El copiloto **nunca** nombra una función que no esté en `capabilities.js`.
+2. Ningún texto propuesto por el modelo llega a una pieza sin un click de
+   Aceptar.
+3. Sin red o con la función caída, la home sigue funcionando con las reglas de
+   hoy: el peor caso es el producto de ayer, nunca una pantalla muerta.
+4. Cuando no hay datos de impacto, lo dice. Nunca estima un número.
+5. Las acciones que ejecuta se ven mientras pasan.

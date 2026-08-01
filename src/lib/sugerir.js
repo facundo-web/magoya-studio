@@ -54,6 +54,26 @@ export function normalizar(texto) {
     .trim()
 }
 
+// El mismo texto sin tildes y en min\u00fascula, pero con LOS MISMOS \u00cdNDICES que
+// el original: NFD descompone y, al sacar los diacr\u00edticos combinantes, cada
+// car\u00e1cter precompuesto vuelve a ocupar un solo lugar.
+//
+// Hace falta porque `normalizar()` adem\u00e1s colapsa espacios, y ah\u00ed los
+// \u00edndices dejan de servir para recortar. Todos los patrones de este archivo
+// est\u00e1n escritos sin tilde (la lista de d\u00edas dice "miercoles"), as\u00ed que la
+// B\u00daSQUEDA tiene que ir sobre esta versi\u00f3n y el RECORTE sobre el original \u2014
+// si no, "el mi\u00e9rcoles 18" no matchea nada y la fecha se queda pegada en el
+// titular adem\u00e1s de aparecer en la bajada.
+//
+// Si alguna vez la cuenta no cierra \u2014un car\u00e1cter que se descompone en dos y
+// corre todos los \u00edndices\u2014 devuelve null en vez de recortar en el lugar
+// equivocado, y quien llama vuelve al camino de siempre.
+function espejoLlano(original) {
+  const s = String(original ?? '')
+  const llano = s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+  return llano.length === s.length ? llano : null
+}
+
 // Un item de lexicón matchea como PALABRA ENTERA. Si termina en `*` es
 // prefijo: 'inscrib*' agarra inscribite, inscripción, inscribirse.
 // Sin esto, 'tip' agarraba "tipo de post" y 'dato' no agarraba "datos".
@@ -77,8 +97,14 @@ const MESES = 'enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|seti
 const DIAS = 'lunes|martes|miercoles|jueves|viernes|sabado|domingo'
 // "11 de junio", "18 sep", "23/07", "jueves 18"
 const RE_FECHA = new RegExp(`\\b\\d{1,2}\\s*(?:de\\s+)?(?:${MESES})\\b|\\b\\d{1,2}[\\/-]\\d{1,2}(?:[\\/-]\\d{2,4})?\\b|\\b(?:${DIAS})\\s+\\d{1,2}\\b`)
-// "11 h", "11hs", "11:00", "a las 19"
-const RE_HORA = /\b\d{1,2}\s*[:.]\s*\d{2}\b|\b\d{1,2}\s*(?:h|hs|horas)\b|\ba las \d{1,2}\b/
+// "11 h", "11hs", "11:00", "a las 19", "a las 11 hs", "a las 19:30"
+// El "a las" y el "hs" tienen que entrar ADENTRO del match. Antes la rama
+// `a las \d{1,2}` ganaba por estar más a la izquierda y se llevaba sólo
+// "a las 11", dejando el "hs" suelto en la frase: de ahí salía el titular
+// "Webinar de IA en campo el hs". La alternación se queda con la primera
+// rama que cierra, no con la que más abarca, así que el orden es de la
+// forma más larga a la más corta.
+const RE_HORA = /\b(?:a\s+las?\s+)?\d{1,2}(?:\s*[:.]\s*\d{2})?\s*(?:hs?\b|horas\b)|\b(?:a\s+las?\s+)?\d{1,2}\s*[:.]\s*\d{2}\b|\ba\s+las?\s+\d{1,2}\b/
 // una cifra que sea NOTICIA: porcentaje o multiplicador. Un "3" suelto no
 // es un resultado, es una cantidad de tips.
 const RE_CIFRA = /[−+-]?\d+(?:[.,]\d+)?\s*%|\b\d+\s*(?:x|veces)\b/
@@ -156,13 +182,31 @@ const RE_PASADO = /\b(estuvimos|fuimos|participamos|pasamos por|estuvo|asi fue|a
 // ============================================================
 export function analizar(texto, formatos = []) {
   const t = normalizar(texto)
+  const crudo = String(texto ?? '')
+  const espejo = espejoLlano(crudo)
+  // El dato duro se devuelve TAL CUAL lo escribió la persona: "miércoles 18"
+  // con su tilde, no "miercoles 18". Estas cuatro señales no se comparan
+  // contra nada —van a la bajada de la pieza, al motivo que se muestra en
+  // pantalla y a lo que lee el copiloto—, así que sacarlas de la versión sin
+  // tildes era perderle una letra a su frase por nada. El lexicón sigue
+  // trabajando sobre `t`, que es donde no importa cómo se escribió.
+  // Los espacios sí se colapsan: si tipeó "11   de junio" el dato es "11 de
+  // junio". Eso no le cambia ni una palabra, y `t` —de donde salía antes—
+  // ya venía colapsado, así que no se pierde nada que antes estuviera.
+  const leer = (re) => {
+    if (espejo) {
+      const m = espejo.match(re)
+      if (m) return crudo.slice(m.index, m.index + m[0].length).replace(/\s+/g, ' ').trim()
+    }
+    return (t.match(re) || [null])[0]
+  }
   const s = {
     texto: t,
     vacio: t.length < 8,        // "algo lindo" no es un pedido
-    fecha: (t.match(RE_FECHA) || [null])[0],
-    hora: (t.match(RE_HORA) || [null])[0],
-    cifra: (t.match(RE_CIFRA) || [null])[0],
-    lista: (t.match(RE_LISTA) || [null])[0],
+    fecha: leer(RE_FECHA),
+    hora: leer(RE_HORA),
+    cifra: leer(RE_CIFRA),
+    lista: leer(RE_LISTA),
     carrusel: RE_CARRUSEL.test(t),
     // ¿lo dijo con esa palabra? El motivo tiene que citar lo que la
     // persona escribió de verdad: si puso "4 slides", decirle "dijiste
@@ -625,13 +669,48 @@ export function sugerirTodo(texto, { templates = [], formatos = [], carruseles =
 // Primer intento: filtraba palabra por palabra y volvía a unir, y salía
 // "Webinar ia campo" — un titular que nadie escribiría. Eso es delirio en
 // miniatura, justo lo que esta herramienta viene a evitar. Ahora se le
-// recorta el andamiaje a los BORDES y el medio se respeta tal cual, con
-// sus preposiciones: "ia en campo".
+// recorta el andamiaje y el resto se respeta tal cual, con sus
+// preposiciones: "ia en campo".
 
 // Lo que sobra al principio: la intención, el tipo de pieza, la red.
 const BORDE_INICIO = /^(?:\s*(?:hola|che|quiero|queria|querria|necesito|dame|haceme|armame|generame|me\s+armas|podes|puedo|hacer|armar|crear|generar|un|una|unos|unas|el|la|los|las|algo|otro|otra|nuevo|nueva|pieza|piezas|placa|placas|posteo|posteos|post|publicacion|publicaciones|diseno|diseño|imagen|grafica|slide|slides|carrusel|carousel|story|stories|storie|reel|miniatura|thumbnail|para|de|del|sobre|en|con|a|al|que|contar|contando|mostrar|mostrando|avisar|anunciar|invitar|invitando|presentar|explicar|explicando|comunicar)\b\s*)+/i
-// Y lo que sobra al final: conectores colgados.
-const BORDE_FIN = /(?:\s*\b(?:de|del|para|por|con|en|y|e|o|a|al|que|sobre|nuestro|nuestra|mi|su|este|esta|el|la|los|las|un|una)\b\s*)+$/i
+// Y lo que sobra al final: conectores colgados. La lista es una sola y se
+// usa en los dos barridos —el del final y el del medio—: dos criterios
+// distintos para lo mismo es la forma de que uno se olvide de un caso.
+// `hasta` y `desde` están acá por el mismo motivo que el resto: son el
+// andamiaje con el que se introduce una fecha. "inscripciones abiertas hasta
+// el 30/06" dejaba "Inscripciones abiertas hasta" — un titular cortado a la
+// mitad, prometiendo un dato que se fue a la bajada.
+const CONECTORES = 'de|del|para|por|con|en|y|e|o|a|al|que|sobre|hasta|desde|nuestro|nuestra|mi|su|este|esta|el|la|los|las|un|una'
+const BORDE_FIN = new RegExp(`(?:\\s*\\b(?:${CONECTORES})\\b\\s*)+$`, 'i')
+
+// Las puntas no alcanzan: la fecha y la hora casi siempre están en el
+// MEDIO, y sacarlas deja el andamiaje colgado ahí adentro. "webinar de IA
+// en campo el 11 de junio a las 11 hs" se quedaba con "el" en el medio y
+// escupía "Webinar de IA en campo el hs" — un titular roto que además la
+// aduana de procedencia rechaza, porque nadie escribió eso.
+//
+// Así que lo que se saca no se borra: se MARCA con un hueco, y después se
+// barren los conectores que venían pegados ANTES del hueco, que eran el
+// andamiaje de lo que sacamos. Los de después no se tocan, porque son de
+// la frase que sigue: "evento el 18 sep en el campo" tiene que quedar
+// "Evento en el campo", no "Evento campo".
+// La marca es un carácter que no puede salir de un teclado, así que no
+// hay forma de confundirlo con algo que haya escrito la persona.
+const HUECO = '\u0000'
+const RESTO_HUECO = new RegExp(`(?:\\b(?:${CONECTORES})\\b\\s*)*${HUECO}\\s*`, 'gi')
+
+// La red tampoco es el tema: "una placa para instagram del webinar" habla
+// del webinar. Va aparte de las otras tres porque se saca CADA mención, no
+// sólo la primera.
+const RE_RED = /\b(?:instagram|linkedin|youtube|whatsapp|wsp|ig|yt|redes)\b/
+
+// Signos que quedan al descubierto cuando se va lo que venía antes: "story
+// para instagram: inscripciones abiertas" perdía el arranque y el titular
+// empezaba con dos puntos. El punto final no se toca, que ahí puede ser de
+// ella.
+const PUNTUACION_INICIO = /^[\s:;,.·—–-]+/
+const PUNTUACION_FIN = /[\s:;,·—–-]+$/
 
 // Siglas que la gente escribe en minúscula y son mayúscula en la pieza.
 const SIGLAS = { ia: 'IA', ai: 'AI', erp: 'ERP', roi: 'ROI', ceo: 'CEO', cto: 'CTO', pyme: 'PyME', fms: 'FMS', ndvi: 'NDVI' }
@@ -640,10 +719,37 @@ export function temaDe(senales, original = '') {
   // se trabaja sobre lo que ESCRIBIÓ la persona, no sobre la versión sin
   // tildes: el titular tiene que salir con sus acentos
   let t = String(original || senales.texto)
-  for (const re of [RE_FECHA, RE_HORA, RE_CARRUSEL]) t = t.replace(new RegExp(re.source, 'i'), ' ')
-  t = t.replace(/\b(?:instagram|linkedin|youtube|whatsapp|wsp|\big\b|\byt\b|redes)\b/gi, ' ')
-  t = t.replace(/\s+/g, ' ').trim()
-  t = t.replace(BORDE_INICIO, '').replace(BORDE_FIN, '').trim()
+  // Pero los patrones están escritos sin tilde, así que se BUSCA sobre el
+  // espejo llano y se RECORTA sobre el original — los dos se van tapando en
+  // paralelo para que los índices sigan valiendo. Sin esto, "el miércoles
+  // 18" no matcheaba RE_FECHA (la lista de días dice "miercoles") y la fecha
+  // se quedaba en el titular ADEMÁS de estar en la bajada.
+  let espejo = espejoLlano(t) || t.toLowerCase()
+  const tapar = (re) => {
+    const m = espejo.match(new RegExp(re.source, 'i'))
+    if (!m) return false
+    const corte = (s) => s.slice(0, m.index) + HUECO + s.slice(m.index + m[0].length)
+    t = corte(t)
+    espejo = corte(espejo)
+    return true
+  }
+  for (const re of [RE_FECHA, RE_HORA, RE_CARRUSEL]) tapar(re)
+  // el hueco es un carácter que no puede volver a matchear, así que esto
+  // termina siempre
+  while (tapar(RE_RED)) { /* todas las menciones de red, no sólo la primera */ }
+  // primero el medio: cada hueco se lleva puesto el andamiaje que lo
+  // introducía, así no queda ni un "el" ni un "para" flotando
+  t = t.replace(RESTO_HUECO, ' ').replace(/\s+/g, ' ').trim()
+  // Y recién después las puntas, que pueden haber quedado al descubierto
+  // justamente por lo que sacamos del medio. Se repite porque cada barrido
+  // destapa al siguiente: sacar la puntuación deja ver un conector, y sacar
+  // el conector deja ver otro signo.
+  for (let i = 0; i < 4; i++) {
+    const antes = t
+    t = t.replace(BORDE_INICIO, '').replace(BORDE_FIN, '')
+      .replace(PUNTUACION_INICIO, '').replace(PUNTUACION_FIN, '').trim()
+    if (t === antes) break
+  }
   if (t.length < 4) return null
   // una frase de una sola palabra rara vez es un titular
   if (!/\s/.test(t) && t.length < 6) return null
@@ -653,8 +759,16 @@ export function temaDe(senales, original = '') {
 }
 
 // La línea de cuándo: "11 de junio · 11 hs". Sólo con lo que dijo.
+//
+// El "a las" viaja adentro de `senales.hora` a propósito: es la única forma
+// de que RE_HORA se lo lleve entero del titular y no quede el "a las"
+// colgado ahí arriba. Pero en la bajada no va — la línea de fecha de estas
+// plantillas se lee "11 de junio · 11 hs", no "11 de junio · a las 11 hs".
+// Sacarlo acá y no en la regex es lo que deja las dos cosas bien de una vez.
+const SOLO_LA_HORA = /^\s*a\s+las?\s+/i
 function cuandoDe(senales) {
-  const partes = [senales.fecha, senales.hora].filter(Boolean)
+  const hora = senales.hora ? String(senales.hora).replace(SOLO_LA_HORA, '').trim() : null
+  const partes = [senales.fecha, hora].filter(Boolean)
   return partes.length ? partes.join(' · ') : null
 }
 

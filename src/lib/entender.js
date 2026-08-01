@@ -27,7 +27,11 @@ const OBJETIVOS = ['webinar', 'prueba', 'ensenar', 'anuncio', 'equipo', 'cierre'
 const REDES = { instagram: 'ig-post', linkedin: 'li-post', whatsapp: 'wa-status', youtube: 'yt-thumb', facebook: 'fb-post', x: 'x-post' }
 
 // Normalizar para comparar: sin tildes, sin puntuación, minúsculas.
-const plano = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim()
+// Se exporta porque el copiloto arma su pool de "lo que dijo la persona"
+// con esta misma función: si cada aduana normalizara a su manera, una
+// dejaría pasar lo que la otra rechaza y el invariante 1 se vuelve una
+// lotería. Una sola vara, un solo lugar donde cambiarla.
+export const plano = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim()
 
 /**
  * La aduana. Todo lo que vuelve del modelo pasa por acá antes de tocar la
