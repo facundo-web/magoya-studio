@@ -87,17 +87,32 @@ export const MAXCHARS = {
 // de demo distinta para que la grilla se pueda mirar en vez de leer.
 // Es sólo para la miniatura: al abrir la pieza la foto la ponés vos.
 import { PHOTOS } from '../brand/photoLibrary.js'
+// Quedó como alias: la foto de muestra ya viene en placeholderContent, y
+// que existieran dos caminos era el bug (la galería mostraba una pieza y
+// se abría otra). Se conserva el nombre porque lo usan la galería y los
+// mockups, y "demo" sigue diciendo bien qué es.
 export function demoContent(t) {
-  const c = placeholderContent(t)
-  if (t.surface !== 'photo' || !PHOTOS.length) return c
-  let h = 0
-  for (const ch of t.id) h = (h * 31 + ch.charCodeAt(0)) >>> 0
-  const p = PHOTOS[h % PHOTOS.length]
-  return { ...c, photo: { src: p.url, natural: null, focal: { x: 0.5, y: 0.5 } } }
+  return placeholderContent(t)
 }
 
 // contenido inicial de una plantilla: mantiene el DISEÑO (colores, logo,
 // motivo, objetos) pero reemplaza el copy por placeholders y limpia la foto.
+// La foto de muestra de una plantilla con foto. Determinística (hash del
+// id contra el banco) para que la miniatura de la galería y la pieza que
+// se abre muestren LA MISMA imagen: eran dos caminos distintos y la
+// plantilla que en la galería tenía foto abría en el esqueleto gris.
+// Aye: "siento que voy a tardar un montón… me cuesta sentir que tengo que
+// tomar todas las decisiones". El gris era exactamente eso: una decisión
+// pendiente dibujada en el lienzo. Ahora la pieza abre terminada y la
+// foto se cambia si se quiere, no porque falte.
+export function fotoDeMuestra(t) {
+  if (t?.surface !== 'photo' || !PHOTOS.length) return null
+  let h = 0
+  for (const ch of t.id) h = (h * 31 + ch.charCodeAt(0)) >>> 0
+  const p = PHOTOS[h % PHOTOS.length]
+  return { src: p.url, natural: null, focal: { x: 0.5, y: 0.5 } }
+}
+
 export function placeholderContent(t) {
   const d = t.defaults || {}
   const c = { ...d }
@@ -120,6 +135,8 @@ export function placeholderContent(t) {
   c.objects = (d.objects || []).map((o) => ({ ...o }))
   if (d.messages) c.messages = d.messages.map((m) => ({ ...m }))
   if (d.steps) c.steps = [...d.steps]
+  const foto = fotoDeMuestra(t)
+  if (foto) c.photo = foto
   return c
 }
 

@@ -124,6 +124,31 @@ function formatoDe(id, ctx) {
   return (actual && FORMATS_BY_ID[actual]) || null
 }
 
+// QUÉ DICE UNA PIEZA, rol por rol.
+//
+// Vive suelto porque lo necesitan dos capacidades y tienen que contestar lo
+// MISMO. estado_actual siempre lo devolvió; abrir_plantilla no, y de ahí
+// salía el peor bucle del run de U1: abrir_plantilla contestaba nombres de
+// roles ("puse kicker y cta") sin decir qué quedó escrito, el modelo iba a
+// buscarlo a detalle_plantilla, leía los `ejemplo` —que son los mismos
+// defaults que la plantilla ya tiene puestos— y los proponía de vuelta
+// palabra por palabra como trabajo suyo. La persona veía "antes: WEBINAR →
+// después: WEBINAR" y gastaba un Aceptar en nada. Se reprodujo en 2 de 2
+// pedidos de webinar y costaba 3 vueltas de 6.
+//
+// Los bloques de una plantilla libre entran también: para el modelo son la
+// misma pregunta, y rolesDePieza ya los trata así.
+function textosDe(content) {
+  const c = content || {}
+  const out = {}
+  ROLES.forEach((r) => { if (c[r] !== undefined && String(c[r]).trim() !== '') out[r] = c[r] })
+  ;(c.textBlocks || []).forEach((b) => {
+    const k = b.style || 'title'
+    if (out[k] === undefined && String(b.text || '').trim() !== '') out[k] = b.text
+  })
+  return out
+}
+
 // Los avisos de copy son los mismos que ve la persona en el inspector:
 // las reglas editoriales de Magoya más el largo recomendado del rol.
 function avisosDe(rol, texto) {
@@ -137,70 +162,33 @@ function avisosDe(rol, texto) {
 }
 
 // ------------------------------------------------------------
-// LA ADUANA DE PROCEDENCIA — el invariante 1, verificado.
+// POR QUÉ ACÁ YA NO HAY ADUANA DE PROCEDENCIA
 //
-// `validar()` en entender.js ya resolvió este problema para el buscador:
-// el tema que devuelve el modelo tiene que estar CONTENIDO en algo que la
-// persona tipeó, y si no está se descarta. Acá es exactamente lo mismo
-// con más plata en juego, porque este texto entra a la pieza SIN pasar
-// por Aceptar. Así que se calca el patrón: cada texto tiene que aparecer
-// literal —normalizado con el mismo plano()— dentro del pool de lo que la
-// persona escribió en esta conversación (`ctx.dicho`, que arma copiloto.js).
+// Hubo una: el modelo mandaba el texto para la pieza y nosotros
+// verificábamos, después, que cada frase apareciera literal en lo que la
+// persona había tipeado. Se cayó en la primera prueba adversarial seria y
+// vale dejar escrito el caso, porque es el argumento entero:
 //
-// Por qué no alcanzaba con pedírselo en la descripción: una instrucción en
-// prosa es una recomendación, y el camino barato para el modelo siempre va
-// a ser una llamada en vez de tres. "Necesito algo del rinde de soja" y de
-// golpe el titular dice "El rinde que no se ve hasta que lo medís", copy
-// que nadie escribió ni aceptó. Con esto ese titular no entra.
+//   la persona: "ojo que no puedo decir que el rinde subio 30%
+//                porque no lo medimos"
+//   el modelo:  cita = "el rinde subio 30%"
 //
-// Sin pool no se aplica nada. Falla cerrada a propósito: si un día alguien
-// llama a las capacidades desde otro lado y se olvida de pasar `dicho`, el
-// peor caso tiene que ser una plantilla con su texto de muestra, nunca
-// texto del modelo adentro de una pieza sin que nadie diga que sí.
+// Substring perfecto. Pasaba la aduana y entraba a la pieza sin Aceptar:
+// una afirmación de impacto que la persona acababa de negar, impresa en
+// material de marketing. Y no era el único agujero — plano() borra la
+// puntuación, así que también se podía volver pregunta una afirmación o
+// agregarle signos; y pedazos sueltos se podían recombinar en un orden que
+// nadie escribió.
+//
+// La lección: verificar texto es un parche cuando el problema es QUIÉN lo
+// elige. Comparar cadenas jamás va a entender una negación. Así que el
+// modelo dejó de elegir: `abrir_plantilla` corre `armar()` —determinístico,
+// regex sobre la frase original— y el modelo sólo dice si usarlo. Todo lo
+// demás que quiera escribir va por `proponer_textos`, con Aceptar.
+//
+// `plano()` se sigue importando: lo usa `listar_fotos` para buscar por
+// nombre, que es comparar cadenas para lo que comparar cadenas sirve.
 // ------------------------------------------------------------
-function porProcedencia(campos, dicho) {
-  const pool = plano(dicho || '')
-  const propios = {}
-  const ajenos = []
-  Object.entries(campos || {}).forEach(([rol, txt]) => {
-    if (loDijo(txt, pool)) propios[rol] = txt
-    else ajenos.push(rol)
-  })
-  return { propios, ajenos }
-}
-
-// Un caso que la regla literal a secas rompía: `armar()` compone la bajada
-// pegando fecha y hora con ' · ' ("11 de junio · 11 hs"). Cada pedazo es
-// textual —salen de las regex, recortados de la frase— pero la línea
-// entera no aparece nunca así en lo que se tipeó, y la habríamos
-// rechazado con la misma dureza que a un titular inventado. Por eso: pasa
-// la frase entera, o pasan TODOS sus pedazos por separado. Sigue sin poder
-// entrar una palabra que nadie escribió; lo único que se permite es
-// juntar, con ese separador, cosas que la persona sí dijo.
-function loDijo(txt, pool) {
-  if (!pool) return false
-  const entero = plano(txt)
-  if (!entero) return false
-  if (pool.includes(entero)) return true
-  const pedazos = String(txt).split(' · ').map(plano).filter(Boolean)
-  return pedazos.length > 1 && pedazos.every((p) => pool.includes(p))
-}
-
-// El rechazo se le cuenta al modelo para que pueda CORREGIRSE solo en la
-// vuelta siguiente —ése es el punto del loop— así que dice qué pasó y cuál
-// es la puerta que sí existe para ese texto.
-//
-// Lo que NO dice es quién lo escribió, porque la aduana no lo sabe: lo
-// único que mide es si el texto coincide literal con lo que se tipeó. Un
-// pedazo que la persona SÍ escribió puede no coincidir igual —si algo lo
-// recortó o lo rearmó por el medio deja de ser literal—, y acusar al
-// modelo de haberlo inventado en ese caso es mentirle: lo manda a pedir un
-// Aceptar de más por un texto que era de ella. El mensaje describe la
-// verificación que falló, nada más.
-const RECHAZO = (roles) =>
-  `No apliqué ${roles.join(', ')}: ese texto no coincide literal con nada de lo que la persona tipeó en esta conversación, y textosDeRegla sólo aplica lo que puede verificar contra sus propias frases. `
-  + 'No sé de dónde salió y no lo estoy adivinando: puede ser copy tuyo, o un pedazo suyo que quedó recortado o rearmado y por eso ya no calza. '
-  + 'Si es tuyo, mandalo por proponer_textos, que pasa por Aceptar o Descartar. Si es de ella, volvé a pasarlo tal cual lo escribió.'
 
 // ------------------------------------------------------------
 // EL RESUMEN DE LA ACCIÓN — la línea que lee la PERSONA cuando termina.
@@ -285,7 +273,7 @@ export const CAPACIDADES = [
   {
     nombre: 'detalle_plantilla',
     etiqueta: 'Mirando la plantilla en detalle…',
-    descripcion: 'Todo sobre una plantilla: qué textos lleva, el largo recomendado de cada uno, el texto de muestra que trae, si va sobre foto y qué estilos de composición admite. Usala antes de proponer textos para una plantilla — los largos importan, un titular de 200 caracteres entra ilegible.',
+    descripcion: 'Todo sobre una plantilla: qué textos lleva, el largo recomendado de cada uno, el texto de muestra que trae, si va sobre foto y qué estilos de composición admite. Usala antes de proponer textos para una plantilla que TODAVÍA NO ESTÁ ABIERTA — los largos importan, un titular de 200 caracteres entra ilegible. Si la plantilla ya está abierta no la llames: `ejemplo` es el texto de muestra que la pieza YA tiene puesto, no lo que dice ahora; para eso está estado_actual, y abrir_plantilla también te lo devuelve al abrir. Proponer un `ejemplo` de acá tal cual es proponerle a la persona lo que ya está en pantalla.',
     esquema: {
       type: 'object',
       properties: { id: { type: 'string', enum: IDS_PLANTILLA, description: 'id de la plantilla' } },
@@ -446,10 +434,12 @@ export const CAPACIDADES = [
             nombre: p.template.name,
             motivo: p.motivo,
             score: p.score,
-            // esto es lo único que se puede aplicar sin pedir permiso:
-            // no es copy escrito, es el texto de la persona reubicado
-            textosDeRegla: a.campos,
-            queSePuso: a.puestos,
+            // Qué va a poner `abrir_plantilla({usarTextoDelPedido:true})`
+            // si elegís ésta. Es informativo: el modelo no puede copiarlo
+            // ni editarlo para mandarlo de vuelta, porque ya no hay
+            // parámetro por donde entre texto.
+            loQueLeEntraria: a.campos,
+            queSePondria: a.puestos,
           }
         }),
         formatoSugerido: r.formato ? fichaFormato(r.formato) : null,
@@ -475,7 +465,14 @@ export const CAPACIDADES = [
       const que = d.esCarrusel
         ? `carrusel de ${plural(d.cantidadSlides, 'slide', 'slides')}`
         : (d.plantilla || 'una pieza')
-      return `${d.nombre || 'sin nombre'}, ${que}`
+      // "Evento / webinar, Evento / webinar". El proyecto se bautiza con
+      // `inicial.title || template.name` (App.jsx, pickTemplate) y 16 de las
+      // 26 plantillas visibles no traen defaults.title, así que el nombre del
+      // proyecto ES el de la plantilla y la coma quedaba juntando dos veces
+      // lo mismo. Decirlo una vez es la misma información.
+      if (!d.nombre) return que
+      if (d.nombre === que) return d.nombre
+      return `${d.nombre}, ${que}`
     },
     ejecutar: async (_args, ctx) => {
       const p = ctx?.proyecto
@@ -486,12 +483,7 @@ export const CAPACIDADES = [
       const slide = p.pieces[i] || p.pieces[0]
       const t = TEMPLATES_BY_ID[slide?.templateId]
       const c = slide?.content || {}
-      const textos = {}
-      ROLES.forEach((r) => { if (c[r] !== undefined && String(c[r]).trim() !== '') textos[r] = c[r] })
-      ;(c.textBlocks || []).forEach((b) => {
-        const k = b.style || 'title'
-        if (textos[k] === undefined && String(b.text || '').trim() !== '') textos[k] = b.text
-      })
+      const textos = textosDe(c)
       return {
         hayAlgoAbierto: true,
         // Dos hechos distintos y los dos importan: que la pieza exista (y
@@ -594,7 +586,7 @@ export const CAPACIDADES = [
   {
     nombre: 'listar_fotos',
     etiqueta: 'Revisando el banco de fotos…',
-    descripcion: 'El banco de fotos de Magoya, por nombre. Son las únicas fotos de marca que hay adentro de la herramienta (la persona también puede subir la suya). Usala cuando pregunten qué fotos hay o cuando recomiendes una plantilla con foto. No podés nombrar una foto que no esté en esta lista.',
+    descripcion: 'El banco de fotos de Magoya, por nombre. Son las únicas fotos de marca que hay adentro de la herramienta (la persona también puede subir la suya). Usala cuando pregunten qué fotos hay. No podés nombrar una foto que no esté en esta lista. OJO, es SÓLO PARA NOMBRAR: no existe ninguna capacidad para poner ni cambiar la foto de una pieza, y las plantillas con foto se abren con el marco VACÍO. La foto la elige la persona desde el panel Detrás del editor. No digas "te la abro con la imagen puesta" ni "le pongo la aérea": nombrá la que te parece y decile que la elija ella ahí.',
     esquema: {
       type: 'object',
       properties: { buscar: { type: 'string', description: 'filtra por nombre: "campo", "persona", "trigo"…' } },
@@ -626,7 +618,7 @@ export const CAPACIDADES = [
   {
     nombre: 'listar_estilos_y_colores',
     etiqueta: 'Mirando los esquemas de color…',
-    descripcion: 'Los esquemas de color, acentos, estilos de composición y degradés aprobados. Es la caja de marca: fuera de esto no hay color libre, ni hexadecimales, ni "un azul más corporativo". Usala cuando pregunten qué se puede cambiar del look de una pieza.',
+    descripcion: 'Los esquemas de color, acentos, estilos de composición y degradés aprobados. Es la caja de marca: fuera de esto no hay color libre, ni hexadecimales, ni "un azul más corporativo". Usala cuando pregunten qué se puede cambiar del look de una pieza. OJO, es SÓLO PARA NOMBRAR: vos no podés cambiarle el esquema, el acento, el degradé ni el estilo a ninguna pieza — no hay capacidad para eso y no la va a haber por escribirla en una frase. Lo hace la persona desde los paneles del editor: el color de fondo en Detrás, el acento en Marca, la composición en Estilo. Nunca contestes "lo que sí puedo hacer es cambiarte el esquema o el acento": lo que corresponde es decirle cuáles hay y en qué panel los cambia.',
     esquema: { type: 'object', properties: {}, required: [], additionalProperties: false },
     muta: false,
     // Cuatro números serían un inventario. Los dos que se cambian de verdad
@@ -650,7 +642,7 @@ export const CAPACIDADES = [
   {
     nombre: 'revisar_copy',
     etiqueta: 'Revisando el copy…',
-    descripcion: 'Pasa un texto por las reglas editoriales de Magoya (sin emojis, sin signos de exclamación, un solo idioma, toda métrica con su ventana temporal) y por el largo recomendado del rol. Usala SOBRE TU PROPIO texto antes de mandarlo por proponer_textos: si te devuelve avisos, corregilo y volvé a revisar. Es más barato acá que en la cara de la persona.',
+    descripcion: 'Pasa UN texto por las reglas editoriales de Magoya (sin emojis, sin signos de exclamación, un solo idioma, toda métrica con su ventana temporal) y por el largo recomendado del rol. Usala sólo cuando estás dudando de un texto suelto y querés decidir antes de escribir el resto. NO hace falta pre-revisar lo que vas a proponer: proponer_textos ya pasa cada texto por estas mismas reglas y te devuelve los avisos, así que revisarlos de a uno acá es gastar una vuelta por texto para enterarte de lo mismo. Cuatro textos son cuatro llamadas y una sola de proponer_textos.',
     esquema: {
       type: 'object',
       properties: {
@@ -665,6 +657,15 @@ export const CAPACIDADES = [
     // información dicha por alguien.
     resumir: (d) => (d.limpio ? 'sin avisos' : plural(d.avisos.length, 'aviso', 'avisos')),
     ejecutar: async ({ rol, texto }) => {
+      // El enum del esquema no lo garantiza: la API no valida los argumentos
+      // y esta capacidad los usaba crudos. Verificado en el run de U1, con
+      // una llamada que llegó con el rol partido al medio —rol:'cta">Guardá
+      // tu lugar'— y contestó `limpio: true, maxChars: null`. Un certificado
+      // de buena salud falso, justo en la herramienta que existe para que el
+      // modelo se autocorrija: con el rol mal escrito no hay MAXCHARS contra
+      // qué medir y un titular de 300 caracteres pasa sin un aviso.
+      // proponer_textos ya cruzaba el rol; ésta no.
+      if (!ROLES.includes(rol)) throw new Error(noExiste('el rol de texto', rol, ROLES))
       const avisos = avisosDe(rol, texto)
       return {
         rol,
@@ -681,16 +682,15 @@ export const CAPACIDADES = [
   {
     nombre: 'abrir_plantilla',
     etiqueta: 'Abriendo la plantilla…',
-    descripcion: 'Abre una plantilla en el editor y deja a la persona ahí adentro. `textosDeRegla` es la ÚNICA forma de meter texto en una pieza sin pedir permiso, y sólo acepta pedazos LITERALES de lo que escribió la persona —lo que devolvió sugerir_plantillas en su campo textosDeRegla—, reubicados. Esto NO es una recomendación: cada texto se verifica contra lo que la persona tipeó en esta conversación y el que no aparece ahí no se aplica, se te devuelve rechazado y la plantilla se abre sin él. Para texto que escribiste vos está proponer_textos, que pasa por Aceptar/Descartar. Si dudás de dónde salió un texto, no va acá.',
+    descripcion: 'Abre una plantilla en el editor y deja a la persona ahí adentro. REEMPLAZA POR COMPLETO la pieza que haya abierta: proyecto nuevo, se pierde todo su texto y no hay deshacer. Mirá estado_actual antes; si ya hay algo armado, avisale que eso se pierde y esperá que diga que sí. Y no la uses para "pasar la pieza a otra plantilla conservando el texto": eso NO es lo que hace. Con `usarTextoDelPedido: true` la pieza abre con lo que las REGLAS extraen de la frase de la persona (el tema al titular, la fecha a la bajada, la cifra al número). Vos no elegís ese texto y no lo podés escribir: lo saca el motor de reglas de sus propias palabras. Si querés poner algo distinto —tuyo, reformulado, o un pedazo suelto de lo que ella dijo— va por proponer_textos, que pasa por Aceptar/Descartar.',
     esquema: {
       type: 'object',
       properties: {
         plantillaId: { type: 'string', enum: IDS_PLANTILLA },
         formatoId: { type: 'string', enum: IDS_FORMATO, description: 'si no lo pasás, queda el formato que ya está elegido' },
-        textosDeRegla: {
-          type: 'object',
-          description: 'rol → texto, tal cual salió de sugerir_plantillas. Sólo texto de la persona: se verifica que cada valor esté contenido, literal, en lo que ella escribió. Lo que reescribas aunque sea un poco, no pasa.',
-          additionalProperties: { type: 'string' },
+        usarTextoDelPedido: {
+          type: 'boolean',
+          description: 'true para que la pieza abra con lo que las reglas extraen de la frase de la persona. No lleva texto: el texto lo saca el motor, no vos.',
         },
       },
       required: ['plantillaId'],
@@ -702,64 +702,94 @@ export const CAPACIDADES = [
     // no con lo que la persona escribió.
     //
     // Rechazado (no coincide con lo que tipeó) e ignorado (la plantilla no
-    // tiene ese lugar) son dos cosas distintas PARA EL MODELO, que se tiene
-    // que corregir distinto en cada caso. Para la persona son una sola: hay
-    // un texto que no está en la pieza. Se suman.
     resumir: (d) => {
-      const partes = [d.abierta]
-      if (d.textosPuestos?.length) {
+      const partes = [d?.abierta].filter(Boolean)
+      if (d?.textosPuestos?.length) {
         partes.push(plural(d.textosPuestos.length, 'texto tuyo puesto', 'textos tuyos puestos'))
       }
-      const fuera = (d.textosRechazados?.length || 0) + (d.rolesIgnorados?.length || 0)
-      if (fuera) partes.push(plural(fuera, 'texto sin aplicar', 'textos sin aplicar'))
-      return partes.join(', ')
+      if (d?.rolesIgnorados?.length) {
+        partes.push(plural(d.rolesIgnorados.length, 'texto sin lugar', 'textos sin lugar'))
+      }
+      return partes.join(', ') || 'listo'
     },
-    ejecutar: async ({ plantillaId, formatoId, textosDeRegla }, ctx) => {
+    ejecutar: async ({ plantillaId, formatoId, usarTextoDelPedido }, ctx) => {
       const t = TEMPLATES_BY_ID[plantillaId]
       if (!t || t.hidden) throw new Error(noExiste('la plantilla', plantillaId, IDS_PLANTILLA))
       if (formatoId && !FORMATS_BY_ID[formatoId]) throw new Error(noExiste('el formato', formatoId, IDS_FORMATO))
       const abrir = accion(ctx, 'abrirPlantilla')
       if (!abrir) throw new Error('Ahora mismo no puedo abrir plantillas desde acá. Decile a la persona qué plantilla te parece y que la abra desde la galería.')
 
-      // sólo entran los roles que la plantilla realmente acepta: meterle
-      // una "cita" a una plantilla sin cita no rompe nada, pero se pierde
-      // en silencio y el modelo cree que la puso
+      // ------------------------------------------------------------
+      // EL MODELO NO ESCRIBE ACÁ. Ni una palabra.
+      //
+      // Antes esto recibía `textosDeRegla` —un objeto rol→texto que mandaba
+      // el modelo— y lo auditábamos después: cada valor tenía que aparecer
+      // literal en lo que la persona había tipeado. Parecía cerrado y no lo
+      // estaba, porque comparar substrings nunca va a entender una frase.
+      // El caso que lo tiró abajo, textual de una prueba real:
+      //
+      //   la persona: "ojo que no puedo decir que el rinde subio 30%
+      //                porque no lo medimos"
+      //   el modelo:  cita = "el rinde subio 30%"
+      //
+      // Es un substring perfecto de algo que ella escribió, así que pasaba
+      // la aduana y entraba a la pieza sin Aceptar: una afirmación de
+      // impacto que la persona había NEGADO explícitamente, publicada en
+      // material de marketing. Lo mismo con la puntuación (plano() la
+      // borra, así que el modelo podía volver pregunta una afirmación o
+      // agregarle signos) y con recombinar pedazos sueltos.
+      //
+      // Ninguno de esos tres agujeros se tapa con un check mejor: el
+      // problema era que el modelo elegía las palabras. Ahora no las elige.
+      // `armar()` es una función determinística de la frase de la persona
+      // —las regex deciden qué es fecha, qué es cifra y qué es tema— y
+      // corre acá, del lado nuestro. El modelo sólo dice SI usarla.
+      // ------------------------------------------------------------
       const acepta = new Set(rolesDe(t))
       const campos = {}
       const ignorados = []
-      Object.entries(textosDeRegla || {}).forEach(([rol, txt]) => {
-        if (!String(txt ?? '').trim()) return
-        if (acepta.has(rol)) campos[rol] = txt
-        else ignorados.push(rol)
-      })
+      if (usarTextoDelPedido) {
+        // Se prueba `armar()` sobre cada turno de la persona y gana el que
+        // más campos llena: en una conversación, el pedido con la carne
+        // puede ser el primero ("webinar de IA el 11 de junio") y el último
+        // no decir nada por sí solo ("ahora para LinkedIn").
+        let mejor = null
+        for (const frase of ctx?.frases || []) {
+          const a = armar(frase, t, FORMATS)
+          const n = Object.keys(a?.campos || {}).length
+          if (n && (!mejor || n > mejor.n)) mejor = { campos: a.campos, n }
+        }
+        Object.entries(mejor?.campos || {}).forEach(([rol, txt]) => {
+          if (!String(txt ?? '').trim()) return
+          if (acepta.has(rol)) campos[rol] = txt
+          else ignorados.push(rol)
+        })
+      }
 
-      // Y de esos, sólo los que de verdad salieron de la persona. Es la
-      // última puerta antes de la pieza: acá no hay Aceptar que la cubra.
-      const { propios, ajenos } = porProcedencia(campos, ctx?.dicho)
-
-      const contenido = Object.keys(propios).length
-        ? aplicarArmado(placeholderContent(t), propios)
-        : null
+      const muestra = placeholderContent(t)
+      const contenido = Object.keys(campos).length ? aplicarArmado(muestra, campos) : null
       const formato = formatoDe(formatoId, ctx)
-      // Si no quedó nada, la plantilla se abre igual con su texto de
-      // muestra: la persona pidió abrir algo y abrir algo se puede. Lo que
-      // no se puede es abrirlo con copy que no autorizó.
       abrir(t, formato, contenido)
 
       const notas = []
-      if (ignorados.length) notas.push(`Esta plantilla no tiene ${ignorados.join(', ')}: esos textos no se pusieron.`)
-      if (ajenos.length) notas.push(RECHAZO(ajenos))
-      if (ajenos.length && !Object.keys(propios).length) {
-        notas.push('La plantilla quedó abierta con su texto de muestra, sin nada de lo que mandaste. No le digas a la persona que ya está puesto, porque no lo está.')
+      if (ignorados.length) notas.push(`Esta plantilla no tiene ${ignorados.join(', ')}: eso no se puso.`)
+      if (usarTextoDelPedido && !Object.keys(campos).length) {
+        notas.push('De la frase de la persona no salió ningún texto aprovechable, así que la plantilla abrió con su texto de muestra. No le digas que ya está puesto, porque no lo está.')
       }
 
       return {
         abierta: t.name,
         plantillaId: t.id,
         formato: formato ? formatLabel(formato.id) : 'el que ya estaba elegido',
-        textosPuestos: Object.keys(propios),
+        // Qué DICE la pieza ahora, no qué roles se tocaron. Sin esto el
+        // modelo se iba a detalle_plantilla a averiguarlo, leía los `ejemplo`
+        // —que son exactamente estos defaults— y los volvía a proponer como
+        // si fueran suyos. Acá está la respuesta, así que no hay nada que ir
+        // a buscar y no hay no-op que proponer.
+        diceAhora: textosDe(contenido || muestra),
+        notaDeLoQueDice: 'Eso es lo que la pieza YA tiene escrito, texto de muestra incluido. No lo propongas de vuelta: proponé sólo lo que querés cambiar.',
+        textosPuestos: Object.keys(campos),
         rolesIgnorados: ignorados.length ? ignorados : undefined,
-        textosRechazados: ajenos.length ? ajenos : undefined,
         notas: notas.length ? notas : undefined,
       }
     },
@@ -768,7 +798,7 @@ export const CAPACIDADES = [
   {
     nombre: 'abrir_carrusel',
     etiqueta: 'Armando el carrusel…',
-    descripcion: 'Abre un carrusel completo: la secuencia de slides con el diseño compartido y el copy de muestra ya calibrado. Sin presetId abre tres slides en blanco, que es lo peor que le podés hacer a alguien que no diseña — elegí un preset con listar_carruseles salvo que la persona pida explícitamente empezar de cero. El formato tiene que ser uno de los que admiten carrusel.',
+    descripcion: 'Abre un carrusel completo: la secuencia de slides con el diseño compartido y el copy de muestra ya calibrado. REEMPLAZA POR COMPLETO la pieza que haya abierta: proyecto nuevo, se pierde todo su texto y no hay deshacer. No convierte lo que ya está en carrusel — eso no se puede hacer desde acá. Si la persona pide "mejor que sea carrusel" y ya venían trabajando una pieza, decíselo ANTES en una frase ("abro el carrusel nuevo pero perdés la fecha y el título que armamos, ¿va?") y esperá el sí. Sin presetId abre tres slides en blanco, que es lo peor que le podés hacer a alguien que no diseña — elegí un preset con listar_carruseles salvo que la persona pida explícitamente empezar de cero. El formato tiene que ser uno de los que admiten carrusel.',
     esquema: {
       type: 'object',
       properties: {
@@ -806,7 +836,7 @@ export const CAPACIDADES = [
   {
     nombre: 'abrir_en_blanco',
     etiqueta: 'Abriendo una pieza en blanco…',
-    descripcion: 'Abre una slide en blanco. Es la última opción: arrancar en blanco es justo donde se rompe la marca y donde la gente se empantana. Usala sólo si la persona lo pide con todas las letras o si de verdad ninguna plantilla sirve.',
+    descripcion: 'Abre una slide en blanco. Es la última opción: arrancar en blanco es justo donde se rompe la marca y donde la gente se empantana. Usala sólo si la persona lo pide con todas las letras o si de verdad ninguna plantilla sirve. También REEMPLAZA POR COMPLETO la pieza que haya abierta, sin deshacer: si hay algo armado, avisá antes.',
     esquema: {
       type: 'object',
       properties: { formatoId: { type: 'string', enum: IDS_FORMATO } },
@@ -858,7 +888,7 @@ export const CAPACIDADES = [
   {
     nombre: 'proponer_textos',
     etiqueta: 'Escribiendo una propuesta…',
-    descripcion: 'LA única forma de que un texto escrito por vos llegue a una pieza. NO lo aplica: lo encola como propuesta y la persona ve el antes y el después con Aceptar o Descartar. Después de llamarla, contale a la persona qué propusiste y por qué — no digas que ya lo cambiaste, porque no lo cambiaste. Los roles tienen que ser de los que TIENE la pieza abierta, no cualquiera de la lista: la de Dato lleva volanta, cifra y descripción, y no tiene titular. Si mandás uno que no está, te lo devuelvo con la lista de los que sí. Antes de encolar, cada texto pasa además por las reglas editoriales y por el largo del rol, y te devuelvo los avisos: si vuelven avisos, corregí y volvé a proponer.',
+    descripcion: 'LA única forma de que un texto escrito por vos llegue a una pieza. NO lo aplica: lo encola como propuesta y la persona ve el antes y el después con Aceptar o Descartar. Después de llamarla, contale a la persona qué propusiste y por qué — no digas que ya lo cambiaste, porque no lo cambiaste. Los roles tienen que ser de los que TIENE la pieza abierta, no cualquiera de la lista: la de Dato lleva volanta, cifra y descripción, y no tiene titular. Si mandás uno que no está, te lo devuelvo con la lista de los que sí. Antes de encolar, cada texto pasa además por las reglas editoriales y por el largo del rol, y te devuelvo los avisos: si vuelven avisos, corregí y volvé a proponer. Por eso NO hace falta que pases los textos por revisar_copy antes: es la misma revisión, una vuelta por texto más cara. Mandá los textos de la pieza juntos en una sola llamada. Y sólo los que CAMBIAN algo: si un texto es igual al que la pieza ya dice, lo saco y te lo aviso.',
     esquema: {
       type: 'object',
       properties: {
@@ -939,7 +969,28 @@ export const CAPACIDADES = [
         }
       }
 
-      const revisados = lista.map(({ rol, texto }) => ({ rol, texto, avisos: avisosDe(rol, texto) }))
+      // ---- ¿esto cambia algo? ----
+      // Una propuesta que dice lo mismo que la pieza le cuesta a la persona
+      // un Aceptar y una card de "antes: WEBINAR → después: WEBINAR". Pasó
+      // en los dos pedidos de webinar del run de U1 y no es culpa del
+      // modelo: hasta ahora abrir_plantilla no le decía qué había quedado
+      // escrito, así que proponía los defaults de vuelta creyendo que los
+      // estaba escribiendo. Eso ya se arregló allá; esto es la red, y es
+      // barata. No aplica nada ni descarta trabajo: saca del camino lo que
+      // no mueve un píxel.
+      const yaDice = abierta ? textosDe(abierta.content) : {}
+      const igual = (x) => yaDice[x.rol] !== undefined
+        && String(yaDice[x.rol]).trim() === String(x.texto ?? '').trim()
+      const repetidos = [...new Set(lista.filter(igual).map((x) => x.rol))]
+      const cambian = lista.filter((x) => !igual(x))
+      if (!cambian.length) {
+        throw new Error(
+          `La pieza ya dice exactamente eso en ${repetidos.join(', ')}, así que no encolé nada: aceptarlo no cambiaría un píxel. `
+          + 'Si querés cambiar algo, proponé un texto distinto; si no, decile a la persona que eso ya está puesto y seguí.',
+        )
+      }
+
+      const revisados = cambian.map(({ rol, texto }) => ({ rol, texto, avisos: avisosDe(rol, texto) }))
       const avisos = revisados.filter((r) => r.avisos.length).map((r) => ({ rol: r.rol, avisos: r.avisos }))
 
       const proponer = accion(ctx, 'proponer')
@@ -962,6 +1013,12 @@ export const CAPACIDADES = [
         encolada: true,
         cuantos: revisados.length,
         estado: 'Propuesta encolada. NO está aplicada: espera el sí de la persona.',
+        // Que se hayan caído no se calla: si el modelo dijera "te propuse la
+        // volanta y el CTA" y la card muestra uno solo, la persona ve otra
+        // cosa de la que le contaron.
+        ...(repetidos.length
+          ? { yaDecianEso: repetidos, nota: `Saqué ${repetidos.join(', ')} de la propuesta: la pieza ya dice exactamente eso. No se lo cuentes como algo que propusiste.` }
+          : {}),
         avisos: avisos.length ? avisos : undefined,
       }
     },

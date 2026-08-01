@@ -483,6 +483,17 @@ export default function Editor({
       w = refDim * (o.scale || 0.5); h = w / (dev?.screen?.ratio || 1)
     } else if (o.kind === 'mockup') { w = refDim * (o.scale || 0.72); h = w * (o.ratio || 0.75) }
     else if (o.kind === 'image' && o.frame) { w = refDim * (o.scale || 0.4); h = w * (o.ratio || 0.6) }
+    else if (o.kind === 'image') {
+      // Una foto sin marco se dibuja con `b.object`, que la mete ENTERA en
+      // una caja de lado `size` (preserveAspectRatio meet). Con una 3:2 lo
+      // que se ve ocupa dos tercios del alto y el resto de la caja es aire:
+      // la selección salía cuadrada y agarrabas una esquina que no era de la
+      // foto. Acá se mide lo dibujado, no la caja. Sin `natural` (objetos
+      // viejos, o la foto todavía cargando) se cae al cuadrado de antes.
+      const lado = refDim * (o.scale || 0.3)
+      const prop = o.natural?.w && o.natural?.h ? o.natural.h / o.natural.w : 1
+      if (prop >= 1) { h = lado; w = lado / prop } else { w = lado; h = lado * prop }
+    }
     else if (o.kind === 'shape') {
       // cada forma tiene su propia proporción; si la caja no la respeta,
       // el marco de selección no coincide con lo que se ve dibujado.
@@ -910,7 +921,9 @@ export default function Editor({
   const hayFotoDetras = (content.bg || (template.surface === 'photo' || template.defaults?.hasPhoto ? 'photo' : 'color')) === 'photo'
   const needsPhoto = template.surface === 'photo' && (content.bg || 'photo') !== 'color' && !content.photo?.src
   // Bloque B — variantes: misma plantilla, otra composición
-  const variants = React.useMemo(() => variantsFor(template), [template])
+  // el catálogo depende del formato: tres siluetas rompen la composición de
+  // la plantilla en algunas proporciones y ahí no se ofrecen (Bloque S)
+  const variants = React.useMemo(() => variantsFor(template, format), [template, format])
   const activeVar = activeVariantId(template, content)
   // si la plantilla no tiene variantes (chat), el panel no existe
 
@@ -992,6 +1005,14 @@ export default function Editor({
               <div className="panel-title" style={{ marginTop: 16 }}>Textos sueltos</div>
               <p className="panel-help">Los que sumás vos. Arrastralos en la pieza para ubicarlos donde quieras.</p>
               <TextBlocksBody content={content} set={set} onSelectText={onSelectText} selText={selText} multiSelText={multiSelText} toggleMultiSelText={toggleMultiSelText} />
+              {/* Mover el bloque de texto se podía sólo en las piezas libres,
+                  y en el resto vivía escondido como tres "estilos" (Arriba,
+                  Abajo, Centrado) que a 128 px no se distinguían del
+                  Original: 9,9% de la pieza el mejor de los tres. Salieron
+                  del panel Estilo —que ahora son siluetas— y el control va
+                  acá, que es donde uno lo busca. */}
+              <div className="panel-title" style={{ marginTop: 16 }}>Posición del bloque</div>
+              <AnchorBody content={content} template={template} set={set} />
             </>
           )
         )}
@@ -2243,8 +2264,9 @@ function objectName(o, icon) {
   if (icon.isWordmark) return icon.label
   if (icon.category === 'ai') return `Logo de IA · ${icon.label}`
   if (icon.category === 'social') return `Logo de red · ${icon.label}`
+  // "Misceláneas" ya no existe como categoría: el botón flecha, el conector
+  // y la mancha viven con los trazos (ver iconLibrary).
   if (icon.category === 'trazos') return `Trazo · ${icon.label}`
-  if (icon.category === 'misc') return `Misceláneo · ${icon.label}`
   return icon.label || 'Elemento'
 }
 

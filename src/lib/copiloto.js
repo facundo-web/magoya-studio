@@ -185,6 +185,15 @@ const PEDIDO_RECHAZADO = 'El copiloto rechazó este pedido. No se cayó: contest
 // mismo pedido no arregla una sesión vencida: la salida es otra y hay que
 // decir cuál, en vez de dejarla adentro del cajón de "pedido rechazado".
 const SIN_PERMISO = 'El copiloto no me dejó entrar: puede ser que la sesión se haya vencido. Recargá la página y probá otra vez. El buscador de acá abajo anda igual, sin sesión.'
+// El 424 es la falla permanente del proveedor (ver el catch de la edge
+// function): la clave, la cuenta o el pedido en sí no van a pasar por más
+// que insistas. Es la única falla que se rinde en el PRIMER intento, y se
+// rinde a propósito: hacerle escribir tres mensajes y esperar tres veces
+// por algo que no va a andar nunca es peor que decirle la verdad de una.
+// No se nombra el motivo de adentro —"tu balance de créditos es bajo" no
+// es una noticia para alguien que vino a hacer un posteo— pero tampoco se
+// finge un misterio: se dice que no se arregla reintentando.
+const SIN_MODELO = 'El copiloto no está pudiendo hablar con el modelo, y esto no se arregla reintentando: es un problema de la cuenta, no de tu pedido. Te devuelvo el buscador de siempre, que corre en tu navegador y arma la pieza igual.'
 
 // El cuerpo del error de la edge function es { error: "..." }. Lo leemos
 // para poder distinguir "demasiados turnos" de cualquier otro 400: uno tiene
@@ -230,6 +239,12 @@ async function llamar({ mensajes, herramientas, sistema, signal }) {
       // decide. El 413 (cuerpo enorme) y el 400 por turnos son el mismo
       // problema visto desde dos lados: la conversación no entra.
       if (r.status < 500) {
+        // La única que se rinde sola. No es una caída —el servidor contestó—
+        // pero tampoco tiene arreglo del lado de la persona, así que se apaga
+        // el chat ya y aparece el buscador con la explicación. Queda
+        // reintentable (noDesplegada sigue en false): si mañana la cuenta se
+        // arregla, "Empezar de nuevo" lo revive.
+        if (r.status === 424) { disponible = false; throw fallo('proveedor', SIN_MODELO) }
         if (r.status === 401 || r.status === 403) throw fallo('permiso', SIN_PERMISO)
         const dice = await motivoDelServidor(r)
         if (r.status === 413 || /turnos|grande/i.test(dice)) throw fallo('largo', MUY_LARGA)
@@ -338,7 +353,7 @@ function resumirResultado(nombre, datos) {
 // Se normaliza con el plano() de entender.js a propósito: es la MISMA
 // aduana que ya valida el tema del buscador, no una parecida.
 // ------------------------------------------------------------
-function loQueDijoLaPersona(mensajes) {
+function frasesDeLaPersona(mensajes) {
   const partes = []
   for (const m of mensajes || []) {
     if (m?.role !== 'user') continue
@@ -349,7 +364,15 @@ function loQueDijoLaPersona(mensajes) {
       })
     }
   }
-  return plano(partes.join(' '))
+  return partes
+}
+
+// El pool sigue existiendo para todo lo que no sea meter texto en una
+// pieza. Los turnos se unen con un separador que NINGUNA frase puede
+// contener: con un espacio, el final de un mensaje y el principio del
+// siguiente formaban una frase que nadie escribió y que igual validaba.
+function loQueDijoLaPersona(mensajes) {
+  return frasesDeLaPersona(mensajes).map((t) => plano(t)).filter(Boolean).join(' \n| ')
 }
 
 // ------------------------------------------------------------
@@ -508,7 +531,15 @@ export async function conversar({ mensajes, ctx, onEvento, signal, original }) {
   // de la UI: adentro del loop no aparece texto nuevo de la persona, sólo
   // turnos del modelo y tool_results nuestros. Si se recalculara sobre
   // `historial` en cada vuelta, el pool se iría contaminando solo.
-  const ctxConDicho = { ...(ctx || {}), dicho: loQueDijoLaPersona(mensajes) }
+  // `frases` son los turnos de la persona SIN normalizar, con sus tildes y
+  // su puntuación. Los necesita `abrir_plantilla` para correr `armar()` por
+  // su cuenta: desde que el modelo no puede mandar el texto, lo tiene que
+  // sacar el motor de reglas de la frase original.
+  const ctxConDicho = {
+    ...(ctx || {}),
+    dicho: loQueDijoLaPersona(mensajes),
+    frases: frasesDeLaPersona(mensajes),
+  }
 
   // La memoria puede no estar (Supabase caído, tabla vacía, sin permisos).
   // Viene en un sobre { ok, texto } / { ok:false, motivo } justamente para

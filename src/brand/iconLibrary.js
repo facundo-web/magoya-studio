@@ -99,10 +99,20 @@ export const ICONS = Object.entries(modules).map(([path, url]) => {
   }
 })
 
-// ---- trazos y misceláneas (currentColor → se tiñen con el acento/negro) ----
-// `doodle-dots` salió de acá: era una imagen fija de 5 puntos y no había
-// forma de decir cuántos son. Ahora es una forma paramétrica (shape:dots).
-const MARK_NAMES = { 'flourish-arrow': 'Flecha', 'flourish-circle': 'Círculo', 'flourish-underline': 'Subrayado', 'flourish-navarrow': 'Botón flecha' }
+// ---- trazos y marcas (currentColor → se tiñen con el acento/negro) ----
+// Antes esto se partía en dos categorías y "Misceláneas" quedaba con UN
+// elemento (el botón flecha). Una categoría de uno se lee como que algo
+// falló al cargar, así que va todo junto: son la misma familia —lo que se
+// dibuja a mano encima de la pieza— y con seis ya se puede elegir.
+// Los dos que faltaban estaban en disco sin ofrecerse: el conector squiggle
+// y la mancha orgánica de las referencias.
+// Quedan afuera a propósito `doodle-dots` (los puntitos son paramétricos,
+// shape:dots, porque hay que poder decir cuántos son) y `doodle-sparkle`
+// (ya existe como forma, "Destello": dos caminos para lo mismo confunden).
+const MARK_NAMES = {
+  'flourish-arrow': 'Flecha', 'flourish-circle': 'Círculo', 'flourish-underline': 'Subrayado',
+  'flourish-navarrow': 'Botón flecha', 'doodle-loop': 'Conector', 'doodle-blob': 'Mancha',
+}
 export const MARKS = Object.entries(markModules)
   .map(([path, url]) => {
     const m = path.match(/\/((?:flourish|doodle)-[^/]+)\.svg$/)
@@ -110,7 +120,7 @@ export const MARKS = Object.entries(markModules)
   })
   .filter(Boolean)
   .filter((x) => MARK_NAMES[x.slug])
-  .map((x) => ({ id: `marks:${x.slug}`, slug: x.slug, category: (x.slug.startsWith('flourish') && x.slug !== 'flourish-navarrow') ? 'trazos' : 'misc', label: MARK_NAMES[x.slug], url: x.url, color: '#0D0C0C', isMark: true }))
+  .map((x) => ({ id: `marks:${x.slug}`, slug: x.slug, category: 'trazos', label: MARK_NAMES[x.slug], url: x.url, color: '#0D0C0C', isMark: true }))
 
 // ---- marca de Magoya como elemento colocable (wordmark + isotipo) ----
 import { WORDMARKS, ISOTIPOS } from './brandKit.js'
@@ -169,5 +179,5 @@ export const SHAPES = [
 
 export const ALL_OBJECTS = [...ICONS, ...MARKS, ...SHAPES, ...MAGOYA_OBJECTS, ...DEVICES, MOCKUP_FOTO]
 export const ICONS_BY_ID = Object.fromEntries(ALL_OBJECTS.map((i) => [i.id, i]))
-export const ICON_CATEGORIES = { agro: 'Agro e IA', ai: 'Logos de IA', social: 'Redes sociales', trazos: 'Trazos', misc: 'Misceláneas', shapes: 'Formas', devices: 'Dispositivos', magoya: 'Logo Magoya' }
+export const ICON_CATEGORIES = { agro: 'Agro e IA', ai: 'Logos de IA', social: 'Redes sociales', trazos: 'Trazos y marcas', shapes: 'Formas', devices: 'Dispositivos', magoya: 'Logo Magoya' }
 export const ICON_URLS = ALL_OBJECTS.map((i) => i.url).filter(Boolean)

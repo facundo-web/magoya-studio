@@ -9,10 +9,40 @@ import { FONT_FAMILY } from '../brand/brandKit.js'
 let _ctx = null
 function ctx() {
   if (!_ctx) {
-    const c = document.createElement('canvas')
-    _ctx = c.getContext('2d')
+    // Fuera del browser (el guard de contraste corre en Node) no hay canvas.
+    // Se mide con una tabla de anchos aproximada de Manrope: alcanza para
+    // decidir cuántas líneas entran, que es lo único que el guard necesita
+    // para llegar a los colores. En el browser sigue midiendo el canvas real.
+    _ctx = typeof document !== 'undefined'
+      ? document.createElement('canvas').getContext('2d')
+      : ctxAproximado()
   }
   return _ctx
+}
+
+// Medidor de emergencia: anchos relativos por clase de carácter (Manrope),
+// con un plus por peso porque las bolds son más anchas.
+function ctxAproximado() {
+  const ANCHO = { angosto: 0.3, digito: 0.6, ancho: 0.86, normal: 0.53 }
+  let px = 16, weight = 400
+  return {
+    set font(v) {
+      const m = /^(\d+)\s+([\d.]+)px/.exec(v) || []
+      weight = Number(m[1]) || 400
+      px = Number(m[2]) || 16
+    },
+    measureText(t) {
+      let w = 0
+      for (const ch of String(t)) {
+        if ('iljtIrf.,;:\'"!|()[]-'.includes(ch)) w += ANCHO.angosto
+        else if (ch >= '0' && ch <= '9') w += ANCHO.digito
+        else if ('mwMWQO@%–—−'.includes(ch)) w += ANCHO.ancho
+        else if (ch === ' ') w += 0.26
+        else w += ANCHO.normal + (ch === ch.toUpperCase() && ch !== ch.toLowerCase() ? 0.09 : 0)
+      }
+      return { width: w * px * (weight >= 700 ? 1.05 : 1) }
+    },
+  }
 }
 
 // `family` existe porque la volanta manuscrita se DIBUJA en Caveat pero se
@@ -50,7 +80,12 @@ function partirPalabra(w, opts, maxWidth) {
 // parte un texto en líneas que entran en maxWidth.
 // Los saltos de línea que escribió la persona se respetan: antes `\n` se
 // trataba como un espacio más y "Nombre\nRol" salía en un solo renglón.
-export function wrapText(text, { px, weight, tracking = 0, maxWidth, family }) {
+// `sinPartir` = esta palabra es una UNIDAD y no se corta nunca. La cifra
+// "−70%" partida en "−7" / "0%" deja de ser un número, y el botón
+// "Agendá 30 minutos" partido a la mitad de una palabra deja de ser un
+// botón. Cuando no entra, el que baja es el tamaño (ver fitText), no la
+// palabra.
+export function wrapText(text, { px, weight, tracking = 0, maxWidth, family, sinPartir = false }) {
   const opts = { px, weight, tracking, family }
   const parrafos = String(text).split(/\r?\n/)
   const lines = []
@@ -59,7 +94,7 @@ export function wrapText(text, { px, weight, tracking = 0, maxWidth, family }) {
     if (!words.length) { lines.push(''); continue }
     let line = null
     for (const w of words) {
-      const trozos = measure(w, opts) > maxWidth ? partirPalabra(w, opts, maxWidth) : [w]
+      const trozos = (!sinPartir && measure(w, opts) > maxWidth) ? partirPalabra(w, opts, maxWidth) : [w]
       for (const t of trozos) {
         if (line === null) { line = t; continue }
         const test = line + ' ' + t
@@ -74,12 +109,16 @@ export function wrapText(text, { px, weight, tracking = 0, maxWidth, family }) {
 
 // auto-encaja un texto en un box: baja el tamaño hasta que entra en
 // maxWidth (con wrap) y maxLines. Devuelve { px, lines }.
-export function fitText(text, { weight, tracking = 0, maxWidth, maxHeight, startPx, lineHeight = 1.15, maxLines = 6, minPx = 8, family }) {
+export function fitText(text, { weight, tracking = 0, maxWidth, maxHeight, startPx, lineHeight = 1.15, maxLines = 6, minPx = 8, family, sinPartir = false }) {
   let px = startPx
   while (px > minPx) {
-    const lines = wrapText(text, { px, weight, tracking, maxWidth, family })
+    const lines = wrapText(text, { px, weight, tracking, maxWidth, family, sinPartir })
     const height = lines.length * px * lineHeight
-    if (lines.length <= maxLines && height <= maxHeight) {
+    // Con `sinPartir` el wrap ya no garantiza el ancho (una palabra sola
+    // puede pasarse), así que el ancho pasa a ser condición de salida: es
+    // lo que hace que la cifra se achique en vez de romperse.
+    const entraAncho = !sinPartir || lines.every((l) => measure(l, { px, weight, tracking, family }) <= maxWidth)
+    if (lines.length <= maxLines && height <= maxHeight && entraAncho) {
       return { px, lines, cortado: false }
     }
     px = Math.floor(px * 0.94)
@@ -87,6 +126,8 @@ export function fitText(text, { weight, tracking = 0, maxWidth, maxHeight, start
   // Ni al mínimo entra: hay que recortar. Antes desaparecían líneas enteras
   // sin ninguna señal — mirabas la pieza y faltaba el final de la frase.
   // Los puntos suspensivos son la única forma de que se vea que se cortó.
+  // Acá sí se parte aunque sea una unidad: entre una cifra rota y una cifra
+  // que se sale de la pieza, la rota al menos se ve entera.
   const todas = wrapText(text, { px, weight, tracking, maxWidth, family })
   if (todas.length <= maxLines) return { px, lines: todas, cortado: false }
   const lines = todas.slice(0, maxLines)

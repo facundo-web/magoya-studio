@@ -129,6 +129,20 @@ export function setProjectExportName(name) {
   _projectName = String(name || '').trim()
 }
 
+// UN SOLO criterio de nombre para las dos salidas. Antes el PNG se bajaba con
+// el título de la slide y el ZIP con el nombre del proyecto: la misma pieza
+// aparecía en Descargas con dos apellidos distintos. Gana el NOMBRE DEL
+// PROYECTO, y no el título, por dos razones: es lo que la persona tipeó y
+// después busca (el título es copy de adentro de la pieza, y cambia cada vez
+// que se edita), y en un carrusel las cinco slides tienen títulos distintos
+// pero son una sola cosa. Si el proyecto todavía no tiene nombre cae al
+// título y después a la plantilla, que es mejor que "pieza".
+// El formato va al final en los dos: la misma pieza se baja en cuadrado y en
+// 9:16, y sin el sufijo el segundo archivo entra como "(1)".
+function nombreBase({ content, template, format, name }) {
+  return slugify(name || _projectName || content?.title || template?.name) + (format?.id ? '-' + format.id : '')
+}
+
 // La misma señal que alimenta uso.js —bajarla es decir que sirvió— es la
 // que le da al copiloto algo para leer. uso.js cuenta en localStorage,
 // para esta pestaña; la bitácora es del equipo. Falla en silencio: la
@@ -150,7 +164,7 @@ export async function exportPiece({ template, content, format, kind = 'png', sca
   // bajarla ES la señal de que la plantilla sirvió (ver project/uso.js)
   registrarUso(template?.id)
   anotarEnBitacora({ template, content, format })
-  const name = slugify((content && content.title) || template.name) + '-' + format.id
+  const name = nombreBase({ content, template, format })
   if (kind === 'svg') {
     const fontFaceCss = await buildFontFaceCss()
     const svg = renderPieceSVG({ template, content, format, fontFaceCss, sizeLock })
@@ -175,8 +189,9 @@ export async function exportCarousel({ slides, format, kind = 'zip', scale = 2, 
   // publica y se mide es el carrusel entero. Se anota por su portada.
   if (slides?.[0]) anotarEnBitacora({ template: slides[0].template, content: slides[0].content, format, carrusel: true })
   const fontFaceCss = await buildFontFaceCss()
-  // nombre explícito → nombre del proyecto abierto → título de la portada
-  const base = slugify(name || _projectName || slides?.[0]?.content?.title || 'carrusel')
+  // mismo criterio que la pieza suelta: proyecto → título de la portada →
+  // plantilla de la portada (ver nombreBase)
+  const base = nombreBase({ content: slides?.[0]?.content, template: slides?.[0]?.template, format, name })
   if (kind === 'pdf') {
     const { jsPDF } = await import('jspdf')
     const orientation = format.w >= format.h ? 'landscape' : 'portrait'

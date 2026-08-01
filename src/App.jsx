@@ -18,6 +18,12 @@ import { CAPACIDADES } from './lib/capabilities.js'
 import * as memoria from './lib/memoria.js'
 import { createShare, loadShare, listComments, addComment, countComments, setVerdict, getVerdicts } from './lib/supabase.js'
 import { TEMPLATES, BLANK_TEMPLATE, placeholderContent, applyDesign, rolesDePieza } from './templates/index.js'
+// El wordmark REAL, el mismo archivo que exporta el Kit de marca. Antes acá
+// decía "Magoya" en Manrope 800 con la palabra en verde: una imitación
+// tipográfica del logo. Facu: "el logo de Magoya tiene que ser el real".
+// En una herramienta de marca, escribir la marca a mano en vez de usar el
+// activo es justo lo que la herramienta existe para impedir.
+import { WORDMARKS } from './brand/brandKit.js'
 import { buildCarousel } from './templates/carousels.js'
 import { tamanoComun } from './engine/layouts.js'
 import { FORMATS_BY_ID, CAROUSEL_FORMATS, isKnownFormat, formatLabel } from './formats/registry.js'
@@ -1045,7 +1051,10 @@ export default function App() {
     return (
       <div className="app app--fixed">
         <div className="topbar">
-          <button className="brand" onClick={exitPreview}>Magoya <b>Studio</b></button>
+          <button className="brand" onClick={exitPreview}>
+            <img src={WORDMARKS.cream.url} alt="Magoya" className="brand-mark" />
+            <span className="brand-sub">Studio</span>
+          </button>
           <span className="save-status">Pieza para revisar</span>
           <div className="spacer" />
           <label className="dk-toggle" style={{ color: 'var(--cream-300)' }}>
@@ -1120,7 +1129,10 @@ export default function App() {
   return (
     <div className={'app ' + (view === 'editor' ? 'app--fixed' : 'app--scroll')}>
       <div className="topbar">
-        <button className="brand" onClick={() => navigate('gallery')} title="Ir al inicio">Magoya <b>Studio</b></button>
+        <button className="brand" onClick={() => navigate('gallery')} title="Ir al inicio">
+          <img src={WORDMARKS.cream.url} alt="Magoya" className="brand-mark" />
+          <span className="brand-sub">Studio</span>
+        </button>
         {view !== 'editor' && (
           <nav className="topnav">
             <button className={view === 'gallery' ? 'on' : ''} onClick={() => navigate('gallery')}>Crear pieza</button>

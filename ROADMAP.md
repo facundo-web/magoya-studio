@@ -432,38 +432,152 @@ Estilo movía 48. La palanca llamada "Estilo" era la más débil de todas.
 
 Resultado: 235 → 178 opciones, idénticas 14,9% → 2,2%, bajo 1% 46,8% → 13,5%.
 
-### Pendiente — la dirección de arte
+### ✅ Los seis estilos con silueta propia (U3) — hecho y medido
 
 El diagnóstico: los cinco ejes son **sub-layout**. Mueven el bloque de texto
-dentro de un marco que nunca cambia. Lo que el ojo usa para decir "esto es otra
-cosa" —dónde están las masas claras y oscuras, cuánta pieza es tinta y cuánta
-imagen— es exactamente lo que ninguna variante toca.
+dentro de un marco que nunca cambia. Lo que el ojo usa para decir "esto es
+otra cosa" —dónde están las masas claras y oscuras, cuánta pieza es tinta y
+cuánta imagen— es exactamente lo que ninguna variante tocaba.
 
-**La regla que ordena la solución:** el esquema decide *qué* colores hay; el
-estilo decide *cuánto* de cada uno y *dónde*. Un estilo nunca introduce un color
-que el esquema no tenga. Probado: cambiar el esquema por slide rompe el
-carrusel en cinco marcas distintas y hace desaparecer el wordmark.
+**La regla que ordenó la solución:** el esquema decide *qué* colores hay; el
+estilo decide *cuánto* de cada uno y *dónde*. Ninguna silueta usa un color
+que el esquema no tenga.
 
-**Set propuesto, seis estilos con silueta distinta:** A sangre · Media pieza ·
-Bloque de color · Titular gigante · Tarjeta · Recuadro. Medidos contra el
-primero a 128 px: 25,6% / 47,4% / 48,6% / 59,2%, contra el 0,2–16% de hoy.
-Criterio de aceptación para cualquier estilo nuevo: **si a 128 px no cambia al
-menos el 25% de los píxeles, no entra al panel.**
+**La vara, primero.** `scripts/siluetas.mjs` rasteriza la pieza a 128 px con
+el motor real y cuenta píxeles contra el Original. **Si un estilo no cambia
+el 25%, no entra al panel.** El script mide el catálogo entero y sale con
+código 1 si alguna combinación ofrecida no llega: la próxima persona que
+agregue un estilo corre la misma vara.
 
-**Lo que hay que arreglar antes**, todo verificado renderizando:
-1. `textColor` está cableado a dos casos (sobre foto / sobre superficie). Con
-   una placa de acento o una tarjeta invertida, miente. La función que elige
-   bien ya existe: `mejorTinta`, adentro de `chatPalette`.
-2. `mutedColor` sale del esquema, no del fondo real: 2,3:1 en la tarjeta crema.
-3. `acentoLegible()` mide contra `scheme.surface`, no contra el fondo real.
-4. El color elegido a mano desaparece sobre una placa clara.
-5. `metric` y `cta` se parten por caracteres cuando la columna se angosta
-   (`−70%` → `−7` / `0%`).
-6. El stack se sale por arriba con `density: roomy` — **ya pasa hoy**.
-7. Un estilo de foto sobre una pieza sin foto promete algo que no puede dar.
-8. Los objetos con `tint: accent` desaparecen sobre el bloque de acento.
-9. Guard de cierre: recorrer 30 plantillas × 6 estilos × 8 esquemas y fallar si
-   algún par baja de 4,5:1 (texto chico) o 3:1 (display).
+Lo primero que midió fue el panel viejo, y lo confirmó: **141 de 178
+combinaciones por debajo del 25%.** Medianas: Centrado 9,9% · Con aire 6,8%
+· Titular grande 8,6% · Etiqueta con línea 0,2%.
+
+| Estilo | mediana | peor | mejor | plantillas |
+|---|---|---|---|---|
+| A sangre | 99,9% | 71,1% | 100% | 26 |
+| Media pieza | 57,9% | 32,3% | 64,8% | 22 |
+| Bloque de color | 49,4% | 29,8% | 62,2% | 25 |
+| Recuadro | 40,8% | 30,2% | 76,5% | 23 |
+| Tarjeta | 38,4% | 30,6% | 86,2% | 23 |
+| Titular gigante | 31,7% | 25,2% | 99,8% | 16 |
+
+**135 combinaciones ofrecidas, las 135 arriba del 25%, en los 13 formatos.**
+El guard de contraste sigue en cero (18.056 piezas, 66.440 pares) y ninguna
+línea se sale del lienzo.
+
+**El panel dejó de ser una lista de ajustes y pasó a ser siete siluetas.**
+Salieron Arriba / Abajo / Centrado (el ancla se elige ahora en el panel
+Texto, que es donde uno la busca), Con aire, Titular grande y Etiqueta con
+línea. Texto en tarjeta y Texto en barra los absorben Tarjeta y Bloque de
+color. Ninguno se borró del motor: siguen siendo ejes y las plantillas los
+usan como default.
+
+**Dónde no se ofrece cada uno, con el motivo medido** (`NO_VA` / `NO_VA_EN`
+en `templates/variants.js`): Media pieza no va en una plantilla que ya es
+media pieza (Foto al costado) ni con zócalo (24,2%); Titular gigante no va
+donde el héroe es una cifra —`metric` ya sale a sizeRel 0,2 y ocupa el
+ancho, así que la pieza YA es un titular gigante (17-20%)—; Tarjeta y
+Recuadro no van donde la plantilla clavó un texto al 6% del borde, porque el
+marco ocupa el 8,5%. **Y con eso se cerró la deuda que dejó U2:** el estilo
+que plantaba el texto sobre el gráfico de `impacto-pantalla` y sobre los
+retratos de `speakers` era *Centrado*, que ya no existe; las siluetas que
+colisionaban se resolvieron por el otro camino que estaba planteado —no se
+ofrecen para esa plantilla—. `CONOCIDAS` quedó vacía.
+
+**Seis cosas del motor que las siluetas destaparon y hubo que arreglar:**
+
+1. El 12% de aire del ancla de arriba **nunca se descontaba** del alto
+   disponible: el stack se ajustaba contra la caja entera y después se lo
+   empujaba 12% para abajo. No saltaba porque ninguna composición llegaba a
+   llenar la caja; con un titular que crece hasta llenarla se salían 40
+   líneas de una.
+2. El auto-ajuste sólo sabía **achicar**. Un titular gigante hecho con un
+   multiplicador fijo dependía del largo del copy: la cita corta cambiaba el
+   19% de la pieza y el titular largo el 91%. Ahora el bloque de más
+   jerarquía **crece hasta llenar la caja**, y se frena en la palabra más
+   larga (si no, "Desayuno" salía "Desayu / no").
+3. El color de un bloque suelto se decidía por su **esquina** y no por su
+   centro: con dos campos en el lienzo, un nombre que arranca al 7% quedaba
+   pintado con la tinta del marco que empieza al 8,5%.
+4. El **wordmark** se elegía por el esquema y la silueta le cambia el campo
+   de abajo: negro sobre el borde de tinta era invisible. Ahora lo decide el
+   contraste con lo que quedó abajo, y Bloque de color y Media pieza le dan
+   una caja propia (estaba aterrizando encima del texto).
+5. El **aviso de contraste de la UI** (`copyCheck.js`) medía contra la
+   superficie del esquema: con un bloque de acento abajo avisaba de una
+   pieza que no existe. Le pregunta al motor (`siluetaInfo`).
+6. El **tamaño común del carrusel** (`medirPieza`) no sabía de siluetas: una
+   slide con Titular gigante quedaba clavada al tamaño de una pieza que no
+   era la suya. Ahora mide con la misma caja y los mismos pesos — y el
+   titular que crece se pisa el lock a propósito: el lock existe para que
+   una cita no salte de 30 a 58 px por casualidad, no para impedir que una
+   slide sea a propósito un titular gigante.
+
+Una séptima, chiquita y del mismo tipo: el titular que crece hasta el borde
+le quedaba encima al wordmark, así que ahora le reserva su altura.
+
+Se miraron las piezas renderizadas en el navegador, no sólo los números:
+las seis siluetas sobre las 26 plantillas, más el editor real (panel Estilo,
+carrusel con el tamaño común, y el control de posición del bloque que se
+mudó al panel Texto).
+
+**Lo que la vara no puede medir, dicho de frente.** No hay rasterizador de
+SVG en el proyecto y no se agregaron dependencias: el script pinta con las
+mismas primitivas que emite el motor. Las fotos son un gris plano, el texto
+se pinta como una caja por carácter y el motivo y el wordmark no se pintan.
+Todas las diferencias van para el mismo lado —quedarse corto—, así que un
+estilo que pasa, pasa. Lo que el número no ve lo vio el ojo: cuatro de los
+siete arreglos de arriba salieron de mirar las piezas renderizadas, no la
+tabla (el wordmark encima de la cita, el motivo cruzado por el titular, el
+titular partido al medio, el stack encima de los dos nombres).
+
+Y una limitación de la vara que conviene tener a mano: mide con el copy que
+trae la plantilla. Tres plantillas traen un titular de dos palabras a
+propósito, y ahí "Titular gigante" no tiene con qué llenar la pieza (23-24%);
+el script las vuelve a medir con un titular del largo que recomienda
+MAXCHARS —31-35%— y lo dice en la corrida. Medir el ejemplo no es medir la
+herramienta.
+
+### ✅ Los nueve arreglos previos (U2) — hechos y medidos
+
+El guard (punto 9) se construyó **primero** y sirvió de red para los otros
+ocho: `scripts/contraste.mjs` dibuja cada plantilla × estilo × esquema con el
+motor real contra un builder espía que anota qué quedó abajo de qué texto.
+
+**28 plantillas × sus estilos × 8 esquemas = 1776 piezas, 6640 pares de
+texto/fondo: 389 por debajo del mínimo → 0.** Barriendo los 13 formatos
+(23.088 piezas, 78.648 pares) también da 0.
+
+1. ✅ `mejorTinta` salió de `chatPalette` y decide toda la app; `contrastOn`
+   (umbral de luminancia, se equivocaba en los tonos del medio) ya no existe.
+2. ✅ `mutedColor` se separa del fondo real hasta el mínimo.
+3. ✅ `acentoLegible()` recibe el fondo contra el que se va a ver.
+4. ✅ El color elegido a mano se conserva y se empuja hasta que se lee.
+5. ✅ `metric` y `cta` son unidades: no se parten, se achican (`−70%` a
+   escala 1,4 salía `−70`/`%`; ahora baja de 302 a 206 px y entra entero).
+6. ✅ El stack se mide entero: primero se recorta el aire, después el tamaño.
+   Reproducido con `metodo` + tamaño a mano: y=−376 con `roomy` (−115 con
+   `normal`, o sea que `roomy` triplicaba el desborde) → adentro del margen.
+7. ✅ `scrim` sin foto degrada a `none` en vez de dibujar nada en silencio.
+8. ✅ Un objeto que no se distingue del fondo se separa. Umbral 1,2 y no 3:1
+   a propósito: una burbuja blanca sobre crema (1,27:1) se lee y forzarla la
+   volvía gris.
+9. ✅ `node scripts/contraste.mjs` (ver README). Sale con código 1 si hay
+   fallas; la deuda declarada vive en `CONOCIDAS`, arriba del script.
+
+**Lo que queda, dicho de frente:** 9 pares (82 en los 13 formatos) donde el
+estilo *Centrado* deja el texto encima de un objeto de la plantilla —el
+gráfico de `impacto-pantalla`, los dos retratos de `speakers`—. No es
+contraste, es colisión: el color no lo puede arreglar. La decisión es de
+diseño y es de este bloque: o la variante corre el objeto, o esa variante no
+se ofrece para esa plantilla.
+
+También, de paso: el aviso de contraste de la UI (`lib/copyCheck.js`) tenía
+su propia copia de las reglas y quedaba viejo el mismo día. Ahora importa las
+del motor. Como el motor ya no genera pares ilegibles, el aviso **no salta
+nunca**: hay que decidir si se convierte en "te corregí el color" (que es lo
+que de verdad pasa ahora) o se retira.
 
 Las imágenes de la propuesta están renderizadas con el motor real.
 

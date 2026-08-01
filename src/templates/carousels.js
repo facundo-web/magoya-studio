@@ -17,6 +17,7 @@
 // ============================================================
 
 import { TEMPLATES_BY_ID, placeholderContent } from './index.js'
+import { PHOTOS } from '../brand/photoLibrary.js'
 
 export const CAROUSELS = [
   {
@@ -26,8 +27,11 @@ export const CAROUSELS = [
     // el interno se repite: es el que multiplicás con "Duplicar"
     slides: ['carrusel-portada', 'tech-titular', 'tech-titular', 'tech-titular', 'carrusel-cierre'],
     design: { accent: 'lime', scheme: 'ink' },
+    // la portada es la única slide con foto: sin esto arranca en el esqueleto
+    // gris mientras las otras cuatro ya tienen color (ver buildCarousel)
+    foto: 'agronomo-libreta',
     copy: [
-      { kicker: 'guía rápida', title: '3 formas de usar IA en el campo' },
+      { kicker: 'GUÍA RÁPIDA', title: '3 formas de usar IA en el campo' },
       { kicker: 'PASO 01', title: 'Empezá por los datos que ya tenés', subtitle: 'Suelo, rinde, aplicaciones. No hace falta sensor nuevo.' },
       { kicker: 'PASO 02', title: 'Poné el modelo donde ya se trabaja', subtitle: 'Si hay que abrir otra app, no se usa.' },
       { kicker: 'PASO 03', title: 'Medí contra la decisión, no contra el modelo', subtitle: 'La métrica es si el agrónomo cambió lo que iba a hacer.' },
@@ -44,8 +48,9 @@ export const CAROUSELS = [
     purpose: 'Contexto, resultado y la voz del cliente. Para probar que funciona.',
     slides: ['carrusel-portada', 'caso-cliente', 'dato', 'cita', 'carrusel-cierre'],
     design: { accent: 'emerald', scheme: 'deep' },
+    foto: 'productor-tablet',
     copy: [
-      { kicker: 'caso', title: 'Cómo bajamos 70% el scouting en 4 meses' },
+      { kicker: 'CASO', title: 'Cómo bajamos 70% el scouting en 4 meses' },
       { kicker: 'EL CONTEXTO', metric: '400', metricLabel: 'lotes en seis planillas distintas', subtitle: 'Los datos ya estaban. Nadie podía leerlos juntos.' },
       { kicker: 'EL RESULTADO', metric: '−70%', metricLabel: 'recorridas a campo, en 4 meses' },
       { quote: 'Se integraron en dos semanas y desde ahí no los tratamos como proveedor.', author: 'VP Product · Apeel Sciences' },
@@ -83,6 +88,19 @@ export const CAROUSELS = [
 
 // Arma las piezas de un carrusel: plantilla + copy calibrado + el mismo
 // diseño en todas (que combinen es el punto).
+//
+// Y con la foto puesta. `placeholderContent` borra la foto a propósito —una
+// pieza suelta la elige la persona—, pero acá eso hacía que el carrusel
+// armado abriera desparejo: la portada en el esqueleto gris de "acá va una
+// foto" y las otras cuatro ya con color. La primera impresión de lo que
+// vendemos como "ya encarado" era un placeholder roto. Es la misma idea de
+// `demoContent` en la galería, sólo que acá la foto la elige el preset: en
+// una guía va alguien trabajando, en un caso va el cliente con la tablet.
+function fotoDelPreset(preset) {
+  const p = PHOTOS.find((x) => x.slug === preset.foto) || PHOTOS[0]
+  return p ? { src: p.url, natural: null, focal: { x: 0.5, y: 0.5 } } : null
+}
+
 export function buildCarousel(preset) {
   return preset.slides.map((id, i) => {
     const t = TEMPLATES_BY_ID[id]
@@ -92,6 +110,15 @@ export function buildCarousel(preset) {
     const copy = preset.copy?.[i] || {}
     const content = { ...placeholderContent(t), ...(preset.design || {}), ...copy }
     if (copy.textBlocks) content.textBlocks = copy.textBlocks.map((b) => ({ ...b }))
+    if (t.surface === 'photo') {
+      // La del preset GANA sobre la de muestra: placeholderContent ahora
+      // trae una foto del banco por hash, pero la del preset la eligió
+      // una persona para esta secuencia. Antes la guarda era
+      // `!content.photo?.src` y con la muestra puesta el preset no
+      // llegaba a aplicar la suya nunca.
+      const foto = fotoDelPreset(preset)
+      if (foto) content.photo = foto
+    }
     return { template: t, content }
   }).filter(Boolean)
 }

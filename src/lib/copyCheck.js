@@ -73,14 +73,16 @@ function ratio(a, b) {
   const l1 = lum(a), l2 = lum(b)
   return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05)
 }
-function contrastOn(hex) {
-  const h = String(hex || '#000').replace('#', '')
-  const r = parseInt(h.slice(0, 2), 16) / 255, g = parseInt(h.slice(2, 4), 16) / 255, b = parseInt(h.slice(4, 6), 16) / 255
-  return (0.2126 * r + 0.7152 * g + 0.0722 * b) > 0.55 ? '#0D0C0C' : '#F6F1EB'
-}
-function acentoLegible(clave, scheme) {
+// El aviso ya no tiene copia propia de las reglas de color: las importa del
+// motor. Tenía una, y cuando el motor aprendió a elegir la tinta contra el
+// fondo REAL (BLOQUE S) esta copia quedó vieja al instante: avisaba "casi no
+// se lee" de un texto que el motor ya había arreglado. Un aviso que se
+// equivoca es peor que ninguno — enseña a ignorar los avisos.
+import { mejorTinta, tintaSobre, suaveSobre, visibleSobre, colorDePlaca, siluetaInfo } from '../engine/layouts.js'
+
+function acentoLegible(clave, scheme, fondo = scheme.surface) {
   const pedido = (ACCENTS[clave] || { value: scheme.accent }).value
-  return ratio(pedido, scheme.surface) >= 1.6 ? pedido : scheme.accent
+  return ratio(pedido, fondo) >= 1.6 ? pedido : scheme.accent
 }
 
 // Umbrales WCAG AA, sin inventar nada: 4.5:1 para texto normal, 3:1 para
@@ -99,34 +101,42 @@ const NOMBRE = {
   author: 'El autor', cta: 'El botón', step: 'El paso',
 }
 
-// El fondo real que queda DETRÁS de este texto, o null si no se puede saber
-// (una foto no tiene un color: ahí preferimos callarnos antes que inventar
-// un aviso que la persona no puede verificar mirando la pieza).
-function fondoDetras({ role, scheme, accent, onPhoto, opaquePlate, highlight }) {
-  if (highlight) return highlight            // el marcador tapa todo lo de atrás
-  if (role === 'cta') return accent          // el CTA se dibuja como pastilla de acento
-  if (opaquePlate) return scheme.surface     // banda o tarjeta: el texto vive sobre la placa
-  if (onPhoto) return null                   // foto: no hay un color con el que medir
-  return scheme.surface
+// El fondo que queda detrás del texto. `null` = una foto, y ahí nos
+// callamos: no hay un color con el que medir y un aviso que la persona no
+// puede verificar mirando la pieza es ruido.
+// La pastilla del CTA y el marcador se separan del fondo con la MISMA tinta
+// de referencia que usa el motor —`tintaSobre(base, scheme, min)`, no
+// `mejorTinta(base)`—: con `mejorTinta` la separación tiraba para otro lado
+// y el aviso medía contra un color que la pieza no tiene (8 combinaciones de
+// esquema × acento sobre placa).
+function fondoDetras({ role, scheme, accent, onPhoto, opaquePlate, highlight, campo, min }) {
+  const base = opaquePlate ? colorDePlaca(scheme, onPhoto) : campo
+  const tintaBase = tintaSobre(base, scheme, min)
+  if (highlight) return visibleSobre(highlight, base, tintaBase, 3)
+  if (role === 'cta') return visibleSobre(accent, base, tintaBase, 3)
+  return base
 }
 
-// El color con el que se va a pintar el texto. Es la MISMA cadena de
-// decisiones que pintarBloque() en layouts.js — si allá cambia, acá también.
-function colorDelTexto({ role, colorElegido, scheme, accent, onPhoto, opaquePlate, highlight }) {
-  const textColor = onPhoto && !opaquePlate ? '#FFFFFF' : scheme.onSurface
-  const mutedColor = onPhoto && !opaquePlate ? '#FFFFFF' : scheme.muted
+// El color con el que el motor va a pintar el texto. Mismas funciones que
+// usa pintarBloque(): no una copia, las mismas.
+function colorDelTexto({ role, colorElegido, scheme, accent, fondo, min, highlight }) {
+  const tinta = tintaSobre(fondo, scheme, min)
+  const suave = suaveSobre(fondo, scheme, tinta, min)
+  const acento = visibleSobre(accent, fondo, tinta, min)
   if (colorElegido && colorElegido !== 'auto') {
-    if (colorElegido === 'accent') return accent
-    if (colorElegido === 'strong') return textColor
-    if (colorElegido === 'muted') return mutedColor
-    const v = (TEXT_COLORS[colorElegido] || {}).value
-    if (v) return v
+    const crudo = colorElegido === 'accent' ? acento
+      : colorElegido === 'strong' ? tinta
+      : colorElegido === 'muted' ? suave
+      : (TEXT_COLORS[colorElegido] || {}).value
+    if (crudo) return visibleSobre(crudo, fondo, tinta, min)
   }
-  if (role === 'cta') return contrastOn(accent)
-  if (highlight) return contrastOn(highlight)
-  if (role === 'kicker' || role === 'metric') return accent
-  if (role === 'author' || role === 'subtitle' || role === 'metricLabel') return mutedColor
-  return textColor
+  // el motor pinta el CTA y el resaltado igual: `mejorTinta(fondoLetra)`.
+  // La rama del resaltado se había perdido al reescribir esto y el aviso
+  // evaluaba la tinta de marca sobre un marcador donde el motor pone negro.
+  if (role === 'cta' || highlight) return mejorTinta(fondo)
+  if (role === 'kicker' || role === 'metric') return acento
+  if (role === 'author' || role === 'subtitle' || role === 'metricLabel') return suave
+  return tinta
 }
 
 // Un aviso, o ninguno. `block` es el bloque suelto (tiene color y resaltado
@@ -137,7 +147,6 @@ export function checkContrast({ role, template, content = {}, block = null }) {
   const d = template.defaults || {}
   const scheme = COLOR_SCHEMES[content.scheme || d.scheme || DEFAULT_SCHEME]
   if (!scheme) return []
-  const accent = acentoLegible(content.accent || d.accent, scheme)
 
   // superficie efectiva, igual que resolvePiece()
   const bg = content.bg || d.bg || null
@@ -150,17 +159,34 @@ export function checkContrast({ role, template, content = {}, block = null }) {
     : (template.zocalo ? 'band' : (onPhoto ? 'scrim' : 'none'))
   const opaquePlate = plate === 'band' || plate === 'card'
 
+  // el acento se mide contra el fondo REAL (la placa, si hay), igual que en
+  // el motor: contra la superficie decía que un verde sobre la tarjeta clara
+  // estaba bien cuando daba 1,8:1
+  // BLOQUE S · con una silueta puesta, el campo que hay detrás del texto no
+  // es la superficie del esquema: es el bloque de acento, la tinta inundada
+  // o el papel de la tarjeta. Se lo pregunta al motor, no se lo adivina.
+  const acentoPieza = acentoLegible(content.accent || d.accent, scheme)
+  const sil = siluetaInfo(content.silueta ?? d.silueta, { scheme, accent: acentoPieza, onPhoto })
+  const campo = sil ? sil.fondo : (onPhoto ? null : scheme.surface)
+  const fondoPlaca = opaquePlate ? colorDePlaca(scheme, onPhoto) : campo
+  const accent = acentoLegible(content.accent || d.accent, scheme, fondoPlaca || scheme.surface)
+
+  // ¿texto grande? El estilo manda, y el tamaño elegido a mano lo corre.
+  // Se calcula ANTES del fondo porque la pastilla del CTA también se separa
+  // usando este mínimo, igual que en el motor. No depende del fondo, así que
+  // no hay circularidad: depende del estilo del rol y del peso de la silueta.
+  const st = TEXT_STYLES[role] || TEXT_STYLES.body
+  // el peso de la silueta cuenta: con "Titular gigante" un titular sale al
+  // doble y ahí ya es display (3:1 y no 4,5:1), igual que en el motor
+  const rel = (st.sizeRel || 0.03) * (block?.size || content.sizes?.[role] || 1) * (sil?.pesos?.[role] || 1)
+  const min = rel >= REL_GRANDE ? AA_GRANDE : AA_NORMAL
+
   const highlight = (HIGHLIGHTS[block?.highlight] || {}).value || null
-  const fondo = fondoDetras({ role, scheme, accent, onPhoto, opaquePlate, highlight })
+  const fondo = fondoDetras({ role, scheme, accent, onPhoto, opaquePlate, highlight, campo, min })
   if (!fondo) return []   // sobre foto no medimos: no hay con qué
 
   const colorElegido = block ? block.color : null
-  const texto = colorDelTexto({ role, colorElegido, scheme, accent, onPhoto, opaquePlate, highlight })
-
-  // ¿texto grande? El estilo manda, y el tamaño elegido a mano lo corre.
-  const st = TEXT_STYLES[role] || TEXT_STYLES.body
-  const rel = (st.sizeRel || 0.03) * (block?.size || content.sizes?.[role] || 1)
-  const min = rel >= REL_GRANDE ? AA_GRANDE : AA_NORMAL
+  const texto = colorDelTexto({ role, colorElegido, scheme, accent, fondo, min, highlight })
   if (ratio(texto, fondo) >= min) return []
 
   const quien = NOMBRE[role] || 'Este texto'
