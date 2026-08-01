@@ -733,3 +733,28 @@ marketing y diseño y sobre todo de redes"*. El copiloto puede:
    hoy: el peor caso es el producto de ayer, nunca una pantalla muerta.
 4. Cuando no hay datos de impacto, lo dice. Nunca estima un número.
 5. Las acciones que ejecuta se ven mientras pasan.
+
+---
+
+## R3 — cerrado por absorción (ago 2026)
+
+R3 ("la arquitectura de la decisión") nació de Aye — *"me cuesta sentir que
+tengo que tomar todas las decisiones"* — y de Lucho — *"hay que ir
+reduciéndole el lugar a la duda"*. Se escribió antes del copiloto, y el
+copiloto es la respuesta a la mayor parte: le contás qué querés y te abre la
+pieza encarada.
+
+Lo que quedaba vivo y se hizo: **las plantillas con foto abren con su foto
+de muestra** (la misma que muestra la miniatura — eran dos caminos distintos
+y el que abría te daba el esqueleto gris: una decisión pendiente dibujada en
+el lienzo).
+
+**Los "niveles de usuario" (básico/intermedio/pro) se cierran sin hacer.**
+El copiloto ya es el nivel: continuo, sin declarar nada antes de empezar. Un
+selector de modos sería una decisión más para gente que nos dijo que le
+sobran decisiones.
+
+Pendiente heredado, chico y concreto: capacidad `poner_foto({slug})` para
+que el copiloto pueda elegir foto del banco (hoy la nombra pero no la puede
+poner), y revisar que ningún chip de arranque ofrezca carrusel en formato
+que no lo admite.
