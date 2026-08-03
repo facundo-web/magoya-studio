@@ -19,7 +19,7 @@
       {
         "kind": "shape",
         "shape": "callout",
-        "tint": "#FFFFFF",
+        "tint": "white",
         "x": 0.52,
         "y": 0.4,
         "scale": 0.72,

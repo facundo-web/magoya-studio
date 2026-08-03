@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import PiecePreview from './PiecePreview.jsx'
 import { TEMPLATES, MAXCHARS } from '../templates/index.js'
 import { variantsFor, activeVariantId } from '../templates/variants.js'
-import { tamanoComun, resolvePiece, siluetaInfo, colorDePlaca, colorEfectivo, tinteEfectivo, paletaChat } from '../engine/layouts.js'
+import { tamanoComun, resolvePiece, siluetaInfo, colorDePlaca, colorEfectivo, tinteEfectivo, esColorFiel, paletaChat } from '../engine/layouts.js'
 import { checkCopy, checkPiece, checkContrast } from '../lib/copyCheck.js'
 import MockupPreview, { MOCKUPS, mockupsPara } from './MockupPreview.jsx'
 import Icon from '../ui/Icon.jsx'
@@ -91,6 +91,11 @@ const ROLE_LABELS = {
 
 // grilla de posiciones (para ubicar objetos rápido)
 const SHAPE_NAMES = { arrow: 'Flecha gruesa', handArrow: 'Flecha a mano', sparkle: 'Destello', badge: 'Etiqueta', bars: 'Barras', sparkline: 'Curva', callout: 'Bocadillo', window: 'Captura de pantalla' }
+
+// cómo alinea cada forma su copy cuando nadie eligió (espejo del motor:
+// mismo contrato `o.textAlign`) — el chip default tiene que mostrarse
+// prendido aunque el campo no exista todavía
+const ALIGN_DEFECTO = { badge: 'center', callout: 'left', window: 'left' }
 
 // ---- búsqueda de elementos en el picker ----
 // La gente busca con SUS palabras, no con el nombre del catálogo: en la
@@ -603,8 +608,8 @@ export default function Editor({
       // centro, y llamaba a closePicker(), que no existe en este scope.
       setObjects([...objects, { kind: 'shape', shape: icon.shape, tint: 'accent', ...pos, scale: 0.34, rotation: 0, shadow: false, opacity: 1,
         ...(icon.shape === 'badge' ? { text: 'NUEVO' } : {}),
-        ...(icon.shape === 'callout' ? { text: '¿Y si el dato ya lo tenías?', tint: '#FFFFFF', shadow: true } : {}),
-        ...(icon.shape === 'window' ? { scale: 0.62, ratio: 0.62, shadow: true, text: 'panel.magoya.com', tint: '#FFFFFF', front: true } : {}),
+        ...(icon.shape === 'callout' ? { text: '¿Y si el dato ya lo tenías?', tint: 'white', shadow: true } : {}),
+        ...(icon.shape === 'window' ? { scale: 0.62, ratio: 0.62, shadow: true, text: 'panel.magoya.com', tint: 'white', front: true } : {}),
         ...(icon.shape === 'panel' ? { scale: 0.34, ratio: 0.7, radius: 0.06 } : {}) }])
       setSelObj(objects.length); return
     }
@@ -1934,8 +1939,8 @@ function ObjectsBody({ objects, setObjects, selObj, setSelObj, multiSel, toggleM
       // tiraba ReferenceError y NINGUNA forma se podía agregar tocándola.
       setObjects([...objects, enCascada(objects, { kind: 'shape', shape: icon.shape, tint: 'accent', x: 0.5, y: 0.42, scale: 0.34, rotation: 0, shadow: false, opacity: 1,
         ...(icon.shape === 'badge' ? { text: 'NUEVO' } : {}),
-        ...(icon.shape === 'callout' ? { text: '¿Y si el dato ya lo tenías?', tint: '#FFFFFF', shadow: true } : {}),
-        ...(icon.shape === 'window' ? { scale: 0.62, ratio: 0.62, shadow: true, text: 'panel.magoya.com', tint: '#FFFFFF', front: true } : {}),
+        ...(icon.shape === 'callout' ? { text: '¿Y si el dato ya lo tenías?', tint: 'white', shadow: true } : {}),
+        ...(icon.shape === 'window' ? { scale: 0.62, ratio: 0.62, shadow: true, text: 'panel.magoya.com', tint: 'white', front: true } : {}),
         ...(icon.shape === 'panel' ? { scale: 0.34, ratio: 0.7, radius: 0.06 } : {}) })])
       setSelObj(objects.length); closePicker(); return
     }
@@ -2272,6 +2277,95 @@ function MultiSelProps({ count, kind = 'elementos', onCopy, onDuplicate, onRemov
   )
 }
 
+// ============================================================
+// COLOR EXACTO — el picker nativo y la pipeta (EyeDropper)
+//
+// Los swatches con nombre son colores que la app CUIDA: si no se ven, los
+// empuja. Un hex elegido acá es la otra promesa: FIEL, se pinta tal cual
+// ("si lo eligió la persona, es su decisión"). El criterio de qué cuenta
+// como hex-de-la-persona vive en el motor (esColorFiel), así el editor y el
+// render no se desincronizan a la primera regla nueva.
+// ============================================================
+
+// negro o blanco para que el hex se lea sobre su propio swatch — es
+// cosmética del botón, no una decisión de render (eso es del motor)
+const tintaDelSwatch = (hex) => {
+  const n = parseInt(String(hex).slice(1), 16)
+  return (0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) > 150 ? '#0D0C0C' : '#FFFFFF'
+}
+
+function ColorExacto({ value, conocidos = [], onPick }) {
+  const inputRef = useRef(null)
+  // "custom activo" = un hex que no es ninguno de los swatches de al lado:
+  // si el picker devuelve justo el negro de la marca, se prende ese swatch
+  const custom = typeof value === 'string' && esColorFiel(value)
+    && !conocidos.some((c) => String(c).toLowerCase() === value.toLowerCase())
+  const abrirPipeta = async () => {
+    try {
+      const r = await new window.EyeDropper().open()
+      if (r?.sRGBHex) onPick(r.sRGBHex.toUpperCase())
+    } catch { /* cerrar la pipeta sin elegir no es un error */ }
+  }
+  return (
+    <>
+      <button className={'sw sw-custom' + (custom ? ' on' : '')}
+        title="Elegí cualquier color con el selector"
+        style={custom ? { background: value, color: tintaDelSwatch(value) } : undefined}
+        onClick={() => inputRef.current?.click()}>
+        {custom ? value.toUpperCase() : 'Color exacto'}
+      </button>
+      {/* la pipeta sólo se ofrece donde el navegador la tiene (Chrome/Edge):
+          un botón muerto enseña a desconfiar de todos los demás */}
+      {typeof window !== 'undefined' && !!window.EyeDropper && (
+        <button className="sw sw-pipeta" title="Pipeta: tomá el color de cualquier punto de la pantalla" onClick={abrirPipeta}>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"
+            strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M4 20l.7-3.2 8.2-8.2 2.5 2.5-8.2 8.2L4 20zM12 7.6L16.4 12M14.6 5l1.4-1.4a2.05 2.05 0 012.9 2.9L17.5 7.9" />
+          </svg>
+        </button>
+      )}
+      {/* el input vive escondido: el botón "Color exacto" es su cara visible */}
+      <input ref={inputRef} type="color" value={custom ? value : '#00DE68'} style={{ display: 'none' }}
+        onChange={(e) => onPick(e.target.value.toUpperCase())} />
+    </>
+  )
+}
+
+// El aviso honesto del color de un objeto, para los DOS swatches (íconos y
+// formas — en formas faltaba, y era exactamente donde Facu eligió Negro hoy
+// y "no se lo tomó"). Dos verdades posibles según quién eligió el color:
+//  · con nombre: el motor lo empuja si no se ve → "se está viendo así"
+//  · hex fiel: el motor NO lo toca (regla nueva) → si no se distinguiría,
+//    se avisa y la decisión queda en manos de la persona.
+// El "¿se distinguiría?" se mide con tinteEfectivo, que aplica el MISMO
+// umbral (1,2:1) que el empuje: si devuelve otro color, no se distingue.
+// Con 'accent' no aplica (ese swatch es semántico, no un color prometido)
+// y sobre foto el fondo no es un color: no se evalúa.
+function AvisoTinte({ crudo, template, content }) {
+  if (!crudo || crudo === 'accent' || !template) return null
+  const p = resolvePiece(template, content || {})
+  const onPhoto = p.surface === 'photo' && !template.split
+  if (onPhoto) return null
+  const sil = p.silueta ? siluetaInfo(p.silueta, { scheme: p.scheme, accent: p.accent, onPhoto }) : null
+  const fondo = sil ? sil.campo : p.scheme.surface
+  const ef = tinteEfectivo(crudo, fondo)
+  if (!ef || ef.toLowerCase() === String(crudo).toLowerCase()) return null
+  if (esColorFiel(crudo)) {
+    return (
+      <div className="hint color-real">
+        <span className="sw-dot" style={{ background: crudo }} />
+        Puede no distinguirse de este fondo — es tu decisión.
+      </div>
+    )
+  }
+  return (
+    <div className="hint color-real">
+      <span className="sw-dot" style={{ background: ef }} />
+      Se ajustó para que se vea sobre este fondo: se está viendo así.
+    </div>
+  )
+}
+
 function ObjectProps({ o, i, updateObject, objRemove, objDuplicate, objBringFront, objSendBack, onToast, goToBg, onAddElement, template, content }) {
   const objIcon = (o.kind === 'icon' || o.kind === 'device') ? ICONS_BY_ID[o.iconId || o.deviceId] : null
   const isMark = !!objIcon?.isMark
@@ -2460,30 +2554,13 @@ function ObjectProps({ o, i, updateObject, objRemove, objDuplicate, objBringFron
             {TINTS.map((t) => (
               <button key={t.k} className={'sw' + ((o.tint || 'accent') === t.value ? ' on' : '')} title={t.label} style={{ background: t.sw }} onClick={() => updateObject(i, { tint: t.value })} />
             ))}
+            <ColorExacto value={o.tint} conocidos={TINTS.map((t) => t.value)}
+              onPick={(hex) => updateObject(i, { tint: hex })} />
           </div>
-          {/* El mismo aviso honesto que ya tienen los textos y el CTA: si el
-              motor separó el color elegido del fondo para que se vea, acá se
-              dice y se muestra el que quedó. "Los colores de acá no son los
-              reales" (Facu, sesión con Aye) era exactamente esto, sin avisar.
-              Con 'accent' no aplica (ese swatch ya es semántico, no un color
-              prometido) y sobre foto el fondo no es un color: no se evalúa. */}
-          {(() => {
-            const crudo = o.tint
-            if (!crudo || crudo === 'accent' || !template) return null
-            const p = resolvePiece(template, content || {})
-            const onPhoto = p.surface === 'photo' && !template.split
-            if (onPhoto) return null
-            const sil = p.silueta ? siluetaInfo(p.silueta, { scheme: p.scheme, accent: p.accent, onPhoto }) : null
-            const fondo = sil ? sil.campo : p.scheme.surface
-            const ef = tinteEfectivo(crudo, fondo)
-            if (!ef || ef.toLowerCase() === String(crudo).toLowerCase()) return null
-            return (
-              <div className="hint color-real">
-                <span className="sw-dot" style={{ background: ef }} />
-                Se ajustó para que se vea sobre este fondo: se está viendo así.
-              </div>
-            )
-          })()}
+          {/* El aviso honesto que ya tienen los textos y el CTA ("los colores
+              de acá no son los reales" — Facu, sesión con Aye). La lógica
+              vive en AvisoTinte porque ahora también la usan las formas. */}
+          <AvisoTinte crudo={o.tint} template={template} content={content} />
         </>
       )}
       {/* logo con tile: el fondo del cuadradito ya se podía cambiar en el
@@ -2549,6 +2626,26 @@ function ObjectProps({ o, i, updateObject, objRemove, objDuplicate, objBringFron
               <button className={'chip' + (o.style === 'outline' ? ' on' : '')} onClick={() => updateObject(i, { style: 'outline' })}>Sólo contorno</button>
             </div>
           )}
+          {/* "permitir ajustar los tamaños tipográficos en todos lados,
+              incluso en las formas, dejando un mínimo" — el slider mueve
+              o.textScale; el piso legible (9 px sobre el lado corto) lo
+              garantiza el MOTOR al dibujar, acá sólo se limita el rango. */}
+          {['badge', 'callout', 'window'].includes(o.shape) && (
+            <>
+              <Ctl label="Tamaño del texto" value={Math.round((o.textScale ?? 1) * 100)} min={50} max={250} step={5} suffix="%"
+                onChange={(v) => updateObject(i, { textScale: v / 100 }, 'textScale')} />
+              <label>Alineación del texto</label>
+              <div className="chips" style={{ marginBottom: 4 }}>
+                {[['left', 'Izquierda'], ['center', 'Centro'], ['right', 'Derecha']].map(([v, l]) => (
+                  <button key={v} className={'chip' + ((o.textAlign || ALIGN_DEFECTO[o.shape]) === v ? ' on' : '')}
+                    onClick={() => updateObject(i, { textAlign: v })}>{l}</button>
+                ))}
+              </div>
+              {/* "no quiero que mueva el objeto" (Facu, textual): alinea el
+                  copy ADENTRO de la caja; la forma no se mueve un píxel */}
+              <div className="hint" style={{ marginBottom: 10 }}>Alinea el texto adentro de la forma — la forma no se mueve.</div>
+            </>
+          )}
           {(o.shape === 'bars' || o.shape === 'sparkline') && (
             <ValoresInput valores={o.values || [3, 5, 4, 7, 9]} onChange={(vals) => updateObject(i, { values: vals })} />
           )}
@@ -2574,7 +2671,12 @@ function ObjectProps({ o, i, updateObject, objRemove, objDuplicate, objBringFron
               <button key={t.k} className={'sw' + ((o.tint || 'accent') === t.value ? ' on' : '')} title={t.label}
                 style={{ background: t.sw }} onClick={() => updateObject(i, { tint: t.value })} />
             ))}
+            <ColorExacto value={o.tint} conocidos={TINTS.map((t) => t.value)}
+              onPick={(hex) => updateObject(i, { tint: hex })} />
           </div>
+          {/* acá FALTABA el aviso honesto que ya tenían los íconos — y es
+              exactamente donde hoy "elegir Negro no hacía nada" sin decirlo */}
+          <AvisoTinte crudo={o.tint} template={template} content={content} />
           {STROKE_SHAPES.includes(o.shape) && (
             <Ctl label="Grosor del trazo" value={Math.round((o.sw || 1) * 100)} min={40} max={300} step={10} suffix="%"
               onChange={(v) => updateObject(i, { sw: v / 100 }, 'sw')} />
@@ -3044,6 +3146,10 @@ function TextProps({ eid, template, content, set, getText, setText, onVolverAlSt
             {Object.entries(TEXT_COLORS).map(([k, tc]) => (
               <button key={k} className={'chip' + ((block.color || 'auto') === k ? ' on' : '')} onClick={() => updateBlock({ color: k })}>{tc.label}</button>
             ))}
+            {/* hex del picker (contrato: block.color acepta hex). El TEXTO
+                es sagrado: acá el empuje de legibilidad SIGUE, por eso no
+                hay "es tu decisión" — hay aviso de ajuste, como siempre. */}
+            <ColorExacto value={block.color} onPick={(hex) => updateBlock({ color: hex })} />
           </div>
           {/* si el motor tuvo que empujar el color elegido para que se
               lea, acá se DICE y se muestra el que quedó. No se desactiva
@@ -3051,7 +3157,7 @@ function TextProps({ eid, template, content, set, getText, setText, onVolverAlSt
           {block.style === 'cta' ? (
             <CtaColorReal template={template} content={content} colorKey={block.color} size={block.size} suelto={!!content.pos?.[eid]} />
           ) : (() => {
-            const crudo = (TEXT_COLORS[block.color] || {}).value
+            const crudo = esColorFiel(block.color) ? block.color : (TEXT_COLORS[block.color] || {}).value
             if (!crudo || !fillReal || crudo.toLowerCase() === String(fillReal).toLowerCase()) return null
             return (
               <div className="hint color-real">

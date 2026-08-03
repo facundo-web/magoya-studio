@@ -168,11 +168,17 @@ function decidirColores({ role, colorKey, hl, px, weight }, fondoBase, scheme, a
   // SIEMPRE con el acento y la elección sólo llegaba a la letra, que encima
   // se volvía ilegible sobre la pastilla. La pastilla es una mancha: le
   // alcanza con despegarse 3:1 del fondo, igual que el marcador.
+  // Además de las claves de TEXT_COLORS, `colorKey` acepta un hex del picker
+  // (contrato block.color). El hex de un TEXTO no es "fiel" como el de una
+  // forma: la letra es sagrada y SIEMPRE pasa por el empuje de legibilidad
+  // de acá abajo (visibleSobre), con su aviso (`ajustado`). Antes un hex
+  // caía en TEXT_COLORS[hex] → undefined y la elección se perdía en silencio.
+  const resolverElegido = (key) => (TEXT_COLORS[key] || {}).value || (esColorFiel(key) ? key : null)
   const pedidoPastilla = isCta && colorKey && colorKey !== 'auto' ? (
     colorKey === 'accent' ? accentTexto
       : colorKey === 'strong' ? tintaBase
       : colorKey === 'muted' ? suaveSobre(fondoBase, scheme, tintaBase, min)
-      : (TEXT_COLORS[colorKey] || {}).value || null
+      : resolverElegido(colorKey)
   ) : null
   const pastilla = isCta ? visibleSobre(pedidoPastilla || accentTexto, fondoBase, tintaBase, 3) : null
   const marcador = hl ? visibleSobre(hl, fondoBase, tintaBase, 3) : null
@@ -189,7 +195,7 @@ function decidirColores({ role, colorKey, hl, px, weight }, fondoBase, scheme, a
     colorKey === 'accent' ? acento
       : colorKey === 'strong' ? tinta
       : colorKey === 'muted' ? suave
-      : (TEXT_COLORS[colorKey] || {}).value || null
+      : resolverElegido(colorKey)
   ) : null
   const elegidoColor = elegidoCrudo ? visibleSobre(elegidoCrudo, fondoLetra, tinta, min) : null
   const fill = elegidoColor
@@ -235,6 +241,33 @@ export function colorEfectivo(bloque, fondo, { scheme, accent, ref = 1000 } = {}
 export function tinteEfectivo(color, fondo) {
   if (!fondo || !color) return color
   return ratio(color, fondo) < 1.2 ? separar(color, fondo, 1.6, mejorTinta(fondo)) : color
+}
+
+// COLOR FIEL (decisión de producto, agosto '26): si el color de un objeto lo
+// eligió LA PERSONA —un hex del picker o de la pipeta— es fiel y se pinta
+// TAL CUAL, sin empuje. "Elegí Negro y me lo devolvió gris" es el motor
+// desautorizando una decisión sin avisar; ahora el editor AVISA si el color
+// puede no distinguirse del fondo, pero no lo corrige. El empuje
+// (`tinteEfectivo`) queda para lo que eligió el SISTEMA ('accent', defaults
+// de plantilla), que sí tiene que verse siempre. El criterio vive acá y lo
+// importa el editor: si cada lado decide con su propia regex, tarde o
+// temprano uno empuja y el otro avisa otra cosa.
+// OJO: el TEXTO nunca es fiel — la letra sobre una forma se pinta con
+// `mejorTinta(color real de la forma)`, así se lee aunque la forma sea
+// invisible a propósito (y el guard de contraste no retrocede).
+export function esColorFiel(v) {
+  return typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v)
+}
+
+// Tintes CON NOMBRE: son del sistema, y el sistema garantiza que se vean
+// (pasan por seVe). Un hex crudo es de la persona y es fiel. La distinción
+// importa para los JSON de plantilla: traían hex de fábrica, y al volverse
+// "fieles" tres destellos de collage-stickers desaparecieron sobre el
+// esquema emerald — un default del sistema no puede ser invisible. Por eso
+// las plantillas usan SIEMPRE estas claves, nunca hex.
+export const TINTES = {
+  ink: '#0D0C0C', white: '#FFFFFF', cream: '#ECE3DB',
+  emerald: '#00DE68', deep: '#133825', blue: '#2E7DD1', yellow: '#F2C14E',
 }
 
 // roles de texto en orden de stack
@@ -922,7 +955,14 @@ export function drawPiece(b, { template, content, format, sizeLock = null }) {
         const baseline = cursorY + bl.px * 0.8 + li * lineH
         const glyphTop = baseline - bl.px * CAP
         const rh = bl.px * CAP + bl.px * 0.14 + padY * 2 // cap + descendente + aire
-        const ry0 = glyphTop - padY
+        // la pastilla del CTA reservaba los 0.14 em del descendente TODOS
+        // abajo: el centro óptico de la letra quedaba 0.07 em arriba del
+        // centro (−4% del alto, medido) y el botón se veía "alto". El aire
+        // extra se reparte mitad y mitad: la mayúscula queda centrada y el
+        // descendente sigue teniendo lugar. El marcador (hl) no se toca: es
+        // un fondo detrás de texto en minúscula y el lugar del descendente
+        // va abajo, que es donde el descendente vive.
+        const ry0 = glyphTop - padY - (isCta ? bl.px * 0.07 : 0)
         const rx0 = textAnchor === 'middle' ? textX - w / 2 - padX : textX - padX
         b.rect({ x: rx0, y: ry0, w: w + padX * 2, h: rh, rx: isCta ? rh / 2 : bl.px * 0.12, fill: bgFill })
       })
@@ -1354,7 +1394,9 @@ function drawObjects(b, { objects, W, H, ref, accent, scheme, fondo = null }) {
     }
     const icon = ICONS_BY_ID[o.iconId]
     if (!icon) continue
-    const tint = seVe(o.tint === 'accent' ? accent : (o.tint || null))
+    // color fiel: el hex elegido a mano no se empuja (ver esColorFiel);
+    // el empuje queda para 'accent' y los valores con nombre
+    const tint = esColorFiel(o.tint) ? o.tint : seVe(o.tint === 'accent' ? accent : (TINTES[o.tint] || o.tint || null))
     if (o.style === 'plain') {
       // trazos y marcas: sin tile, sin sombra y con grosor de trazo ajustable
       // antes: shadow forzada a false en los trazos → el toggle no hacía nada
@@ -1395,9 +1437,33 @@ function drawShape(b, { o, W, H, ref, accent, scheme, seVe = (c) => c }) {
   const cx = W * (o.x ?? 0.5), cy = H * (o.y ?? 0.5)
   const rot = o.rotation || 0
   const flipX = !!o.flipX
-  const color = seVe(o.tint === 'accent' ? accent : (o.tint || accent))
+  // color fiel: el hex del picker se pinta tal cual; el empuje queda para
+  // 'accent' y los valores con nombre (la garantía del sistema). El texto de
+  // cada forma se pinta más abajo con mejorTinta(color REAL): aunque la
+  // forma sea invisible a propósito, la letra se lee igual.
+  const color = esColorFiel(o.tint) ? o.tint : seVe(o.tint === 'accent' ? accent : (TINTES[o.tint] || o.tint || accent))
   const op = o.opacity ?? 1
   const swMul = o.sw || 1 // grosor de trazo ajustable por el usuario
+  // Tamaño del texto de la forma, elegido a mano (contrato o.textScale).
+  // El editor limita el slider; el motor garantiza el piso: 9 px en una
+  // pieza de lado corto 1000 (proporcional en cualquier formato) — menos
+  // que eso no se lee ni ampliando el feed. Multiplica el tamaño BASE de
+  // cada forma, que sigue escalando con el objeto como siempre.
+  const escTexto = Number(o.textScale) > 0 ? Number(o.textScale) : 1
+  const pxTexto = (base) => Math.max(ref * 0.009, base * escTexto)
+  // Alineación del COPY adentro de la caja de la forma (contrato
+  // o.textAlign). NO mueve el objeto: sólo decide de dónde arranca la letra.
+  // Cada forma pasa su default (la etiqueta centra, el resto va a la izq).
+  const alinear = (def) => (['left', 'center', 'right'].includes(o.textAlign) ? o.textAlign : def)
+  // Centro ÓPTICO de un texto de una línea: b.text pone la baseline en
+  // y + 0.8·px y la mayúscula de Manrope mide ~0.72 em (cap height). Para
+  // que el texto se VEA centrado en su caja, la baseline tiene que caer
+  // capHeight/2 DEBAJO del centro: y = centro + px·(CAP/2 − 0.8). La
+  // etiqueta usaba un −0.62 puesto a ojo y el centro óptico quedaba 0.18 em
+  // ARRIBA del centro de la píldora (−9% del alto, medido): el "NUEVO"
+  // flotaba hacia el borde superior.
+  const CAP = 0.72
+  const yCentrado = (centro, px) => centro + px * (CAP / 2 - 0.8)
   // La sombra dura se crea SÓLO cuando la rama la va a usar. Antes se creaba
   // acá arriba para cualquier forma, así que el bocadillo y la ventana (que
   // llevan su propia sombra suave) dejaban un <filter> definido y nunca
@@ -1449,7 +1515,7 @@ function drawShape(b, { o, W, H, ref, accent, scheme, seVe = (c) => c }) {
   }
   if (o.shape === 'badge') {
     const txt = String(o.text || 'NUEVO').toUpperCase()
-    const px = size * 0.26
+    const px = pxTexto(size * 0.26)
     const w = measure(txt, { px, weight: 800, tracking: 0.06 }) + px * 1.5
     const h = px * 2
     const solid = o.style !== 'outline'
@@ -1457,8 +1523,14 @@ function drawShape(b, { o, W, H, ref, accent, scheme, seVe = (c) => c }) {
     // hacían nada. Se dibuja como path para poder girarla entera.
     b.path({ d: roundRect(cx - w / 2, cy - h / 2, w, h, h / 2), fill: solid ? color : 'none',
       stroke: solid ? null : color, sw: Math.max(2, ref * 0.006 * swMul), ...g, filterId: hardShadow() })
-    b.text({ x: cx, y: cy - px * 0.62, lines: [txt], px, weight: 800, tracking: 0.06,
-      fill: solid ? mejorTinta(color) : color, anchor: 'middle', opacity: op, rotation: rot, rcx: cx, rcy: cy, eid: eidDe('text') })
+    // la píldora se ajusta al texto (0.75·px de aire por lado), así que
+    // alinear sólo se nota en textos con saltos o cuando el editor la
+    // agranda; igual se respeta el contrato para que el control no mienta
+    const alignB = alinear('center')
+    const tbx = alignB === 'left' ? cx - w / 2 + px * 0.75 : alignB === 'right' ? cx + w / 2 - px * 0.75 : cx
+    b.text({ x: tbx, y: yCentrado(cy, px), lines: [txt], px, weight: 800, tracking: 0.06,
+      fill: solid ? mejorTinta(color) : seVe(color), anchor: alignB === 'left' ? 'start' : alignB === 'right' ? 'end' : 'middle',
+      opacity: op, rotation: rot, rcx: cx, rcy: cy, eid: eidDe('text') })
     return
   }
   if (o.shape === 'bars') {
@@ -1514,12 +1586,15 @@ function drawShape(b, { o, W, H, ref, accent, scheme, seVe = (c) => c }) {
       })
     } else if (String(o.body || '').trim()) {
       // ventana con texto adentro, como una nota o un aviso del sistema
-      const px = Math.max(ref * 0.018, bh * 0.13)
+      const px = pxTexto(Math.max(ref * 0.018, bh * 0.13))
       const tinta = mejorTinta(marco)
       const lineas = wrapText(String(o.body), { px, weight: 500, maxWidth: bw - px * 1.6 }).slice(0, 8)
+      const alignV = alinear('left')
+      const tvx = alignV === 'center' ? bx + bw / 2 : alignV === 'right' ? bx + bw - px * 0.8 : bx + px * 0.8
       b.text({
-        x: bx + px * 0.8, y: by + px * 0.7, lines: lineas, px, weight: 500,
-        fill: tinta, anchor: 'start', lineHeight: 1.35, opacity: op, rotation: rot, rcx: cx, rcy: cy, eid: eidDe('body'),
+        x: tvx, y: by + px * 0.7, lines: lineas, px, weight: 500,
+        fill: tinta, anchor: alignV === 'center' ? 'middle' : alignV === 'right' ? 'end' : 'start',
+        lineHeight: 1.35, opacity: op, rotation: rot, rcx: cx, rcy: cy, eid: eidDe('body'),
       })
     } else {
       b.imageCover({ x: bx, y: by, w: bw, h: bh, href: null, rotation: rot, rcx: cx, rcy: cy })
@@ -1536,9 +1611,21 @@ function drawShape(b, { o, W, H, ref, accent, scheme, seVe = (c) => c }) {
       })
     })
     if (o.text) {
-      const px = barH * 0.5
-      b.text({ x: cx, y: y0 + (barH - px) / 2 - px * 0.05, lines: [String(o.text)], px, weight: 600,
-        fill: mejorTinta(marco) === INK ? "#8A9096" : 'rgba(255,255,255,.7)', anchor: 'middle',
+      const px = pxTexto(barH * 0.5)
+      // el título de la barra centra como una ventana de macOS; una
+      // alineación elegida a mano lo sigue (a la izquierda arranca DESPUÉS
+      // del semáforo, que llega hasta ~2.35·barH — pisarlo es peor que no
+      // alinear). Es la única forma cuyo default de align no es el del
+      // contrato ('left'): el default del contrato es para el copy del
+      // cuerpo (o.body, ya a la izquierda); el título es chrome y centrado
+      // es su estado natural.
+      const alignT = ['left', 'center', 'right'].includes(o.textAlign) ? o.textAlign : 'center'
+      const ttx = alignT === 'left' ? x0 + barH * 2.6 : alignT === 'right' ? x0 + w - barH * 0.5 : cx
+      // mismo centrado óptico que la etiqueta: antes el título quedaba
+      // 0.11 em arriba del centro de la barra
+      b.text({ x: ttx, y: yCentrado(y0 + barH / 2, px), lines: [String(o.text)], px, weight: 600,
+        fill: mejorTinta(marco) === INK ? "#8A9096" : 'rgba(255,255,255,.7)',
+        anchor: alignT === 'left' ? 'start' : alignT === 'right' ? 'end' : 'middle',
         opacity: op, rotation: rot, rcx: cx, rcy: cy, eid: eidDe('text') })
     }
     return
@@ -1547,7 +1634,7 @@ function drawShape(b, { o, W, H, ref, accent, scheme, seVe = (c) => c }) {
     // el bocadillo se ajusta AL TEXTO (como una burbuja de verdad): el ancho
     // lo fija el usuario con el tamaño, el alto sale de las líneas que entran.
     const w = size
-    const px = w * 0.115
+    const px = pxTexto(w * 0.115)
     const padX = w * 0.09, padY = w * 0.075
     const txt = String(o.text || '').trim()
     const lines = txt ? wrapText(txt, { px, weight: 600, maxWidth: w - padX * 2 }) : []
@@ -1561,7 +1648,10 @@ function drawShape(b, { o, W, H, ref, accent, scheme, seVe = (c) => c }) {
     const burbuja = o.fill || color || '#FFFFFF'
     b.path({ d: calloutPath(w, h, { r: w * 0.09 }), fill: burbuja, tx: x0, ty: y0, ...g, filterId: soft })
     if (lines.length) {
-      b.text({ x: x0 + padX, y: y0 + padY, lines, px, weight: 600, fill: mejorTinta(burbuja), lineHeight: lh, opacity: op, eid: eidDe('text') })
+      const alignC = alinear('left')
+      const tcx = alignC === 'center' ? x0 + w / 2 : alignC === 'right' ? x0 + w - padX : x0 + padX
+      b.text({ x: tcx, y: y0 + padY, lines, px, weight: 600, fill: mejorTinta(burbuja), lineHeight: lh,
+        anchor: alignC === 'center' ? 'middle' : alignC === 'right' ? 'end' : 'start', opacity: op, eid: eidDe('text') })
     }
     return
   }

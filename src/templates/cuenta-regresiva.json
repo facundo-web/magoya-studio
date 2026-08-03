@@ -41,7 +41,7 @@
         "kind": "icon",
         "iconId": "agro:reloj-campana",
         "style": "plain",
-        "tint": "#133825",
+        "tint": "deep",
         "x": 0.855,
         "y": 0.155,
         "scale": 0.14,

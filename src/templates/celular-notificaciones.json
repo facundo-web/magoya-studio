@@ -63,7 +63,7 @@
       {
         "kind": "shape",
         "shape": "callout",
-        "tint": "#ECE3DB",
+        "tint": "cream",
         "x": 0.27,
         "y": 0.4,
         "scale": 0.34,
@@ -89,7 +89,7 @@
       {
         "kind": "shape",
         "shape": "callout",
-        "tint": "#ECE3DB",
+        "tint": "cream",
         "x": 0.29,
         "y": 0.75,
         "scale": 0.34,
