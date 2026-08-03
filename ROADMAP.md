@@ -758,3 +758,210 @@ Pendiente heredado, chico y concreto: capacidad `poner_foto({slug})` para
 que el copiloto pueda elegir foto del banco (hoy la nombra pero no la puede
 poner), y revisar que ningún chip de arranque ofrezca carrusel en formato
 que no lo admite.
+
+---
+
+## BLOQUE V — La sesión en vivo con Aye (3 ago): armando el webinar
+
+Facu y Aye armaron una pieza de webinar EN VIVO compartiendo pantalla. Cada
+item de abajo pasó de verdad, con la frase de quien lo sufrió. Diagnóstico
+verificado contra el código el mismo día (guards en verde de arranque:
+contraste 0 fallas, siluetas 135/135 arriba del 25%).
+
+**La lección transversal:** cuatro de los items graves NO son funcionalidad
+que falta — es funcionalidad que existe y no se descubre (2, 3, 15) o que
+existe y miente (10, 14). El motor de agosto empuja colores para que se lean
+y la UI sigue mostrando el color pedido: ahí nace "los colores de acá no son
+los reales".
+
+Clasificación: **BUG** (debería andar y no anda) · **FALTA** (no existe) ·
+**NSD** (existe pero no se descubre: el arreglo es affordance/rotulado) ·
+**YA** (resuelto por trabajo posterior a la sesión).
+
+| # | Item | La frase que lo parió | Clase | Prio |
+|---|---|---|---|---|
+| V1 | La manito en lo movible | "no me aparecía la manito… ni siquiera intenté moverlo" (Aye) | BUG de affordance (textos) | P0 |
+| V2 | Escribir sobre el texto | "me molesta que no se pueda escribir sobre el texto" (Facu) | NSD + agujeros | P1 |
+| V3 | Agarrar el objeto de abajo | "un objeto se te queda arriba, lo corrés, y otro" (Facu) | NSD | P1 |
+| V4 | Resize proporcional desde esquinas | "no te permite achicar en proporción desde los extremos" (Facu) | mitad EXISTE / FALTA en textos | P1 |
+| V5 | Multi-select mixto (objetos+textos) | "me encantaría poder mover todo seleccionado, pero no se me agrupa todo" (Facu) | FALTA (rediseño) | P1 |
+| V6 | Shift+Enter en campos del inspector | "¿te deja? shift enter… eso lo modifico" (Facu) | mayormente EXISTE / FALTA en bocadillo | P2 |
+| V7 | Alineación del texto en su contenedor | "me molesta que no esté alineado el texto al contenedor" (Facu, por pedido de Aye) | FALTA — contrato acordado | P0 |
+| V8 | Color del CTA | "queda negro sí o sí es un espanto" (Facu) | BUG/FALTA | P1 |
+| V9 | La burbuja sin color | "la burbuja esta no me deja cambiarle el color" | A VERIFICAR (2 causas candidatas) | P1 |
+| V10 | Los swatches mienten | "los colores de acá no son los reales" (Facu) | BUG de comunicación (confirmado) | P1 |
+| V11 | Label "POSICIÓN DEL BLOQUE" en el logo | "está mal escrito, debería decir posición del logo" (Facu) | probablemente YA (verificar prod) | P2 |
+| V12 | Estilos de texto sin pista de tamaño | "estaba en un estilo que me hacía todo gigante y no entendía por qué" (Aye) | FALTA (affordance) | P0 |
+| V13 | Logo de marca rígido | "el logo no se mueve a mano… hay criterios medio raros" (Facu) | FALTA (posición vertical) | P1 |
+| V14 | Dos logos no aparecen en el picker | "alguno de estos dos no sé por qué no aparecen" (Facu) | BUG confirmado: Google y Gemini | P0 |
+| V15 | Variantes de logo suelto | "sería con contenedor y sin fondo, capaz con fondo y sin fondo" (Facu) | NSD (nombres) + 1 variante FALTA | P2 |
+| V16 | Badge EN VIVO listo | (la sesión lo improvisó con globo + texto) | FALTA | P1 |
+| V17 | El picker desorienta | "estos son acciones, eso hay que separarlo mejor" (Facu) | FALTA (rotulado) + BUG conexo P0 | P1 |
+| V18 | Buscar elementos trae cualquier cosa | Facu buscó "link en la bio" y le trajo texto | FALTA (no hay búsqueda de elementos) | P2 |
+
+### El detalle, item por item (archivo:línea para los que construyen)
+
+**V1 · La manito.** Los objetos SÍ la muestran: `.obj-hit { cursor: grab }`
+(styles.css:484) + contorno punteado en hover (:486). Los TEXTOS son
+arrastrables (Editor.jsx:843-866) pero muestran cursor de ESCRITURA
+(`cursor: text`, styles.css:491) y no tienen ninguna señal en hover — el
+marco `.text-sel` recién aparece al seleccionar (Editor.jsx:1202-1205). Lo
+que Aye no pudo mover era casi seguro un texto. Fix: cursor grab/move +
+contorno en hover para `text[data-eid]`. El logo y la foto de fondo no son
+interactivos en el canvas (eso es V13 y diseño deliberado, no bug).
+
+**V2 · Escribir sobre el texto.** El doble-click YA abre el editor in-place
+(onFrameDblClick, Editor.jsx:908-911) y el segundo click sobre un texto ya
+seleccionado también (852). Por qué no se descubrió/falló en vivo:
+(a) los textos de las FORMAS (etiqueta, bocadillo, ventana) y los mensajes
+del chat se dibujan sin `eid` (layouts.js:1311, 1371, 1391, 1415, 1079) →
+in-place no existe para ellos, sólo el campo del inspector; el "EN VIVO"
+improvisado era justo un bocadillo. (b) Los overlays `.obj-hit` son divs
+HTML ENCIMA del SVG (Editor.jsx:1164-1183): la caja de cualquier objeto que
+pise un texto se roba el click y el doble-click. (c) La única pista es el
+empty-state del inspector (1364) y el drag-hint (1242). Fix: eid en los
+textos de formas, y revisar el orden de hit-testing texto-vs-objeto.
+
+**V3 · Objetos tapados.** Alt+click YA cicla hacia el objeto de abajo
+(Editor.jsx:771-781), pero no lo sabe nadie: cero tooltip, cero menú. Fix
+con patrón conocido: click repetido en el mismo punto sobre algo ya
+seleccionado cicla al de abajo (Figma), manteniendo Alt+click; y sumar
+"Seleccionar el de abajo" al menú contextual (1184-1201).
+
+**V4 · Resize proporcional.** Los OBJETOS ya tienen esquinas con proporción
+fija y ancla en la esquina opuesta (startHandleResize, Editor.jsx:631-663;
+handles 1172-1176 — sólo el primario de la selección). Los TEXTOS no tienen
+handles: su caja de selección es pasiva (1202-1205) y el tamaño sólo se toca
+con los chips del inspector (2543-2554). Fix: handles de esquina en la caja
+del texto que mapeen a su multiplicador de tamaño.
+
+**V5 · Multi-select mixto.** Confirmado: objetos y textos son dos grupos NO
+mezclables a propósito (la justificación de julio está en el comentario de
+Editor.jsx:283-287). El arrastre por delta existe SÓLO para objetos
+(dragRef.group, 792-795 y 827-836); los textos ni siquiera se mueven en
+grupo entre sí (MultiSelProps lo dice: "Se copian y se borran juntos",
+1892-1913). Rediseño pedido: UNA selección donde shift+click suma cualquier
+cosa, y el drag aplica el mismo delta a todo (objetos vía x/y, textos vía
+`content.pos`). Delete/duplicar pueden seguir por tipo si mezclar complica.
+
+**V6 · Shift+Enter.** Los textarea ya van bien: inspector (2510), in-place
+(Enter hace salto, 1153-1159), chat (2610); y `wrapText` respeta `\n`
+(textLayout.js:81-93). Los que NO dejan: los `<input>` de una línea —
+el texto del bocadillo/etiqueta/barra de ventana comparten uno solo
+(Editor.jsx:2146-2148) y los pasos (1841). El bocadillo SÍ es multilínea en
+el motor (layouts.js:1404): pasarlo a textarea. Etiqueta y barra de ventana
+son de una línea por diseño, se quedan.
+
+**V7 · Alineación de texto.** FALTA de verdad: el anchor es del stack ENTERO
+(textX/textAnchor, layouts.js:709-710) y `pintarBloque` (781-852) lo recibe
+por parámetro; no existe align por bloque. El inspector (TextProps,
+Editor.jsx:2497-2586) no lo ofrece. CONTRATO ACORDADO (dos agentes lo
+implementan, respetarlo exacto): los bloques de texto llevan un campo
+opcional `align: 'left' | 'center'` (default: lo que ya hace la plantilla);
+el inspector lo ofrece como chips y el motor lo respeta al posicionar las
+líneas dentro del ancho del bloque. Tocar: pushBlock (549-588) carga align,
+pintarBloque resuelve x/anchor por bloque; chips en TextProps.
+
+**V8 · Color del CTA.** Dos causas apiladas: el inspector ESCONDE el color
+justo para el CTA (`block.style !== 'cta'` condiciona los chips,
+Editor.jsx:2561; y el rol `cta` de plantillas clásicas no tiene ningún
+control de color, 2555-2583), y el motor pinta la pastilla SIEMPRE con el
+acento (layouts.js:793) — el color elegido sólo llegaría a la letra
+(825-831). Fix: ofrecer color para CTA y que la pastilla use el elegido con
+el mismo clamp de legibilidad (`visibleSobre`, 3:1). El "negro sí o sí" es
+el acento empujado por `visibleSobre` contra ese fondo.
+
+**V9 · La burbuja sin color.** No se pudo confirmar CUÁL burbuja; dos
+candidatas verificadas: (a) el bocadillo (callout): el control EXISTE
+(swatches Editor.jsx:2176-2182 → `o.tint`; el motor lo usa,
+layouts.js:1412), pero `seVe()` (1104-1114) empuja el color si se parece al
+fondo — blanco sobre crema da 1,12:1 < 1,2 y se separa a 1,6, así que elegir
+Blanco "no hace nada" visible. Mismo síntoma que V10. (b) un globo del CHAT
+de WhatsApp: ahí FALTA de verdad — toda la paleta sale de `chatPalette`
+(layouts.js:956-1012) y ChatBody (Editor.jsx:2589-2619) no ofrece color.
+Preguntarle a Facu cuál era; el fix de V10 probablemente cierra (a).
+
+**V10 · Los swatches mienten.** CONFIRMADA la causa sospechada: desde los
+arreglos de contraste, el motor empuja los colores elegidos y la UI muestra
+el pedido, no el dibujado. Los tres empujadores: `visibleSobre`
+(layouts.js:117-120) sobre el color de bloque (825-831), `seVe` sobre los
+tintes de objetos (1104-1114), `acentoLegible` sobre el acento (48-51,
+496). Los swatches muestran el crudo (TINTS Editor.jsx:15-22, TEXT_COLORS
+2567-2571, ACCENTS 2330-2336). Fix honesto (NO desactivar el ajuste, es un
+invariante): cuando efectivo ≠ elegido, el inspector lo dice ("se ajustó
+para que se lea") y muestra el color efectivo. El motor ya exporta
+`siluetaInfo` (372-377) para que la UI mida contra el MISMO fondo — falta
+exportar/reutilizar el cálculo del color efectivo con ese fondo.
+
+**V11 · Label mentiroso.** Probablemente YA: el panel del logo dice
+"Posición del logo" desde el 24/7 (commit 78183cf; Editor.jsx:2356). Los
+únicos "Posición del bloque" que quedan (987 y 1014) están en el panel
+TEXTO y refieren al stack — correctos ahí, aunque "Posición del texto"
+sería menos ambiguo. Verificar que prod tenga ese commit desplegado; si
+Facu lo vio el 3/8, o prod está viejo o lo que vio fue el del panel Texto.
+
+**V12 · Estilos de texto sin pista.** TEXT_STYLE_OPTS (Editor.jsx:2374-2382)
+sólo anticipa el tamaño en "Dato (número grande)"; el resto (Título, Bajada,
+Etiqueta, Cita…) no dice nada y el selector es un `<select>` pelado (2558).
+Fix: sufijo por opción ("Dato — número gigante", "Etiqueta — chico y en
+mayúsculas"…) o mini-preview del tamaño relativo. Es exactamente lo que
+frenó a Aye.
+
+**V13 · Logo de marca rígido.** Hoy: Izquierda/Derecha + escala 1-4×
+(LogoPosition, Editor.jsx:2351-2371). La VERTICAL la decide el motor y no se
+puede elegir: siempre opuesta al stack de texto (drawLogo,
+layouts.js:1452-1455), y con banda se mete en la placa (1447-1450). "Del
+otro lado" (vertical) no existe, y el criterio no se explica en ningún lado
+— de ahí "criterios medio raros". Fix mínimo: chips Arriba/Abajo con
+"Automático" como default (conserva la regla actual) + una línea que diga
+qué hace Automático.
+
+**V14 · Dos logos no aparecen.** BUG confirmado y son exactamente dos:
+**Google y Gemini**, los únicos LIGHT_TILE (iconLibrary.js:17). En el picker
+se les pinta fondo blanco (Editor.jsx:1755) y el CSS fuerza TODOS los glifos
+a blanco (`filter: brightness(0) invert(1)`, styles.css:459) → blanco sobre
+blanco, invisibles. En la pieza se dibujan bien (layouts.js:1231 usa
+coloredIcon/gradientIcon). Fix: en el picker, para LIGHT_TILE no aplicar el
+invert (clase extra) o mostrar el glifo con `coloredIcon(icon.url,
+LIGHT_TILE[slug])`.
+
+**V15 · Variantes de logo suelto.** Los chips "En cuadradito" / "Suelto"
+existen (Editor.jsx:2025-2030); "Suelto" es el glifo solo, teñible, y sin
+tinte sale en su color de marca (layouts.js:1214-1217). Lo que Facu
+describe — "con contenedor y sin fondo" — no existe: sería el tile en
+contorno con fondo transparente. Fix: renombrar por lo que muestran ("App
+(cuadradito)" / "Logo solo") y decidir si la tercera variante vale el motor.
+
+**V16 · Badge EN VIVO.** FALTA como elemento listo. La base ya está: el
+badge es teñible y lleva texto (iconLibrary.js:168; motor
+layouts.js:1301-1313) — la sesión lo improvisó con bocadillo + texto. Fix:
+entrada nueva en SHAPES (p.ej. preset del badge con text 'EN VIVO', tinte
+rojo y puntito estilo streaming) para que salga de la biblioteca en un tap.
+
+**V17 · El picker desorienta.** El rail reparte por posición
+('Detrás'/'Encima', Editor.jsx:940-946) y adentro de Encima conviven la
+lista de lo puesto, "+ Subir PNG" y el picker con 7 categorías
+(ICON_CATEGORIES, iconLibrary.js:182) que mezclan contenido (logos, formas,
+trazos) con cosas que operan distinto (dispositivos, mockup). Revisión de
+rótulos y agrupamiento con Aye delante. **Y un BUG conexo encontrado al
+verificar, prioridad P0:** `setPanel('photos')` apunta a un panel que ya no
+existe (se renombró a 'settings'): el CTA "Elegí la foto de fondo para
+empezar" (Editor.jsx:1219-1223) y "Poner una foto detrás →" (1348) abren un
+panel izquierdo VACÍO. Fix: `setPanel('settings')`.
+
+**V18 · Buscar elementos.** No hay búsqueda de elementos: el único buscador
+es el de la home (Gallery.jsx:265) y sugiere PLANTILLAS (lib/sugerir.js) —
+"link en la bio" no dispara ninguna regla y a lo sumo el eco de palabras
+devuelve una plantilla de texto. Fix barato: buscador por nombre + sinónimos
+sobre ALL_OBJECTS dentro del picker (los labels ya están curados en
+iconLibrary); o al menos que el buscador de la home diga que busca
+plantillas.
+
+### Validación (no requiere código)
+
+- Aye, textual: **"me es más fácil opinar cuando alguien ya está haciendo
+  algo que crear de cero"** — confirma la tesis de la pieza encarada que
+  sostiene R3 y el copiloto: el valor no está en el lienzo en blanco sino en
+  llegar con algo hecho para corregir.
+- Los estilos viejos de las piezas guardadas de Aye van a cambiar con los 6
+  estilos nuevos de silueta — Facu ya se lo dijo; no hay migración pendiente.

@@ -26,12 +26,20 @@ Un template es un `.json` en esta carpeta + un import en `index.js`. Es **data**
   "scheme": "deep",        // esquema de color: deep | ink | cream | studio
   "accent": "emerald",     // acento: emerald | lime | deep
   "logo": "cream",         // wordmark: cream | green | black | deep
+  "logoVPos": "auto",      // vertical del wordmark: auto (opuesto al texto / en la banda) | top | bottom
   "clientLogo": "none",    // none | basf | bayer | corteva | johndeere | syngenta
   "hasPhoto": true,        // define surface si no se especifica
   "treatment": "bw",       // foto: bw (B&N) | color
-  "kicker": "…", "title": "…", "subtitle": "…"  // textos por rol
+  "kicker": "…", "title": "…", "subtitle": "…",  // textos por rol
+  "colors": { "cta": "ink" },   // opcional: color por rol (claves de TEXT_COLORS); en un CTA pinta la pastilla
+  "bubbleTint": "accent"        // sólo chat: color del globo propio ('accent' o hex); default: la regla de WhatsApp
 }
 ```
+Los bloques de texto libres (`textBlocks`) aceptan además `align: "left" | "center"`
+(opcional): alinea las líneas de ESE bloque adentro de la caja del stack, sin
+mover el ancla de la pieza. Todo color elegido a mano pasa igual por el empuje
+de legibilidad del motor (`colorEfectivo` / `tinteEfectivo` en engine/layouts.js
+devuelven el color que de verdad sale pintado).
 
 ## Reglas de marca que el motor garantiza (anti-"AI delira")
 - Colores: solo **roles aprobados** (nunca color libre). Verde `#00DE68`, Verde Magoya `#133825`, Crema `#ECE3DB`, Negro, Lime marcador.

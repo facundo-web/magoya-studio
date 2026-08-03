@@ -185,9 +185,9 @@ export function rolesDePieza(template, contenido = null) {
 
 // lo que es DISEÑO: si cambiás de plantilla, esto lo decide la plantilla
 const DESIGN_KEYS = [
-  'scheme', 'accent', 'logo', 'showLogo', 'logoPos', 'logoScale',
+  'scheme', 'accent', 'logo', 'showLogo', 'logoPos', 'logoVPos', 'logoScale', 'bubbleTint',
   'bg', 'hasPhoto', 'treatment', 'gradient', 'photoDim', 'photoBlur', 'vignette',
-  'plate', 'anchor', 'density', 'scale', 'rule', 'sizes',
+  'plate', 'anchor', 'density', 'scale', 'rule', 'sizes', 'colors',
 ]
 
 // lo que es COPY: sobrevive al cambio de diseño

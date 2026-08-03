@@ -454,9 +454,26 @@ button.obj-row { width: 100%; cursor: pointer; text-align: left; font: inherit; 
 .posdot { aspect-ratio: 1/1; border: 1px solid var(--ui-line); background: #fff; border-radius: 4px; }
 .posdot:hover { border-color: var(--ui-line-strong); }
 .posdot.on { background: var(--ui-selected-ink); border-color: var(--ui-selected-ink); }
+/* buscador del picker de elementos: la gente busca con sus palabras
+   ("link en la bio"), no recorriendo solapas — ver SINONIMOS en Editor.jsx */
+.picker-search { width: 100%; font: inherit; font-size: 13px; padding: 7px 10px;
+  border: 1px solid var(--ui-line); border-radius: 8px; background: #fff; }
+.picker-search:focus { outline: none; border-color: var(--ui-focus); }
+/* "se está viendo así": la muestra del color que el motor empujó para que
+   se lea — al lado del aviso, no en otra punta del panel */
+.hint.color-real { display: flex; align-items: center; gap: 7px; }
+.hint.color-real .sw-dot { flex: none; width: 14px; height: 14px; border-radius: 4px;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,.18); display: inline-block; }
 .icon-grid { display: grid; grid-template-columns: repeat(5,1fr); gap: 6px; }
 .icon-pick { position: relative; aspect-ratio: 1/1; border-radius: 10px; border: 0; display: flex; align-items: center; justify-content: center; padding: 6px; }
-.icon-pick:not(.custom):not(.upload):not(.asset) img { width: 70%; height: 70%; filter: brightness(0) invert(1); }
+.icon-pick:not(.custom):not(.upload):not(.asset) img { width: 70%; height: 70%; }
+/* V14 · el invert pinta el glifo de BLANCO, que es lo correcto para un tile
+   de color… y blanco-sobre-blanco para las marcas de tile claro (Google,
+   Gemini): en el picker eran un cuadradito vacío. Esas traen el glifo ya
+   coloreado (coloredIcon/gradientIcon), así que acá no se tocan. */
+.icon-pick:not(.custom):not(.upload):not(.asset):not(.light) img { filter: brightness(0) invert(1); }
+/* el tile blanco necesita borde para leerse como tile sobre el panel claro */
+.icon-pick.light { border: 1px solid var(--ui-line); }
 .icon-pick.custom { background: #fff; border: 1px solid var(--ui-line); }
 .icon-pick.asset { background: var(--ui-sunken); border: 1px solid var(--ui-line); }
 .icon-pick.asset img { width: 82%; height: 82%; object-fit: contain; filter: none; }
@@ -487,8 +504,14 @@ button.obj-row { width: 100%; cursor: pointer; text-align: left; font: inherit; 
 .obj-hit.sel { outline: 2px solid var(--ui-focus); outline-offset: 1px; background: rgba(37,99,235,.07); }
 /* parte del grupo pero no el primario: mismo color, sin los tiradores */
 .obj-hit.sel-extra { outline: 2px dashed var(--ui-focus); outline-offset: 1px; background: rgba(37,99,235,.07); }
-/* texto editable in-place (doble-click) */
-.piece-frame svg text[data-eid] { cursor: text; }
+/* Los textos se AGARRAN igual que los objetos (arrastrar es el primer
+   reflejo de cualquiera), pero el cursor de barrita decía "acá se escribe
+   y nada más" y en hover no pasaba nada — en la sesión del 3/8 nadie
+   descubrió que se podían mover ni tocar. Misma manito y misma señal
+   punteada que ya tienen los objetos; escribir sigue a doble-click. */
+.piece-frame svg text[data-eid] { cursor: grab; }
+.piece-frame svg text[data-eid]:active { cursor: grabbing; }
+.piece-frame svg text[data-eid]:hover { outline: 2px dashed rgba(37,99,235,.75); outline-offset: 3px; }
 /* Shift+click para armar un grupo de textos también dispara la selección
    nativa de texto del navegador sobre el SVG (el resaltado azul) — es un
    efecto colateral del navegador, no de la app, pero se ve como un lío
@@ -936,6 +959,9 @@ button.obj-row { width: 100%; cursor: pointer; text-align: left; font: inherit; 
   background: rgba(0,222,104,.07); pointer-events: none; z-index: 4; }
 /* parte del grupo pero no el primario — mismo idioma que .obj-hit.sel-extra */
 .text-sel.extra { border-style: dashed; }
+/* las esquinas del texto SÍ se agarran aunque el marco sea pasivo:
+   estirarlas cambia el tamaño de la letra (ver startTextResize) */
+.text-sel .rs-handle { pointer-events: auto; }
 
 /* el formato se elige desde la barra del lienzo */
 .fmt-picker { position: relative; display: inline-flex; align-items: center; gap: 8px;

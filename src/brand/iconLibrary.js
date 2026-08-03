@@ -166,6 +166,14 @@ export const SHAPES = [
   { id: 'shape:handArrow', slug: 'handArrow', category: 'shapes', label: 'Flecha a mano', shape: 'handArrow', isShape: true, color: '#00DE68' },
   { id: 'shape:sparkle', slug: 'sparkle', category: 'shapes', label: 'Destello', shape: 'sparkle', isShape: true, color: '#00DE68' },
   { id: 'shape:badge', slug: 'badge', category: 'shapes', label: 'Etiqueta', shape: 'badge', isShape: true, color: '#00DE68' },
+  // V16 · el badge que faltaba: en la sesión con Aye el "EN VIVO" del webinar
+  // terminó improvisado adentro de un bocadillo. Va acá, al lado de la
+  // Etiqueta, porque "Formas" es donde se lo buscó — pero por dentro es un
+  // TRAZO (isMark): un solo path currentColor con el punto y las letras
+  // caladas, así lo tiñe el pipeline existente (coloredIcon + el empuje de
+  // legibilidad) con el acento o el color que elijan, sin tocar motor ni
+  // editor. No es isShape a propósito: el motor no conoce un shape 'envivo'.
+  { id: 'marks:envivo', slug: 'envivo', category: 'shapes', label: 'Badge EN VIVO', url: markModules['./assets/badge-envivo.svg'], color: '#0D0C0C', isMark: true },
   { id: 'shape:bars', slug: 'bars', category: 'shapes', label: 'Barras', shape: 'bars', isShape: true, color: '#00DE68' },
   { id: 'shape:sparkline', slug: 'sparkline', category: 'shapes', label: 'Curva', shape: 'sparkline', isShape: true, color: '#00DE68' },
   { id: 'shape:callout', slug: 'callout', category: 'shapes', label: 'Bocadillo', shape: 'callout', isShape: true, color: '#00DE68' },

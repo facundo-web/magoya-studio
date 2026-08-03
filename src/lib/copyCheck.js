@@ -109,11 +109,22 @@ const NOMBRE = {
 // `mejorTinta(base)`—: con `mejorTinta` la separación tiraba para otro lado
 // y el aviso medía contra un color que la pieza no tiene (8 combinaciones de
 // esquema × acento sobre placa).
-function fondoDetras({ role, scheme, accent, onPhoto, opaquePlate, highlight, campo, min }) {
+function fondoDetras({ role, scheme, accent, onPhoto, opaquePlate, highlight, campo, min, colorElegido }) {
   const base = opaquePlate ? colorDePlaca(scheme, onPhoto) : campo
   const tintaBase = tintaSobre(base, scheme, min)
   if (highlight) return visibleSobre(highlight, base, tintaBase, 3)
-  if (role === 'cta') return visibleSobre(accent, base, tintaBase, 3)
+  if (role === 'cta') {
+    // 8 · el color elegido en un CTA pinta la PASTILLA: el aviso tiene que
+    // medir contra la pastilla que se dibuja, no contra la del acento.
+    // Mismo cálculo de `pedidoPastilla` que decidirColores en el motor.
+    const pedido = colorElegido && colorElegido !== 'auto' ? (
+      colorElegido === 'accent' ? accent
+        : colorElegido === 'strong' ? tintaBase
+        : colorElegido === 'muted' ? suaveSobre(base, scheme, tintaBase, min)
+        : (TEXT_COLORS[colorElegido] || {}).value || null
+    ) : null
+    return visibleSobre(pedido || accent, base, tintaBase, 3)
+  }
   return base
 }
 
@@ -123,7 +134,9 @@ function colorDelTexto({ role, colorElegido, scheme, accent, fondo, min, highlig
   const tinta = tintaSobre(fondo, scheme, min)
   const suave = suaveSobre(fondo, scheme, tinta, min)
   const acento = visibleSobre(accent, fondo, tinta, min)
-  if (colorElegido && colorElegido !== 'auto') {
+  // en el CTA la elección se fue a la pastilla (ver fondoDetras): la letra
+  // sigue siendo mejorTinta, igual que en el motor
+  if (colorElegido && colorElegido !== 'auto' && role !== 'cta') {
     const crudo = colorElegido === 'accent' ? acento
       : colorElegido === 'strong' ? tinta
       : colorElegido === 'muted' ? suave
@@ -182,10 +195,12 @@ export function checkContrast({ role, template, content = {}, block = null }) {
   const min = rel >= REL_GRANDE ? AA_GRANDE : AA_NORMAL
 
   const highlight = (HIGHLIGHTS[block?.highlight] || {}).value || null
-  const fondo = fondoDetras({ role, scheme, accent, onPhoto, opaquePlate, highlight, campo, min })
+  // los roles clásicos también tienen color propio ahora (content.colors,
+  // el gemelo de sizes): el CTA de una plantilla clásica se pinta con él
+  const colorElegido = block ? block.color : (content.colors?.[role] || null)
+  const fondo = fondoDetras({ role, scheme, accent, onPhoto, opaquePlate, highlight, campo, min, colorElegido })
   if (!fondo) return []   // sobre foto no medimos: no hay con qué
 
-  const colorElegido = block ? block.color : null
   const texto = colorDelTexto({ role, colorElegido, scheme, accent, fondo, min, highlight })
   if (ratio(texto, fondo) >= min) return []
 

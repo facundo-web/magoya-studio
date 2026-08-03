@@ -140,6 +140,103 @@ export function minTexto(px, weight, ref) {
   return (px >= ref * 0.03 || (px >= ref * 0.022 && weight >= 700)) ? 3 : 4.5
 }
 
+// ============================================================
+// LA DECISIÓN DE COLOR DE UN BLOQUE, EN UN SOLO LUGAR
+//
+// Vivía adentro de `pintarBloque` y por eso el inspector no podía saber qué
+// color iba a salir pintado: mostraba el swatch crudo mientras el motor
+// empujaba el color por legibilidad. En la sesión del 3/8 eso se leyó como
+// "los swatches mienten": Aye elegía Crema sobre una tarjeta clara y no
+// pasaba nada visible, sin ninguna explicación. La regla no cambia —el color
+// elegido a mano NUNCA gana contra la legibilidad— pero ahora la decisión es
+// consultable: `colorEfectivo` devuelve lo que de verdad se pinta y si hubo
+// ajuste, para que la UI lo DIGA en vez de dejar que parezca un bug.
+//
+// `role` acá es el estilo tipográfico (title, cta, …); `colorKey` es lo que
+// eligió la persona ('auto' | 'accent' | 'strong' | 'muted' | clave de
+// TEXT_COLORS); `hl` es el hex del marcador o null. `fondoBase` es lo que
+// hay DEBAJO del bloque (null = foto, no se puede medir).
+// ============================================================
+function decidirColores({ role, colorKey, hl, px, weight }, fondoBase, scheme, accentTexto, ref) {
+  const isCta = role === 'cta'
+  // el mínimo depende del tamaño DIBUJADO, no del rol: un titular achicado
+  // por falta de lugar dejó de ser display
+  const min = minTexto(px, weight, ref)
+  const tintaBase = tintaSobre(fondoBase, scheme, min)
+  // 8 · el color elegido en un CTA pinta la PASTILLA, no la letra. Es lo que
+  // cualquiera entiende por "el color del botón": antes la pastilla salía
+  // SIEMPRE con el acento y la elección sólo llegaba a la letra, que encima
+  // se volvía ilegible sobre la pastilla. La pastilla es una mancha: le
+  // alcanza con despegarse 3:1 del fondo, igual que el marcador.
+  const pedidoPastilla = isCta && colorKey && colorKey !== 'auto' ? (
+    colorKey === 'accent' ? accentTexto
+      : colorKey === 'strong' ? tintaBase
+      : colorKey === 'muted' ? suaveSobre(fondoBase, scheme, tintaBase, min)
+      : (TEXT_COLORS[colorKey] || {}).value || null
+  ) : null
+  const pastilla = isCta ? visibleSobre(pedidoPastilla || accentTexto, fondoBase, tintaBase, 3) : null
+  const marcador = hl ? visibleSobre(hl, fondoBase, tintaBase, 3) : null
+  // y el fondo REAL de las letras es la mancha cuando la hay
+  const fondoLetra = pastilla || marcador || fondoBase
+  const tinta = tintaSobre(fondoLetra, scheme, min)
+  const suave = suaveSobre(fondoLetra, scheme, tinta, min)
+  const acento = visibleSobre(accentTexto, fondoLetra, tinta, min)
+  // El color elegido a mano gana… pero se tiene que ver: se conserva el tono
+  // y se lo empuja hasta que se lee. Es la misma regla que ya se aplica al
+  // acento; no hay motivo para que la elección de la persona sea la única
+  // que la app no cuida. En el CTA la elección ya se fue a la pastilla.
+  const elegidoCrudo = !isCta && colorKey && colorKey !== 'auto' ? (
+    colorKey === 'accent' ? acento
+      : colorKey === 'strong' ? tinta
+      : colorKey === 'muted' ? suave
+      : (TEXT_COLORS[colorKey] || {}).value || null
+  ) : null
+  const elegidoColor = elegidoCrudo ? visibleSobre(elegidoCrudo, fondoLetra, tinta, min) : null
+  const fill = elegidoColor
+    || (isCta || hl ? mejorTinta(fondoLetra)
+    : role === 'kicker' || role === 'metric' ? acento
+    : role === 'author' || role === 'subtitle' || role === 'metricLabel' ? suave
+    : tinta)
+  // lo que se pidió vs. lo que sale: el CTA se juzga por su pastilla,
+  // el resto por la letra
+  const pedido = isCta ? pedidoPastilla : elegidoCrudo
+  const efectivo = isCta ? pastilla : fill
+  return { fill, pastilla, marcador, fondoLetra, tinta, tintaBase, suave, acento, pedido, efectivo, ajustado: !!pedido && pedido !== efectivo }
+}
+
+// 10 · CONTRATO CON EL EDITOR: el color que DE VERDAD se pinta.
+// `bloque` es el textBlock tal como lo guarda el editor ({ style, color,
+// highlight, size }) o un rol clásico ({ role }); `fondo` es el fondo real
+// detrás del texto (el `fondo` de `siluetaInfo`, o null sobre foto); `ctx`
+// lleva el esquema y la CLAVE de acento de la pieza (content.accent).
+// Devuelve { color, pastilla, marcador, pedido, ajustado }:
+//   color     el hex que sale pintado (en un CTA, el de la pastilla)
+//   pedido    lo que se había pedido antes del empuje (null si era 'auto')
+//   ajustado  true si el motor tuvo que empujar el color para que se lea
+// El px se aproxima con el tamaño de arranque del estilo: si el auto-ajuste
+// achica el texto en el render, el corte display/no-display puede diferir en
+// el borde — para el aviso "se ajustó para que se lea" alcanza y sobra.
+export function colorEfectivo(bloque, fondo, { scheme, accent, ref = 1000 } = {}) {
+  const role = bloque.style || bloque.role || 'body'
+  const st = TEXT_STYLES[role] || TEXT_STYLES.body
+  const px = ref * st.sizeRel * (Number(bloque.size) || 1)
+  const accentTexto = acentoLegible(accent, scheme, fondo || scheme.surface)
+  const hl = bloque.hl !== undefined ? bloque.hl : ((HIGHLIGHTS[bloque.highlight] || {}).value || null)
+  const col = decidirColores({ role, colorKey: bloque.color, hl, px, weight: st.weight }, fondo, scheme, accentTexto, ref)
+  return { color: col.efectivo, pastilla: col.pastilla, marcador: col.marcador, pedido: col.pedido, ajustado: col.ajustado }
+}
+
+// 9a/10 · CONTRATO CON EL EDITOR: el tinte que DE VERDAD lleva un objeto.
+// Es el mismo empuje que hace `drawObjects` (el `seVe` de siempre): sólo se
+// toca lo que de verdad no se distingue del fondo (< 1,2:1) y se lo separa
+// hasta el 1,6 que ya usa `acentoLegible`. El inspector lo llama con el
+// mismo fondo que recibe drawObjects (el campo de la pieza) para mostrar el
+// swatch real y avisar del ajuste, en vez de que "elegir Blanco no haga nada".
+export function tinteEfectivo(color, fondo) {
+  if (!fondo || !color) return color
+  return ratio(color, fondo) < 1.2 ? separar(color, fondo, 1.6, mejorTinta(fondo)) : color
+}
+
 // roles de texto en orden de stack
 // `cta` faltaba: una plantilla clásica no podía tener botón, sólo las
 // libres. Va último porque es el cierre del stack.
@@ -373,7 +470,11 @@ export function siluetaInfo(id, { scheme, accent, onPhoto }) {
   const sil = SILUETAS[id]
   if (!sil) return null
   const esc = sil({ W: 1000, H: 1250, ref: 1000, onPhoto, p: { scheme, accent, surface: onPhoto ? 'photo' : 'solid' } })
-  return { fondo: esc.fondo, pesos: esc.pesos || {} }
+  // `campo` = el color del CENTRO de la pieza, que es contra el que se ven
+  // los objetos sueltos (drawObjects recibe exactamente esto). Lo necesita
+  // el inspector para llamar a `tinteEfectivo` con el mismo fondo que el
+  // motor y no avisar de un ajuste que no existe.
+  return { fondo: esc.fondo, campo: esc.campoEn ? esc.campoEn(500, 625) : esc.fondo, pesos: esc.pesos || {} }
 }
 
 export function resolvePiece(template, content) {
@@ -409,6 +510,11 @@ export function resolvePiece(template, content) {
     textBlocks: c.textBlocks || d.textBlocks || [],
     showLogo: c.showLogo !== undefined ? c.showLogo : d.showLogo !== false,
     logoPos: c.logoPos || d.logoPos || 'left',
+    // 13 · la vertical del logo, elegible. 'auto' = la regla de siempre
+    // (opuesto al stack de texto, o adentro de la banda): es un buen default
+    // pero era el ÚNICO comportamiento, y en la sesión del 3/8 no hubo forma
+    // de subir el logo sin mover todo lo demás.
+    logoVPos: ['top', 'bottom'].includes(c.logoVPos || d.logoVPos) ? (c.logoVPos || d.logoVPos) : 'auto',
     logoScale: c.logoScale || d.logoScale || 1,
     // logo automático: lo decide el contraste con el fondo. Es la regla de
     // marca que menos debería depender del criterio de cada uno.
@@ -425,6 +531,11 @@ export function resolvePiece(template, content) {
     objects: c.objects || d.objects || [],
     steps: c.steps || d.steps || [],
     sizes: c.sizes || d.sizes || null,
+    // 8 · color por ROL (rol → clave de TEXT_COLORS), el gemelo de `sizes`.
+    // Los textBlocks siempre tuvieron `color`; los roles clásicos no tenían
+    // dónde enchufarlo, así que el CTA de una plantilla clásica no se podía
+    // pintar ni queriendo.
+    colors: c.colors || d.colors || null,
     vignette: c.vignette ?? d.vignette ?? 0,
     photoDim: c.photoDim ?? d.photoDim ?? 0,
     photoBlur: c.photoBlur ?? d.photoBlur ?? 0,
@@ -585,15 +696,15 @@ export function drawPiece(b, { template, content, format, sizeLock = null }) {
       maxHeight: fijo ? H * 0.86 : H * (esc?.techo ?? 0.5), startPx: fijo || startPx,
       lineHeight: st.lineHeight || 1.15, maxLines: fijo ? 99 : maxLines,
     })
-    blocks.push({ role, st, value, px: fit.px, lines: fit.lines, lineHeight: st.lineHeight || 1.15, hand, hl: opts.hl || null, color: opts.color || null, eid: opts.eid || null, fijo: !!elegido, fitOpts })
+    blocks.push({ role, st, value, px: fit.px, lines: fit.lines, lineHeight: st.lineHeight || 1.15, hand, hl: opts.hl || null, color: opts.color || null, align: opts.align || null, eid: opts.eid || null, fijo: !!elegido, fitOpts })
   }
   // roles de la plantilla (piezas clásicas)
   for (const role of STACK_ORDER) {
-    if (p.roles.includes(role)) pushBlock(role, p.text[role], { eid: `role:${role}` })
+    if (p.roles.includes(role)) pushBlock(role, p.text[role], { eid: `role:${role}`, color: p.colors?.[role] })
   }
   // bloques de texto sumados por el usuario (freeform / componentes)
   p.textBlocks.forEach((tb, idx) => {
-    pushBlock(tb.style || 'title', tb.text, { hl: (HIGHLIGHTS[tb.highlight] || {}).value, color: tb.color, eid: `tb:${idx}`, size: tb.size })
+    pushBlock(tb.style || 'title', tb.text, { hl: (HIGHLIGHTS[tb.highlight] || {}).value, color: tb.color, align: tb.align, eid: `tb:${idx}`, size: tb.size })
   })
   // pasos numerados (plantilla "método")
   ;(p.steps || []).forEach((st, idx) => {
@@ -772,7 +883,13 @@ export function drawPiece(b, { template, content, format, sizeLock = null }) {
   }
 
   // ---- objetos DETRÁS del texto (profundidad) ----
-  drawObjects(b, { objects: (p.objects || []).filter((o) => !o.front), W, H, ref, accent: p.accent, scheme: p.scheme, fondo: fondoPieza })
+  // V2a · cada objeto viaja con su índice REAL en content.objects (`_i`):
+  // los textos que dibuja una forma (etiqueta, bocadillo, ventana) llevan
+  // data-eid "obj:<i>:<campo>" y el editor resuelve por ese índice. Sin
+  // esto el eid apuntaría al índice DENTRO del filtro front/back, que no
+  // es el del objeto — editarías el texto de otro elemento.
+  const objsIdx = (p.objects || []).map((o, i) => ({ ...o, _i: i }))
+  drawObjects(b, { objects: objsIdx.filter((o) => !o.front), W, H, ref, accent: p.accent, scheme: p.scheme, fondo: fondoPieza })
 
   // dibujar un bloque en (x, y). Devuelve cuánto ocupó en alto.
   // `fondoBase` es lo que hay DEBAJO de este bloque: la placa si está en el
@@ -781,22 +898,16 @@ export function drawPiece(b, { template, content, format, sizeLock = null }) {
   const pintarBloque = (bl, textX, cursorY, textAnchor, fondoBase = fondoStack) => {
     const isKicker = bl.role === 'kicker'
     const isCta = bl.role === 'cta'
-    const isAccentRole = bl.role === 'metric'
     const weight = bl.hand ? 700 : bl.st.weight
     const tracking = bl.hand ? 0 : (bl.st.tracking || 0)
-    // el mínimo depende del tamaño DIBUJADO, no del rol: un titular achicado
-    // por falta de lugar dejó de ser display
-    const min = minTexto(bl.px, weight, ref)
-    const tintaBase = tintaSobre(fondoBase, p.scheme, min)
-    // la pastilla del CTA y el marcador son manchas: tienen que despegarse
-    // del fondo (3:1) o el botón desaparece sobre una placa del mismo tono
-    const pastilla = isCta ? visibleSobre(accentTexto, fondoBase, tintaBase, 3) : null
-    const marcador = bl.hl ? visibleSobre(bl.hl, fondoBase, tintaBase, 3) : null
-    // y el fondo REAL de las letras es la mancha cuando la hay
-    const fondoLetra = pastilla || marcador || fondoBase
-    const tinta = tintaSobre(fondoLetra, p.scheme, min)
-    const suave = suaveSobre(fondoLetra, p.scheme, tinta, min)
-    const acento = visibleSobre(accentTexto, fondoLetra, tinta, min)
+    // Toda la decisión de color vive en `decidirColores`, que es LA MISMA
+    // función que consulta el inspector vía `colorEfectivo`: si esto y lo
+    // que muestra la UI se calculan en dos lugares, los swatches vuelven a
+    // mentir tarde o temprano (ya pasó con las placas y con copyCheck).
+    const { pastilla, marcador, fondoLetra, tintaBase, fill } = decidirColores(
+      { role: bl.role, colorKey: bl.color, hl: bl.hl, px: bl.px, weight },
+      fondoBase, p.scheme, accentTexto, ref,
+    )
 
     // fondo del texto: CTA (pill acento) o resaltado (marcador).
     // Geometría basada en la línea de base real que usa b.text (y + px*0.8).
@@ -817,23 +928,6 @@ export function drawPiece(b, { template, content, format, sizeLock = null }) {
       })
     }
 
-    // El color elegido a mano gana… pero se tiene que ver. 4 · el crema
-    // elegido a mano sobre una tarjeta clara desaparecía y la app no decía
-    // nada: se conserva el tono y se lo empuja hasta que se lee. Es la misma
-    // regla que ya se aplica al acento; no hay motivo para que la elección
-    // de la persona sea la única que la app no cuida.
-    const elegidoCrudo = bl.color && bl.color !== 'auto' ? (
-      bl.color === 'accent' ? acento
-        : bl.color === 'strong' ? tinta
-        : bl.color === 'muted' ? suave
-        : (TEXT_COLORS[bl.color] || {}).value || null
-    ) : null
-    const elegidoColor = elegidoCrudo ? visibleSobre(elegidoCrudo, fondoLetra, tinta, min) : null
-    const fill = elegidoColor
-      || (isCta || bl.hl ? mejorTinta(fondoLetra)
-      : isKicker || isAccentRole ? acento
-      : bl.role === 'author' || bl.role === 'subtitle' || bl.role === 'metricLabel' ? suave
-      : tinta)
     b.text({
       x: textX, y: cursorY, lines: bl.lines, px: bl.px,
       weight, fill, anchor: textAnchor,
@@ -853,7 +947,18 @@ export function drawPiece(b, { template, content, format, sizeLock = null }) {
   }
 
   // el stack, como siempre
-  for (const bl of enStack) cursorY += pintarBloque(bl, textX, cursorY, textAnchor)
+  // 7 · CONTRATO CON EL EDITOR: `textBlock.align: 'left' | 'center'`
+  // (opcional). El anchor de la plantilla sigue mandando el stack ENTERO;
+  // este campo alinea las líneas de UN bloque adentro de la caja. Nació en
+  // la sesión del 3/8: el ancla era de todo el stack y no había forma de
+  // centrar sólo el título dejando el resto a la izquierda. Se calcula
+  // contra `safe` y no contra W/2 porque con split o silueta la caja del
+  // texto no está centrada en la pieza.
+  for (const bl of enStack) {
+    const tx = bl.align === 'center' ? safe.x + safe.w / 2 : bl.align === 'left' ? safe.x : textX
+    const ta = bl.align === 'center' ? 'middle' : bl.align === 'left' ? 'start' : textAnchor
+    cursorY += pintarBloque(bl, tx, cursorY, ta)
+  }
   // y los que están sueltos, cada uno donde lo dejaron. Se dibujan al
   // final para que queden por encima de la placa y del stack.
   // Un bloque suelto NO está sobre la placa (salvo que lo hayas soltado
@@ -885,14 +990,18 @@ export function drawPiece(b, { template, content, format, sizeLock = null }) {
     // drawLogo pone la marca en la punta OPUESTA al stack: con el stack
     // abajo (el bloque), 'bottom' la manda arriba de su caja, que es donde va
     const vLogo = esc?.cajaLogo ? 'bottom' : vAnchor
+    // el color del campo se mide EN DONDE va a estar el logo: si la persona
+    // eligió la vertical (13), la medición la sigue — medir la otra punta es
+    // volver a elegir tinta contra un fondo que no es el del logo
+    const logoArriba = p.logoVPos === 'top' ? true : p.logoVPos === 'bottom' ? false : vLogo !== 'top'
     drawLogo(b, {
       p, W, H, safe: cajaLogo, ref, textAnchor, hAnchor, vAnchor: vLogo, plateRect,
-      campoLogo: esc ? campoEn(cajaLogo.x, vLogo === 'top' ? cajaLogo.y + cajaLogo.h : cajaLogo.y) : undefined,
+      campoLogo: esc ? campoEn(cajaLogo.x, logoArriba ? cajaLogo.y : cajaLogo.y + cajaLogo.h) : undefined,
     })
   }
 
   // ---- objetos DELANTE del texto (profundidad) ----
-  drawObjects(b, { objects: (p.objects || []).filter((o) => o.front), W, H, ref, accent: p.accent, scheme: p.scheme, fondo: fondoPieza })
+  drawObjects(b, { objects: objsIdx.filter((o) => o.front), W, H, ref, accent: p.accent, scheme: p.scheme, fondo: fondoPieza })
 }
 
 // Qué tamaño le toca a cada estilo en esta pieza, sin dibujar nada.
@@ -953,7 +1062,11 @@ export function tamanoComun(slides, format) {
 // `scheme` + acento, pero con la MISMA estructura de WhatsApp (papel,
 // barra oscura arriba, globo propio teñido a la derecha, recibido a la
 // izquierda) y con los contrastes forzados para que nada se funda.
-function chatPalette(scheme, accent) {
+// `globoElegido` (9b, sesión del 3/8): el color del globo propio, elegido a
+// mano. Hasta ahora chatPalette decidía TODO y el editor no tenía dónde
+// enchufar una elección: era la única burbuja de la app sin control de
+// color. Acepta 'accent' o un hex; null = la regla de siempre.
+function chatPalette(scheme, accent, globoElegido = null) {
   // `mejorTinta` nació acá adentro y era la única que acertaba. Ahora vive
   // arriba y la usa toda la app (punto 1 del BLOQUE S).
   const fondo = scheme.surface
@@ -994,7 +1107,12 @@ function chatPalette(scheme, accent) {
   // llama acento.
   // Recibido = el papel empujado al extremo (blanco sobre papel claro,
   // gris oscuro sobre papel oscuro).
-  const verdeGlobo = croma(fondo) > croma(accent) ? fondo : accent
+  // El elegido a mano gana sobre la regla del "verde con más color"… pero
+  // no sobre la legibilidad: pasa por el MISMO `separar` que el automático,
+  // así el globo nunca se funde con el papel (y si se empujó, el editor lo
+  // puede contar comparando contra `bubbleTint`).
+  const verdeGlobo = (globoElegido === 'accent' ? accent : globoElegido)
+    || (croma(fondo) > croma(accent) ? fondo : accent)
   const mio = separar(verdeGlobo, papel, 1.35, tinta)
   const otro = separar(mix(papel, papelClaro ? '#FFFFFF' : '#0D0C0C', 0.6), papel, 1.25, papelClaro ? '#FFFFFF' : '#0D0C0C')
   // el avatar tiene que verse SOBRE el header: si el acento se le parece
@@ -1009,6 +1127,22 @@ function chatPalette(scheme, accent) {
     tintaHeader,
     tintaHeaderSuave: mix(tintaHeader, header, 0.3),
   }
+}
+
+// 9b · CONTRATO CON EL EDITOR: la paleta del chat que DE VERDAD se pinta.
+// El inspector necesita dos cosas que hasta ahora vivían encerradas acá:
+//   · `mio` — el color real del globo propio, para avisar si el elegido a
+//     mano se empujó por legibilidad (mismo patrón que colorEfectivo);
+//   · `papel` — el fondo sobre el que caen los objetos de una pieza de chat,
+//     para que tinteEfectivo mida contra el fondo que usa drawObjects.
+// Resuelve esquema, acento y bubbleTint igual que drawChat: si esto y el
+// dibujo se calculan distinto, los swatches vuelven a mentir.
+export function paletaChat(content, template) {
+  const c = content || {}
+  const d = template?.defaults || {}
+  const scheme = COLOR_SCHEMES[c.scheme || d.scheme || DEFAULT_SCHEME]
+  const accent = acentoLegible(c.accent || d.accent, scheme)
+  return { ...chatPalette(scheme, accent, c.bubbleTint ?? d.bubbleTint ?? null), accent }
 }
 
 // ---- renderer de chat (WhatsApp) ----
@@ -1034,8 +1168,9 @@ function drawChat(b, { template, content, format }) {
     b.gradientOverlay({ w: W, h: H, angle: grad.angle ?? g.angle, stops: g.stops, opacity: grad.opacity ?? 1 })
   }
 
-  // toda la paleta del chat sale del esquema elegido
-  const pal = chatPalette(scheme, accent)
+  // toda la paleta del chat sale del esquema elegido; `bubbleTint` (opcional,
+  // 'accent' o hex) pisa el color del globo propio — CONTRATO CON EL EDITOR
+  const pal = chatPalette(scheme, accent, c.bubbleTint ?? d.bubbleTint ?? null)
 
   // panel del chat (el "papel" / wallpaper)
   const px = W * 0.06, py = H * 0.055, pw = W * 0.88, ph = H * 0.89
@@ -1049,14 +1184,21 @@ function drawChat(b, { template, content, format }) {
   // avatar
   const av = hh * 0.58, avx = px + ref * 0.03, avy = py + (hh - av) / 2
   b.rect({ x: avx, y: avy, w: av, h: av, fill: pal.avatar, rx: av / 2 })
+  // la "m" del avatar NO lleva eid a propósito: es el monograma de la
+  // marca, no un texto que alguien escribió — editarla no tiene sentido
   b.text({ x: avx + av / 2, y: avy + av * 0.24, lines: ['m'], px: av * 0.52, weight: 800, fill: pal.tintaAvatar, anchor: 'middle' })
-  b.text({ x: avx + av + ref * 0.022, y: py + hh * 0.22, lines: [chatName], px: ref * 0.038, weight: 700, fill: pal.tintaHeader })
-  b.text({ x: avx + av + ref * 0.022, y: py + hh * 0.56, lines: [chatStatus], px: ref * 0.026, weight: 500, fill: pal.tintaHeaderSuave })
+  // V2a · nombre y estado se editan con doble click sobre la pieza, como
+  // cualquier otro texto: el editor resuelve estos eids a chatName/chatStatus
+  b.text({ x: avx + av + ref * 0.022, y: py + hh * 0.22, lines: [chatName], px: ref * 0.038, weight: 700, fill: pal.tintaHeader, eid: 'chat:name' })
+  b.text({ x: avx + av + ref * 0.022, y: py + hh * 0.56, lines: [chatStatus], px: ref * 0.026, weight: 500, fill: pal.tintaHeaderSuave, eid: 'chat:status' })
 
   // Objetos "detrás": detrás de los MENSAJES, pero encima del panel. Si van
   // antes del panel quedan 100% tapados (el panel es opaco y cubre casi toda
   // la pieza): era el mismo bug de antes, sólo que más difícil de ver.
-  drawObjects(b, { objects: objects.filter((o) => !o.front), W, H, ref, accent, scheme, fondo: pal.papel })
+  // V2a · mismo índice real que en drawPiece: los eids de los textos de las
+  // formas se resuelven contra content.objects, no contra el filtro
+  const objsIdx = objects.map((o, i) => ({ ...o, _i: i }))
+  drawObjects(b, { objects: objsIdx.filter((o) => !o.front), W, H, ref, accent, scheme, fondo: pal.papel })
 
   // mensajes (burbujas)
   let cy = py + hh + ref * 0.045
@@ -1064,7 +1206,10 @@ function drawChat(b, { template, content, format }) {
   const padX = ref * 0.03, padY = ref * 0.022
   const fpx = ref * 0.032
   const lh = 1.32
-  for (const m of messages) {
+  // el índice es el de content.messages (los vacíos se saltean pero cuentan):
+  // el eid tiene que apuntar al mensaje real que vas a editar
+  for (let mi = 0; mi < messages.length; mi++) {
+    const m = messages[mi]
     if (!m || !String(m.text || '').trim()) continue
     const mine = m.from === 'me'
     const lines = wrapText(m.text, { px: fpx, weight: 500, tracking: 0, maxWidth: maxBubbleW - padX * 2 })
@@ -1076,20 +1221,20 @@ function drawChat(b, { template, content, format }) {
     // La tinta la decide el contraste con el globo, no un negro fijo.
     const globo = mine ? pal.mio : pal.otro
     b.rect({ x: bx, y: cy, w: tw, h: th, fill: globo, rx: ref * 0.024 })
-    b.text({ x: bx + padX, y: cy + padY, lines, px: fpx, weight: 500, fill: mine ? pal.tintaMia : pal.tintaOtro, lineHeight: lh })
+    b.text({ x: bx + padX, y: cy + padY, lines, px: fpx, weight: 500, fill: mine ? pal.tintaMia : pal.tintaOtro, lineHeight: lh, eid: `msg:${mi}` })
     cy += th + ref * 0.022
     if (cy > py + ph - ref * 0.06) break
   }
 
   // objetos DELANTE del panel + logo, igual que en cualquier otra pieza
-  drawObjects(b, { objects: objects.filter((o) => o.front), W, H, ref, accent, scheme, fondo: pal.papel })
+  drawObjects(b, { objects: objsIdx.filter((o) => o.front), W, H, ref, accent, scheme, fondo: pal.papel })
   const vig = c.vignette ?? d.vignette ?? 0
   if (vig > 0) b.vignette({ w: W, h: H, strength: vig })
   const mostrarLogo = c.showLogo !== undefined ? c.showLogo : d.showLogo !== false
   if (mostrarLogo) {
     const safe = safeRect(format)
     drawLogo(b, {
-      p: { logo: c.logo || d.logo || 'cream', logoPos: c.logoPos || d.logoPos || 'left', logoScale: c.logoScale || d.logoScale || 1, plate: 'none' },
+      p: { logo: c.logo || d.logo || 'cream', logoPos: c.logoPos || d.logoPos || 'left', logoVPos: c.logoVPos || d.logoVPos || 'auto', logoScale: c.logoScale || d.logoScale || 1, plate: 'none' },
       W, H, safe, ref, hAnchor: 'left', vAnchor: 'top', plateRect: null,
     })
   }
@@ -1102,16 +1247,15 @@ function drawChat(b, { template, content, format }) {
 // superficie del esquema; con los estilos nuevos (bloque de color) pasa a
 // ser la regla, no la excepción.
 function drawObjects(b, { objects, W, H, ref, accent, scheme, fondo = null }) {
-  const tintaFondo = fondo ? mejorTinta(fondo) : null
   // OJO con el umbral: "desaparece" no es lo mismo que "no cumple WCAG". Una
   // burbuja blanca sobre crema da 1,27:1 y se lee perfecto —es una superficie
   // grande y con sombra—; pedirle 3:1 la volvía gris y rompía la plantilla de
   // la pregunta en las cinco marcas claras. Se toca sólo lo que de verdad no
   // se distingue del fondo, y se lo separa hasta el mismo 1,6 que ya usa
   // `acentoLegible`.
-  const seVe = (color) => (fondo && color && ratio(color, fondo) < 1.2
-    ? separar(color, fondo, 1.6, tintaFondo)
-    : color)
+  // el cálculo vive en `tinteEfectivo` (exportado) para que el inspector
+  // muestre EL MISMO color que sale pintado — ver el bloque de V10 arriba
+  const seVe = (color) => tinteEfectivo(color, fondo)
   for (const o of objects || []) {
     // ---- FORMAS generativas (flecha, sparkle, badge, barras, bocadillo) ----
     if (o.kind === 'shape') { drawShape(b, { o, W, H, ref, accent, scheme, seVe }); continue }
@@ -1242,6 +1386,11 @@ function drawObjects(b, { objects, W, H, ref, accent, scheme, fondo = null }) {
 
 // ---- formas paramétricas (Bloque A: alto impacto) ----
 function drawShape(b, { o, W, H, ref, accent, scheme, seVe = (c) => c }) {
+  // V2a · el texto de una forma también se edita con doble click. El eid
+  // dice de QUÉ objeto y de QUÉ campo es ("obj:3:text"): el editor lo
+  // resuelve con updateObject, igual que el panel de la derecha. Sin `_i`
+  // (piezas dibujadas fuera del motor, tests) no se emite eid y listo.
+  const eidDe = (campo) => (o._i != null ? `obj:${o._i}:${campo}` : null)
   const size = ref * (o.scale || 0.3)
   const cx = W * (o.x ?? 0.5), cy = H * (o.y ?? 0.5)
   const rot = o.rotation || 0
@@ -1309,7 +1458,7 @@ function drawShape(b, { o, W, H, ref, accent, scheme, seVe = (c) => c }) {
     b.path({ d: roundRect(cx - w / 2, cy - h / 2, w, h, h / 2), fill: solid ? color : 'none',
       stroke: solid ? null : color, sw: Math.max(2, ref * 0.006 * swMul), ...g, filterId: hardShadow() })
     b.text({ x: cx, y: cy - px * 0.62, lines: [txt], px, weight: 800, tracking: 0.06,
-      fill: solid ? mejorTinta(color) : color, anchor: 'middle', opacity: op, rotation: rot, rcx: cx, rcy: cy })
+      fill: solid ? mejorTinta(color) : color, anchor: 'middle', opacity: op, rotation: rot, rcx: cx, rcy: cy, eid: eidDe('text') })
     return
   }
   if (o.shape === 'bars') {
@@ -1370,7 +1519,7 @@ function drawShape(b, { o, W, H, ref, accent, scheme, seVe = (c) => c }) {
       const lineas = wrapText(String(o.body), { px, weight: 500, maxWidth: bw - px * 1.6 }).slice(0, 8)
       b.text({
         x: bx + px * 0.8, y: by + px * 0.7, lines: lineas, px, weight: 500,
-        fill: tinta, anchor: 'start', lineHeight: 1.35, opacity: op, rotation: rot, rcx: cx, rcy: cy,
+        fill: tinta, anchor: 'start', lineHeight: 1.35, opacity: op, rotation: rot, rcx: cx, rcy: cy, eid: eidDe('body'),
       })
     } else {
       b.imageCover({ x: bx, y: by, w: bw, h: bh, href: null, rotation: rot, rcx: cx, rcy: cy })
@@ -1390,7 +1539,7 @@ function drawShape(b, { o, W, H, ref, accent, scheme, seVe = (c) => c }) {
       const px = barH * 0.5
       b.text({ x: cx, y: y0 + (barH - px) / 2 - px * 0.05, lines: [String(o.text)], px, weight: 600,
         fill: mejorTinta(marco) === INK ? "#8A9096" : 'rgba(255,255,255,.7)', anchor: 'middle',
-        opacity: op, rotation: rot, rcx: cx, rcy: cy })
+        opacity: op, rotation: rot, rcx: cx, rcy: cy, eid: eidDe('text') })
     }
     return
   }
@@ -1412,7 +1561,7 @@ function drawShape(b, { o, W, H, ref, accent, scheme, seVe = (c) => c }) {
     const burbuja = o.fill || color || '#FFFFFF'
     b.path({ d: calloutPath(w, h, { r: w * 0.09 }), fill: burbuja, tx: x0, ty: y0, ...g, filterId: soft })
     if (lines.length) {
-      b.text({ x: x0 + padX, y: y0 + padY, lines, px, weight: 600, fill: mejorTinta(burbuja), lineHeight: lh, opacity: op })
+      b.text({ x: x0 + padX, y: y0 + padY, lines, px, weight: 600, fill: mejorTinta(burbuja), lineHeight: lh, opacity: op, eid: eidDe('text') })
     }
     return
   }
@@ -1441,16 +1590,22 @@ function drawLogo(b, { p, W, H, safe, ref, hAnchor, vAnchor, plateRect, campoLog
   const sombra = p.surface === 'photo' && !(plateRect && p.plate === 'band')
     ? b.filter({ kind: 'soft', r: ref * 0.014, dy: ref * 0.004, opacity: 0.45 })
     : null
+  // 13 · la vertical la elige el usuario ('top'/'bottom'); 'auto' mantiene
+  // las dos reglas de siempre: adentro de la banda si hay banda, y si no,
+  // opuesto al stack de texto. Una elección explícita gana sobre las dos:
+  // si pediste el logo arriba, meterlo en la banda de abajo es no escucharte.
+  const vp = p.logoVPos || 'auto'
   // B4 · con banda, el logo va ADENTRO de la placa, del lado libre (hoy
   // flotaba aparte y la pieza se leía como dos cosas pegadas). Sólo si el
   // texto no llega hasta ahí: nunca se pisan.
-  if (plateRect && p.plate === 'band' && hAnchor !== 'center'
+  if (vp === 'auto' && plateRect && p.plate === 'band' && hAnchor !== 'center'
       && safe.x + plateRect.textW + lw + ref * 0.06 <= W - safe.x) {
     b.asset({ x: W - safe.x - lw, y: plateRect.y + (plateRect.h - lh) / 2, w: lw, h: lh, href: logoUrl })
     return
   }
-  // vertical: opuesto al stack de texto; horizontal: elegido por el usuario
+  // horizontal: elegido por el usuario
   const lx = onRight ? W - safe.x - lw : safe.x
-  const ly = vAnchor === 'top' ? safe.y + safe.h - lh : safe.y
+  const arriba = vp === 'top' ? true : vp === 'bottom' ? false : vAnchor !== 'top'
+  const ly = arriba ? safe.y : safe.y + safe.h - lh
   b.asset({ x: lx, y: ly, w: lw, h: lh, href: logoUrl, filterId: sombra })
 }

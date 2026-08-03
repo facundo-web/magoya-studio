@@ -2,13 +2,13 @@ import React, { useState, useRef, useEffect } from 'react'
 import PiecePreview from './PiecePreview.jsx'
 import { TEMPLATES, MAXCHARS } from '../templates/index.js'
 import { variantsFor, activeVariantId } from '../templates/variants.js'
-import { tamanoComun } from '../engine/layouts.js'
+import { tamanoComun, resolvePiece, siluetaInfo, colorDePlaca, colorEfectivo, tinteEfectivo, paletaChat } from '../engine/layouts.js'
 import { checkCopy, checkPiece, checkContrast } from '../lib/copyCheck.js'
 import MockupPreview, { MOCKUPS, mockupsPara } from './MockupPreview.jsx'
 import Icon from '../ui/Icon.jsx'
 import { FORMATS_BY_ID, formatsByNetwork, CAROUSEL_FORMATS } from '../formats/registry.js'
 import { COLOR_SCHEMES, ACCENTS, WORDMARKS, GRADIENTS, HIGHLIGHTS, TEXT_COLORS } from '../brand/brandKit.js'
-import { ALL_OBJECTS, ICONS_BY_ID, ICON_CATEGORIES, LIGHT_TILE, TILE_GRADIENT, TILE_SHAPE } from '../brand/iconLibrary.js'
+import { ALL_OBJECTS, ICONS_BY_ID, ICON_CATEGORIES, LIGHT_TILE, TILE_GRADIENT, GLYPH_GRADIENT, TILE_SHAPE } from '../brand/iconLibrary.js'
 import { PHOTOS } from '../brand/photoLibrary.js'
 
 // colores para teñir logos "sin fondo" y marcas
@@ -20,7 +20,7 @@ const TINTS = [
   { k: 'blue', label: 'Azul', value: '#2E7DD1', sw: '#2E7DD1' },
   { k: 'yellow', label: 'Amarillo', value: '#F2C14E', sw: '#F2C14E' },
 ]
-import { imageSize, getAsset, compressImage, removeBackground } from '../engine/assets.js'
+import { imageSize, getAsset, compressImage, removeBackground, coloredIcon, gradientIcon } from '../engine/assets.js'
 import { measure, wrapText } from '../engine/textLayout.js'
 import { exportPiece, exportCarousel } from '../engine/export.js'
 
@@ -85,10 +85,39 @@ const ROLE_LABELS = {
   metricLabel: 'Descripción del dato',
   quote: 'Cita',
   author: 'Autor / fuente',
+  cta: 'Botón / CTA',
 }
 
 // grilla de posiciones (para ubicar objetos rápido)
 const SHAPE_NAMES = { arrow: 'Flecha gruesa', handArrow: 'Flecha a mano', sparkle: 'Destello', badge: 'Etiqueta', bars: 'Barras', sparkline: 'Curva', callout: 'Bocadillo', window: 'Captura de pantalla' }
+
+// ---- búsqueda de elementos en el picker ----
+// La gente busca con SUS palabras, no con el nombre del catálogo: en la
+// sesión del 3/8 se buscó "link en la bio" y no apareció nada. Los
+// sinónimos viven acá (donde está el filtro) y se indexan por slug, así
+// un elemento nuevo de la biblioteca entra a la búsqueda por su label sin
+// tocar esta lista.
+const SINONIMOS = {
+  badge: 'boton cta pill tag nuevo link bio vivo live directo streaming',
+  callout: 'globo burbuja dialogo speech comentario mensaje',
+  window: 'pantalla screenshot navegador browser ventana demo panel',
+  bars: 'grafico chart datos estadistica columnas',
+  sparkline: 'grafico linea tendencia evolucion chart',
+  dots: 'puntos slider paginacion carrusel indicador',
+  panel: 'rectangulo bloque placa fondo collage color',
+  sparkle: 'brillo estrella magia ia chispa',
+  arrow: 'apuntar senalar direccion',
+  handArrow: 'apuntar senalar dibujada garabato',
+  x: 'twitter tuiter',
+  googlegemini: 'gemini bard ia',
+  openai: 'chatgpt gpt ia',
+  anthropic: 'claude ia',
+  claude: 'anthropic ia',
+  whatsapp: 'wpp wsp chat mensaje',
+  mockup: 'celular telefono mano tablet dispositivo foto',
+}
+// sin acentos y en minúsculas: "boton" tiene que encontrar "Botón"
+const normalizar = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
 // formas dibujadas con trazo (tienen grosor ajustable)
 const STROKE_SHAPES = ['handArrow', 'sparkline']
 
@@ -280,11 +309,13 @@ export default function Editor({
   }
   const [selText, setSelText] = useState(null) // eid del texto seleccionado
   // "Cuando es texto no me permite selección múltiple" — mismo modelo que
-  // los objetos (primario + resto del grupo), aplicado a textos. Es un
-  // grupo APARTE del de objetos a propósito: mezclar un texto y un logo
-  // en un mismo grupo no tiene una acción de conjunto clara (¿el borrado
-  // qué hace con cada uno?), así que se puede armar un grupo de varios
-  // objetos O de varios textos, no los dos mezclados.
+  // los objetos (primario + resto del grupo), aplicado a textos. Siguen
+  // siendo DOS estados (los objetos se nombran por índice, los textos por
+  // eid), pero ya no son dos mundos: en la sesión del 3/8 Aye armó el grupo
+  // con lo que VEÍA —un logo y su texto— sin reparar en de qué tipo era
+  // cada cosa, y el grupo mixto no se movía. Ahora MOVER y BORRAR operan
+  // sobre la unión de los dos grupos; copiar y duplicar siguen por tipo
+  // porque cada portapapeles guarda cosas distintas (objetos vs bloques).
   const [multiSelText, setMultiSelText] = useState(() => new Set())
   const textSeleccion = React.useMemo(
     () => [...new Set([selText, ...multiSelText])].filter(Boolean),
@@ -413,6 +444,21 @@ export default function Editor({
     const set = new Set(idxs)
     setObjects(objects.filter((_, idx) => !set.has(idx))); deselectAll()
     onToast(`Se quitaron ${idxs.length} elementos`, true)
+  }
+  // Borrar un grupo MIXTO tiene que ser UN solo set(): objRemoveMany y
+  // textRemoveMany en fila se pisan (los dos parchean sobre el mismo
+  // `content` viejo, gana el último) y encima quedarían como dos pasos de
+  // Deshacer para un solo gesto.
+  const removeMixto = (idxs, eids) => {
+    const idxSet = new Set(idxs)
+    const tbIdx = new Set(eids.map((eid) => (eid.startsWith('tb:') ? +eid.slice(3) : null)).filter((i) => i != null))
+    set({
+      objects: objects.filter((_, i) => !idxSet.has(i)),
+      textBlocks: (content.textBlocks || []).filter((_, i) => !tbIdx.has(i)),
+    })
+    deselectAll(); setSelText(null); setMultiSelText(new Set())
+    const saltados = eids.length - tbIdx.size
+    onToast(`Se quitaron ${idxs.length + tbIdx.size} (elementos y textos)` + (saltados ? ` · ${saltados} de la plantilla no se tocaron` : ''), true)
   }
   // Duplicar y pegar hacen lo mismo (una copia en cascada de cada uno,
   // encadenadas para que no queden todas exactamente superpuestas) — por
@@ -593,7 +639,9 @@ export default function Editor({
       if (!seleccion.length && !textSeleccion.length) return
       if (e.key === 'Delete' || e.key === 'Backspace') {
         e.preventDefault()
-        if (seleccion.length) objRemoveMany(seleccion)
+        // grupo mixto: borra las dos mitades en un solo paso (ver removeMixto)
+        if (seleccion.length && textSeleccion.length) removeMixto(seleccion, textSeleccion)
+        else if (seleccion.length) objRemoveMany(seleccion)
         else textRemoveMany(textSeleccion)
         return
       }
@@ -656,6 +704,46 @@ export default function Editor({
       const k = d / d0
       // el ancla no se mueve: el centro se recalcula a mitad de camino
       updateObject(i, { scale: clampScale(s0 * k), x: ax + (px - ax) / 2, y: ay + (py - ay) / 2 }, 'resize')
+    }
+    const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up) }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
+  }
+
+  // ---- resize de TEXTOS agarrando una esquina ----
+  // "puedo agrandar la letra estirando?" — los objetos ya tenían handles y
+  // los textos sólo chips (Chico/Normal/Grande) en el inspector. El gesto
+  // escribe el MISMO multiplicador que los chips (`size` en el bloque,
+  // `sizes[rol]` en los roles): no es otro sistema de tamaño, es otra
+  // manija para el que ya existía.
+  const tamanoDe = (eid) => {
+    if (eid.startsWith('tb:')) return (content.textBlocks || [])[+eid.slice(3)]?.size || 1
+    const rol = eid.startsWith('step:') ? 'step' : eid.startsWith('role:') ? eid.slice(5) : null
+    return (rol && content.sizes?.[rol]) || 1
+  }
+  const setTamano = (eid, v, tag) => {
+    if (eid.startsWith('tb:')) {
+      const i = +eid.slice(3)
+      set({ textBlocks: (content.textBlocks || []).map((b, idx) => (idx === i ? { ...b, size: v } : b)) }, tag)
+    } else {
+      const rol = eid.startsWith('step:') ? 'step' : eid.startsWith('role:') ? eid.slice(5) : null
+      if (rol) set({ sizes: { ...(content.sizes || {}), [rol]: v } }, tag)
+    }
+  }
+  const startTextResize = (e, box, corner) => {
+    e.stopPropagation(); e.preventDefault()
+    try { e.currentTarget.setPointerCapture(e.pointerId) } catch {}
+    const fr = frameRef.current.getBoundingClientRect()
+    // ancla = la esquina de enfrente, igual que en los objetos
+    const ax = fr.left + (corner.includes('w') ? box.left + box.width : box.left)
+    const ay = fr.top + (corner.includes('n') ? box.top + box.height : box.top)
+    const d0 = Math.hypot(e.clientX - ax, e.clientY - ay) || 1
+    const s0 = tamanoDe(box.eid)
+    const move = (ev) => {
+      const k = Math.hypot(ev.clientX - ax, ev.clientY - ay) / d0
+      // el tope de abajo evita el texto-hormiga irrecuperable; el de arriba
+      // es el mismo espíritu que el clamp de escala de los objetos
+      setTamano(box.eid, Math.min(3, Math.max(0.4, +(s0 * k).toFixed(2))), 'tresize:' + box.eid)
     }
     const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up) }
     window.addEventListener('pointermove', move)
@@ -763,17 +851,61 @@ export default function Editor({
     }).filter(Boolean)
     setTextBoxes(cajas)
   }, [textSeleccion, selText, content, format.id, panelW.left, panelW.right, zoom])
+  // qué objetos tienen su caja sobre este punto (en % de la pieza), en
+  // orden de índice = orden de apilado. Lo usan Alt+click y el ciclado.
+  const losQueTocan = (px, py) => objects.map((o, k) => [k, objBox(o)])
+    .filter(([, b]) => px * 100 >= b.left && px * 100 <= b.left + b.w && py * 100 >= b.top && py * 100 <= b.top + b.h)
+    .map(([k]) => k)
+  // Dónde está HOY un texto, en coordenadas de la pieza. Si ya lo moviste
+  // a mano está en content.pos; si sigue en el stack se lee del dibujo —
+  // es la única fuente de verdad de dónde lo puso el motor.
+  const posTextoActual = (eid) => {
+    const guardada = content.pos?.[eid]
+    if (guardada) return { x: guardada.x, y: guardada.y }
+    const t = frameRef.current?.querySelector(`text[data-eid="${CSS.escape(eid)}"]`)
+    if (!t) return null
+    const fr = frameRef.current.getBoundingClientRect()
+    const r = t.getBoundingClientRect()
+    return { x: (r.left - fr.left) / fr.width, y: (r.top - fr.top) / fr.height }
+  }
+  // El grupo que se va a arrastrar: TODO lo seleccionado, objetos y textos,
+  // con la posición de partida de cada uno. Un solo drag, un solo delta.
+  const armarGrupo = (e) => ({
+    start: posFromEvent(e),
+    pressClient: { x: e.clientX, y: e.clientY },
+    moved: false,
+    orig: new Map(seleccion.map((k) => [k, { x: objects[k]?.x ?? 0.5, y: objects[k]?.y ?? 0.5 }])),
+    // los textos ajenos (de un elemento o del chat) no entran al drag del
+    // grupo: moverlos por `pos` no hace nada y ensucia el proyecto
+    origTexto: new Map(textSeleccion.filter((eid) => !esTextoAjeno(eid)).map((eid) => [eid, posTextoActual(eid)]).filter(([, v]) => v)),
+  })
   const startDrag = (e, i) => {
     e.stopPropagation()
+    // Los .obj-hit son divs HTML ENCIMA del SVG: tapan todo su rectángulo,
+    // incluido un texto que se dibuja por arriba del objeto. En la sesión
+    // del 3/8 eso hacía imposible tocar un título que pisaba la caja de
+    // una foto. Si en el punto exacto del click hay letras de un texto y
+    // el objeto vive detrás del texto, el click es del texto — es lo que
+    // se ve arriba. (Se mira el glifo real con elementsFromPoint, no la
+    // caja: entre letra y letra el objeto se sigue pudiendo agarrar.)
+    // Con una excepción: si el objeto YA está seleccionado, el click es
+    // para arrastrarlo (o arrastrar su grupo) — robárselo para el texto
+    // haría imposible mover un objeto que quedó abajo de un titular.
+    if (!objects[i]?.front && !(selObj === i || multiSel.has(i))) {
+      const t = document.elementsFromPoint(e.clientX, e.clientY)
+        .map((el) => el.closest && el.closest('text[data-eid]')).find(Boolean)
+      // los textos "obj:" son del PROPIO elemento (el bocadillo, la
+      // etiqueta): tocarlos es tocar el elemento, no un texto que lo tapa.
+      // Sin esta excepción, hacer click en un bocadillo por su texto
+      // seleccionaría el texto y el bocadillo se volvería inarrastrable.
+      if (t && frameRef.current?.contains(t) && !t.getAttribute('data-eid').startsWith('obj:')) { bajarSobreTexto(t, e); return }
+    }
     // Alt+click cicla hacia lo que está DEBAJO: si dos objetos se pisan,
     // sin esto sólo se puede agarrar el de arriba.
     let idx = i
     if (e.altKey) {
       const r = frameRef.current.getBoundingClientRect()
-      const px = (e.clientX - r.left) / r.width, py = (e.clientY - r.top) / r.height
-      const bajo = objects.map((o, k) => [k, objBox(o)])
-        .filter(([, b]) => px * 100 >= b.left && px * 100 <= b.left + b.w && py * 100 >= b.top && py * 100 <= b.top + b.h)
-        .map(([k]) => k)
+      const bajo = losQueTocan((e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height)
       if (bajo.length > 1) {
         const pos = bajo.indexOf(selObj)
         idx = bajo[(pos + bajo.length - 1) % bajo.length]   // el siguiente hacia abajo
@@ -785,14 +917,23 @@ export default function Editor({
     // Un click normal sobre algo que YA es parte del grupo arrastra el
     // GRUPO entero (como Figma/Canva); si es algo nuevo, lo aísla —
     // exactamente el comportamiento de antes cuando no había grupo.
+    // Ojo: si es parte del grupo NO se suelta la selección de textos —
+    // el grupo puede ser mixto y se mueve entero.
     const yaEnGrupo = selObj === idx || multiSel.has(idx)
-    if (!yaEnGrupo) { setSelObj(idx); setMultiSel(new Set()) }
-    setSelText(null); setMultiSelText(new Set()); setSelBg(false)
+    if (!yaEnGrupo) { setSelObj(idx); setMultiSel(new Set()); setSelText(null); setMultiSelText(new Set()) }
+    setSelBg(false)
     dragRef.current.i = idx
-    const grupo = yaEnGrupo ? seleccion : [idx]
-    dragRef.current.group = grupo.length > 1
-      ? { start: posFromEvent(e), orig: new Map(grupo.map((k) => [k, { x: objects[k]?.x ?? 0.5, y: objects[k]?.y ?? 0.5 }])) }
+    dragRef.current.group = yaEnGrupo && (seleccion.length > 1 || textSeleccion.length)
+      ? armarGrupo(e)
       : null
+    // Click repetido sobre el único seleccionado (sin mover) = ciclar hacia
+    // el de abajo, como en Figma. Es la versión descubrible del Alt+click:
+    // nadie encontraba el Alt, y con dos objetos pisados el de abajo era
+    // inalcanzable. Se decide al SOLTAR, para no robarle el gesto al drag.
+    dragRef.current.press = {
+      cx: e.clientX, cy: e.clientY, p0: posFromEvent(e), moved: false,
+      ciclable: yaEnGrupo && seleccion.length === 1 && !textSeleccion.length && !e.altKey,
+    }
     // sin capturar el puntero, arrastrar rápido hacia el borde soltaba el
     // objeto a mitad de camino (en cualquier editor podés salir y volver)
     try { e.currentTarget.setPointerCapture(e.pointerId) } catch {}
@@ -815,7 +956,10 @@ export default function Editor({
         return
       }
     }
-    if (dragRef.current.i == null) return
+    if (dragRef.current.i == null && !dragRef.current.group) return
+    // para el ciclado: si el puntero se movió de verdad, esto fue un drag
+    const pr = dragRef.current.press
+    if (pr && !pr.moved && Math.hypot(e.clientX - pr.cx, e.clientY - pr.cy) > 4) pr.moved = true
     let pos = posFromEvent(e)
     // snapping al centro (guías)
     const snapV = Math.abs(pos.x - 0.5) < 0.02
@@ -825,46 +969,90 @@ export default function Editor({
     setGuides({ v: snapV, h: snapH })
     const grp = dragRef.current.group
     if (grp) {
+      // Si el grupo lleva textos, el drag arranca recién a los 6 px (el
+      // mismo umbral del texto suelto): un click con temblor de mano NO
+      // puede sacar un título del stack — ponerle `pos` a un texto es
+      // cambiarle la vida, no sólo moverlo un píxel.
+      if (grp.origTexto?.size && !grp.moved
+        && Math.hypot(e.clientX - grp.pressClient.x, e.clientY - grp.pressClient.y) < 6) return
+      grp.moved = true
       // grupo: se mueve por DELTA desde donde arrancó cada uno, no a la
       // posición absoluta del cursor (eso los hubiera apilado a todos en
-      // el mismo punto).
+      // el mismo punto). Objetos y textos van en UN solo set(): dos
+      // parches seguidos sobre el mismo content se pisan entre sí.
       const dx = pos.x - grp.start.x, dy = pos.y - grp.start.y
-      setObjects(objects.map((o, idx) => {
-        const base = grp.orig.get(idx)
-        if (!base) return o
-        return { ...o, x: Math.min(1, Math.max(0, base.x + dx)), y: Math.min(1, Math.max(0, base.y + dy)) }
-      }), 'drag')
+      const patch = {}
+      if (grp.orig.size) {
+        patch.objects = objects.map((o, idx) => {
+          const base = grp.orig.get(idx)
+          if (!base) return o
+          return { ...o, x: Math.min(1, Math.max(0, base.x + dx)), y: Math.min(1, Math.max(0, base.y + dy)) }
+        })
+      }
+      if (grp.origTexto?.size) {
+        const nuevo = { ...(content.pos || {}) }
+        for (const [eid, base] of grp.origTexto) nuevo[eid] = { x: base.x + dx, y: base.y + dy }
+        patch.pos = nuevo
+      }
+      set(patch, 'drag')
     } else {
       updateObject(dragRef.current.i, pos, 'drag')
     }
   }
-  const endDrag = () => { dragRef.current.i = null; dragRef.current.group = null; textDragRef.current = null; setGuides({ v: false, h: false }) }
-  const onFrameDown = (e) => {
-    const t = e.target.closest && e.target.closest('text[data-eid]')
-    if (t) {
-      const eid = t.getAttribute('data-eid')
-      // Shift+click arma el grupo de textos — igual que en los objetos,
-      // nunca arrastra ni edita en el mismo gesto.
-      if (e.shiftKey) { toggleMultiSelText(eid); return }
-      // segundo tap/click sobre el texto ya seleccionado → editar (touch-friendly).
-      // Si era parte de un grupo, el primer click sólo lo aísla — evita
-      // que un click para "soltar el grupo" te mande derecho a editar.
-      if (selText === eid && !multiSelText.size) { openTextEditor(t) }
-      else { setSelText(eid); setMultiSelText(new Set()); setSelObj(null); setMultiSel(new Set()); setSelBg(false) }
-      // el primer reflejo de cualquiera es arrastrar el texto. Se guarda
-      // dónde lo agarraste DENTRO del bloque para que no salte al soltar.
-      const fr = frameRef.current.getBoundingClientRect()
-      const r = t.getBoundingClientRect()
-      const g = posFromEvent(e)
-      textDragRef.current = {
-        x: e.clientX, y: e.clientY, eid, moved: false,
-        dx: g.x - (r.left - fr.left) / fr.width,
-        dy: g.y - (r.top - fr.top) / fr.height,
-        wRel: r.width / fr.width,
+  const endDrag = () => {
+    // ciclado (ver startDrag): click sobre el único seleccionado, sin
+    // mover, con más de uno apilado en ese punto → pasa al de abajo.
+    const pr = dragRef.current.press
+    if (pr?.ciclable && !pr.moved) {
+      const bajo = losQueTocan(pr.p0.x, pr.p0.y)
+      if (bajo.length > 1) {
+        const pos = bajo.indexOf(selObj)
+        setSelObj(bajo[(pos + bajo.length - 1) % bajo.length])
       }
+    }
+    dragRef.current.i = null; dragRef.current.group = null; dragRef.current.press = null
+    textDragRef.current = null; setGuides({ v: false, h: false })
+  }
+  // pointer-down sobre un texto de la pieza. Vive aparte porque entra por
+  // dos puertas: el click directo sobre el SVG (onFrameDown) y el click
+  // sobre un .obj-hit que tapa un texto dibujado encima (startDrag).
+  const bajarSobreTexto = (t, e) => {
+    const eid = t.getAttribute('data-eid')
+    // Shift+click arma el grupo de textos — igual que en los objetos,
+    // nunca arrastra ni edita en el mismo gesto.
+    if (e.shiftKey) { toggleMultiSelText(eid); return }
+    // Si el texto ya es parte de un grupo (de textos o mixto), el click
+    // arrastra el GRUPO entero — el mismo trato que un objeto agrupado.
+    if (textSeleccion.includes(eid) && seleccion.length + textSeleccion.length > 1) {
+      dragRef.current.i = null
+      dragRef.current.group = armarGrupo(e)
       try { e.currentTarget.setPointerCapture(e.pointerId) } catch {}
       return
     }
+    // segundo tap/click sobre el texto ya seleccionado → editar (touch-friendly).
+    // Sólo si es lo ÚNICO seleccionado: un click para soltar un grupo no
+    // te puede mandar derecho a editar.
+    if (selText === eid && !multiSelText.size && selObj == null) { openTextEditor(t) }
+    else { setSelText(eid); setMultiSelText(new Set()); setSelObj(null); setMultiSel(new Set()); setSelBg(false) }
+    // un texto ajeno (de un elemento o del chat) se selecciona y se edita,
+    // pero no se arrastra: su posición es la de su dueño
+    if (esTextoAjeno(eid)) return
+    // el primer reflejo de cualquiera es arrastrar el texto. Se guarda
+    // dónde lo agarraste DENTRO del bloque para que no salte al soltar.
+    const fr = frameRef.current.getBoundingClientRect()
+    const r = t.getBoundingClientRect()
+    const g = posFromEvent(e)
+    textDragRef.current = {
+      x: e.clientX, y: e.clientY, eid, moved: false,
+      dx: g.x - (r.left - fr.left) / fr.width,
+      dy: g.y - (r.top - fr.top) / fr.height,
+      wRel: r.width / fr.width,
+    }
+    try { e.currentTarget.setPointerCapture(e.pointerId) } catch {}
+  }
+  const onFrameDown = (e) => {
+    const t = e.target.closest && e.target.closest('text[data-eid]')
+    if (t) { bajarSobreTexto(t, e); return }
     // cualquier click que no caiga sobre un objeto o un texto DESELECCIONA:
     // sin esto nunca se ve la pieza limpia, siempre queda un marco encima.
     setCtxMenu(null)
@@ -880,10 +1068,21 @@ export default function Editor({
   // pieza pero no leer ni escribir: el editor abría vacío y lo que
   // tipeabas no iba a ningún lado. Sólo se podían editar desde el panel.
   const pasos = () => content.steps || template.defaults?.steps || []
+  const mensajes = () => content.messages || template.defaults?.messages || []
+  // V2a · un texto puede pertenecer a un ELEMENTO (la etiqueta, el bocadillo,
+  // la barra de la ventana: "obj:<i>:<campo>") o al CHAT (mensajes, nombre,
+  // estado). Se editan con doble click como cualquier otro, pero NO se
+  // arrastran por su cuenta: su posición es la del dueño, y darles un
+  // `content.pos` sería escribir un campo que el motor ignora.
+  const esTextoAjeno = (eid) => /^(obj:|msg:|chat:)/.test(eid)
   const getText = (eid) => {
     if (eid.startsWith('role:')) { const k = eid.slice(5); return content[k] ?? template.defaults?.[k] ?? '' }
     if (eid.startsWith('tb:')) { const i = +eid.slice(3); return (content.textBlocks || [])[i]?.text ?? '' }
     if (eid.startsWith('step:')) { const i = +eid.slice(5); return pasos()[i] ?? '' }
+    if (eid.startsWith('obj:')) { const [, i, campo] = eid.split(':'); return String(objects[+i]?.[campo] ?? '') }
+    if (eid.startsWith('msg:')) { const i = +eid.slice(4); return mensajes()[i]?.text ?? '' }
+    if (eid === 'chat:name') return content.chatName ?? template.defaults?.chatName ?? 'Magoya'
+    if (eid === 'chat:status') return content.chatStatus ?? template.defaults?.chatStatus ?? 'en línea'
     return ''
   }
   const setText = (eid, val) => {
@@ -891,6 +1090,10 @@ export default function Editor({
     if (eid.startsWith('role:')) set({ [eid.slice(5)]: val }, 'txt:' + eid)
     else if (eid.startsWith('tb:')) { const i = +eid.slice(3); set({ textBlocks: (content.textBlocks || []).map((b, idx) => (idx === i ? { ...b, text: val } : b)) }, 'txt:' + eid) }
     else if (eid.startsWith('step:')) { const i = +eid.slice(5); set({ steps: pasos().map((s, idx) => (idx === i ? val : s)) }, 'txt:' + eid) }
+    else if (eid.startsWith('obj:')) { const [, i, campo] = eid.split(':'); updateObject(+i, { [campo]: val }, 'txt:' + eid) }
+    else if (eid.startsWith('msg:')) { const i = +eid.slice(4); set({ messages: mensajes().map((m, idx) => (idx === i ? { ...m, text: val } : m)) }, 'txt:' + eid) }
+    else if (eid === 'chat:name') set({ chatName: val }, 'txt:' + eid)
+    else if (eid === 'chat:status') set({ chatStatus: val }, 'txt:' + eid)
   }
   const openTextEditor = (t) => {
     const eid = t.getAttribute('data-eid')
@@ -906,7 +1109,16 @@ export default function Editor({
     })
   }
   const onFrameDblClick = (e) => {
-    const t = e.target.closest && e.target.closest('text[data-eid]')
+    let t = e.target.closest && e.target.closest('text[data-eid]')
+    // el texto de un elemento (bocadillo, etiqueta) vive DEBAJO del div
+    // .obj-hit que cubre al objeto: el target del doble click es el div,
+    // no el <text>. Se mira qué hay de verdad en ese punto, igual que en
+    // startDrag — es lo que hace editable el "EN VIVO" de la sesión del 3/8.
+    if (!t) {
+      const bajo = document.elementsFromPoint(e.clientX, e.clientY)
+        .map((el) => el.closest && el.closest('text[data-eid]')).find(Boolean)
+      if (bajo && frameRef.current?.contains(bajo)) t = bajo
+    }
     if (t) openTextEditor(t)
   }
 
@@ -928,7 +1140,7 @@ export default function Editor({
   // si la plantilla no tiene variantes (chat), el panel no existe
 
   return (
-    <div className={'editor' + (selObj != null || selText ? ' has-sel' : '') + (sheet ? ' sheet-open' : '') + (seleccion.length > 1 || textSeleccion.length > 1 ? ' multi-sel' : '')}>
+    <div className={'editor' + (selObj != null || selText ? ' has-sel' : '') + (sheet ? ' sheet-open' : '') + (seleccion.length + textSeleccion.length > 1 ? ' multi-sel' : '')}>
       <nav className="insert-rail">
         {/* El rail se reparte por POSICION, no por material. Antes había
             "Fotos" y "Fondo" como dos entradas distintas, y una foto podía
@@ -984,7 +1196,7 @@ export default function Editor({
               <div className="panel-title">Textos</div>
               <p className="panel-help">Sumá textos y tocalos para ajustarlos a la derecha.</p>
               <TextBlocksBody content={content} set={set} onSelectText={onSelectText} selText={selText} multiSelText={multiSelText} toggleMultiSelText={toggleMultiSelText} />
-              <div className="panel-title" style={{ marginTop: 16 }}>Posición del bloque</div>
+              <div className="panel-title" style={{ marginTop: 16 }}>Posición del texto</div>
               <AnchorBody content={content} template={template} set={set} />
             </>
           ) : (
@@ -1011,7 +1223,7 @@ export default function Editor({
                   Original: 9,9% de la pieza el mejor de los tres. Salieron
                   del panel Estilo —que ahora son siluetas— y el control va
                   acá, que es donde uno lo busca. */}
-              <div className="panel-title" style={{ marginTop: 16 }}>Posición del bloque</div>
+              <div className="panel-title" style={{ marginTop: 16 }}>Posición del texto</div>
               <AnchorBody content={content} template={template} set={set} />
             </>
           )
@@ -1201,7 +1413,15 @@ export default function Editor({
             )}
             {textBoxes.map((b) => (
               <div key={b.eid} className={'text-sel' + (b.primaria ? '' : ' extra')}
-                style={{ left: b.left, top: b.top, width: b.width, height: b.height }} />
+                style={{ left: b.left, top: b.top, width: b.width, height: b.height }}>
+                {/* mismas esquinas que los objetos: estirar cambia el tamaño
+                    de la letra (el multiplicador de los chips, no otra cosa) */}
+                {b.primaria && !editing && ['nw', 'ne', 'sw', 'se'].map((c) => (
+                  <span key={c} className={'rs-handle ' + c} role="button" tabIndex={-1}
+                    aria-label="Cambiar el tamaño del texto"
+                    onPointerDown={(e) => startTextResize(e, b, c)} />
+                ))}
+              </div>
             ))}
             {guides.v && <div className="guide-v" />}
             {guides.h && <div className="guide-h" />}
@@ -1216,13 +1436,19 @@ export default function Editor({
               // (tapa justo lo que acabás de colocar): pasa a ser un chip.
               // Y lleva al panel Fondo, que es donde vive la foto de FONDO
               // — no al file picker, así también podés usar la biblioteca.
+              // 'photos' murió cuando el panel pasó a llamarse 'settings'
+              // (Detrás): el CTA abría un panel izquierdo VACÍO — justo el
+              // botón que recibe a la persona en una pieza de foto.
               <button className={'photo-cta' + (objects.length ? ' mini' : '')}
-                onClick={() => { setPanel('photos'); setSheet(true) }}>
+                onClick={() => { setPanel('settings'); setSheet(true) }}>
                 <span className="pc-ic"><Icon n="plus" size={objects.length ? 14 : 20} /></span>
                 <span>{objects.length ? 'Falta la foto de fondo' : 'Elegí la foto de fondo para empezar'}</span>
               </button>
             )}
-            {seleccion.length > 1 ? (
+            {seleccion.length > 0 && textSeleccion.length > 0 ? (
+              // grupo mixto: el cartel promete lo que el drag cumple ahora
+              <div className="drag-hint group-hint">{seleccion.length + textSeleccion.length} seleccionados — se mueven juntos</div>
+            ) : seleccion.length > 1 ? (
               // "El shift no me muestra que seleccioné más de un objeto" —
               // el panel derecho SÍ decía "2 elementos seleccionados", pero
               // ahí no es donde mirás mientras trabajás en el lienzo. Con
@@ -1330,7 +1556,12 @@ export default function Editor({
 
       <aside className="inspector" style={{ width: panelW.right }}>
         <button className="sheet-close" onClick={() => { setSelObj(null); setMultiSel(new Set()); setSelText(null); setMultiSelText(new Set()) }} aria-label="Cerrar propiedades"><Icon n="down" size={18} /></button>
-        {seleccion.length > 1 ? (
+        {seleccion.length > 0 && textSeleccion.length > 0 ? (
+          // grupo MIXTO: se mueve y se borra junto; copiar/duplicar siguen
+          // por tipo (portapapeles distintos), así que acá no se ofrecen.
+          <MultiSelProps count={seleccion.length + textSeleccion.length} kind="elementos y textos"
+            onRemove={() => removeMixto(seleccion, textSeleccion)} />
+        ) : seleccion.length > 1 ? (
           <MultiSelProps count={seleccion.length}
             onCopy={() => copySelection(seleccion)}
             onDuplicate={() => objDuplicateMany(seleccion)}
@@ -1344,8 +1575,9 @@ export default function Editor({
           <>
             <div className="insp-kicker">Propiedades del elemento</div>
             <ObjectProps o={objects[selObj]} i={selObj} updateObject={updateObject} objRemove={objRemove} objDuplicate={objDuplicate} objBringFront={objBringFront} objSendBack={objSendBack} onToast={onToast}
+              template={template} content={content}
               onAddElement={onAddElement}
-              goToBg={() => { setSelObj(null); setMultiSel(new Set()); setPanel('photos'); setSheet(true) }} />
+              goToBg={() => { setSelObj(null); setMultiSel(new Set()); setPanel('settings'); setSheet(true) }} />
           </>
         ) : selText ? (
           <>
@@ -1687,6 +1919,26 @@ function ObjectsBody({ objects, setObjects, selObj, setSelObj, multiSel, toggleM
     placeImage(src, el?.id, nice)
   }
   const iconsInCat = cat === 'custom' ? [] : ALL_OBJECTS.filter((i) => i.category === cat)
+  // búsqueda por nombre + sinónimos, cruzando TODAS las categorías (y los
+  // elementos propios): quien busca "flecha" no sabe en qué solapa vive
+  const [q, setQ] = useState('')
+  const nq = normalizar(q.trim())
+  // las palabras de 1-2 letras son pegamento ("link EN LA bio"), no
+  // búsqueda: exigirlas dejaba la frase natural sin resultados
+  const palabrasDe = (s) => s.split(/\s+/).filter((p) => p.length > 2)
+  const coincide = (icon) => {
+    const palabras = palabrasDe(nq)
+    if (!palabras.length) return false
+    const bolsa = normalizar([icon.label, icon.slug, CATS[icon.category], SINONIMOS[icon.slug]].filter(Boolean).join(' '))
+    return palabras.every((palabra) => bolsa.includes(palabra))
+  }
+  const iconResults = nq ? ALL_OBJECTS.filter(coincide) : []
+  const elementResults = nq ? elements.filter((el) => {
+    if (el.kind === 'photo') return false
+    const nombre = normalizar(el.name)
+    const palabras = palabrasDe(nq)
+    return palabras.length && palabras.every((p) => nombre.includes(p))
+  }) : []
 
   return (
     <>
@@ -1716,56 +1968,109 @@ function ObjectsBody({ objects, setObjects, selObj, setSelObj, multiSel, toggleM
         <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => e.target.files[0] && addImage(e.target.files[0])} />
       </div>
 
-      {picking && (
-        <div style={{ marginTop: 10 }}>
-          <div className="chips" style={{ marginBottom: 8 }}>
-            {Object.entries(CATS).map(([k, label]) => (
-              <button key={k} className={'chip' + (cat === k ? ' on' : '')} onClick={() => setCat(k)}>{label}</button>
-            ))}
+      {picking && (() => {
+        // un solo dibujante de miniatura, lo usan la solapa y la búsqueda
+        const renderIcon = (icon) => {
+          // los trazos (agro, marcas) NO llevan tile de color: se colocan
+          // como trazo suelto, y la miniatura tiene que mostrarlo así.
+          const asset = icon.isDevice || icon.category === 'magoya' || icon.isMark
+          // V14 · las marcas de tile CLARO (Google, Gemini) eran invisibles:
+          // el CSS pinta el glifo de blanco (correcto para un tile de color)
+          // sobre el fondo blanco del tile. Acá el glifo va YA coloreado con
+          // el MISMO pipeline que la pieza (degradé de Gemini incluido) y el
+          // CSS no lo toca (clase `light`). Si el SVG todavía no se precargó,
+          // queda el crudo (negro), que sobre blanco también se ve.
+          const claro = LIGHT_TILE[icon.slug]
+          const gGlifo = claro && GLYPH_GRADIENT[icon.slug]
+          const glifo = claro
+            ? (gGlifo && gradientIcon(icon.url, gGlifo.stops, gGlifo.angle)) || coloredIcon(icon.url, claro) || icon.url
+            : icon.url
+          return (
+            <button key={icon.id} title={icon.label + ' — tocá o arrastrá a la pieza'} onClick={() => addIcon(icon)}
+              className={'icon-pick' + (asset ? ' asset' : '') + (icon.isShape ? ' shape' : '') + (icon.isMark ? ' mark' : '') + (claro ? ' light' : '')}
+              style={(asset || icon.isShape) ? undefined : {
+                // la miniatura tiene que mostrar lo que se va a dibujar:
+                // degradé, círculo o cuadradito, según la marca
+                background: TILE_GRADIENT[icon.slug]
+                  ? `linear-gradient(${TILE_GRADIENT[icon.slug].angle ?? 135}deg, ${TILE_GRADIENT[icon.slug].stops.map((st) => st.c).join(', ')})`
+                  : claro ? '#FFFFFF' : icon.color,
+                borderRadius: TILE_SHAPE[icon.slug] === 'circle' ? '50%' : undefined,
+              }}
+              draggable onDragStart={(e) => e.dataTransfer.setData('application/x-magoya', JSON.stringify({ type: 'icon', id: icon.id }))}>
+              {icon.isShape ? <ShapeGlyph shape={icon.shape} /> : <img src={glifo} alt={icon.label} />}
+            </button>
+          )
+        }
+        const renderElemento = (el) => (
+          <div key={el.id} className="icon-pick custom" title={el.name + ' — tocá o arrastrá a la pieza'}
+            draggable onDragStart={(e) => e.dataTransfer.setData('application/x-magoya', JSON.stringify({ type: 'element', id: el.id }))}>
+            <img src={el.src} alt={el.name} onClick={() => placeImage(el.src, el.id)} />
+            <button className="el-del" title="Quitar de la biblioteca" onClick={(e) => { e.stopPropagation(); onDeleteElement && onDeleteElement(el.id) }}><Icon n="close" size={11} /></button>
           </div>
-          {cat === 'custom' ? (
+        )
+        return (
+        <div style={{ marginTop: 10 }}>
+          <input type="search" className="picker-search" placeholder="Buscar un elemento… (flecha, captura, logo)"
+            value={q} onChange={(e) => setQ(e.target.value)} />
+          {nq ? (
             <>
-              <div className="icon-grid">
-                <button className="icon-pick upload" title="Subir un elemento" onClick={() => fileRef.current?.click()}><span><Icon n="plus" size={18} /></span></button>
-                {elements.filter((e) => e.kind !== 'photo').map((el) => (
-                  <div key={el.id} className="icon-pick custom" title={el.name + ' — tocá o arrastrá a la pieza'}
-                    draggable onDragStart={(e) => e.dataTransfer.setData('application/x-magoya', JSON.stringify({ type: 'element', id: el.id }))}>
-                    <img src={el.src} alt={el.name} onClick={() => placeImage(el.src, el.id)} />
-                    <button className="el-del" title="Quitar de la biblioteca" onClick={(e) => { e.stopPropagation(); onDeleteElement && onDeleteElement(el.id) }}><Icon n="close" size={11} /></button>
-                  </div>
-                ))}
+              <div className="icon-grid" style={{ marginTop: 8 }}>
+                {iconResults.map(renderIcon)}
+                {elementResults.map(renderElemento)}
               </div>
-              {elements.filter((e) => e.kind !== 'photo').length === 0 && <div className="hint">Subí logos o elementos (PNG/SVG). Las fotos van en el panel <b>Fotos</b>.</div>}
+              {/* el botón de verdad no es un elemento: es un estilo de texto.
+                  Quien busca "cta" o "link en la bio" se lleva la etiqueta
+                  como aproximación Y la puerta al lugar correcto. */}
+              {/\b(cta|boton|button|link|bio)\b/.test(nq) && (
+                <div className="hint">¿Buscás un botón (CTA)? Es un <b>estilo de texto</b>: panel Texto → Agregar texto → estilo «Botón / CTA».</div>
+              )}
+              {!iconResults.length && !elementResults.length && (
+                <div className="hint">
+                  Nada que se llame así. Probá con otra palabra («flecha», «captura», «logo»)…
+                  ¿Es un logo tuyo? Subilo en <b>Mis elementos</b>.
+                </div>
+              )}
             </>
           ) : (
             <>
-              <div className="icon-grid">
-                {iconsInCat.map((icon) => {
-                  // los trazos (agro, marcas) NO llevan tile de color: se colocan
-                  // como trazo suelto, y la miniatura tiene que mostrarlo así.
-                  const asset = icon.isDevice || icon.category === 'magoya' || icon.isMark
-                  return (
-                    <button key={icon.id} title={icon.label + ' — tocá o arrastrá a la pieza'} onClick={() => addIcon(icon)}
-                      className={'icon-pick' + (asset ? ' asset' : '') + (icon.isShape ? ' shape' : '') + (icon.isMark ? ' mark' : '')}
-                      style={(asset || icon.isShape) ? undefined : {
-                        // la miniatura tiene que mostrar lo que se va a dibujar:
-                        // degradé, círculo o cuadradito, según la marca
-                        background: TILE_GRADIENT[icon.slug]
-                          ? `linear-gradient(${TILE_GRADIENT[icon.slug].angle ?? 135}deg, ${TILE_GRADIENT[icon.slug].stops.map((st) => st.c).join(', ')})`
-                          : LIGHT_TILE[icon.slug] ? '#FFFFFF' : icon.color,
-                        borderRadius: TILE_SHAPE[icon.slug] === 'circle' ? '50%' : undefined,
-                      }}
-                      draggable onDragStart={(e) => e.dataTransfer.setData('application/x-magoya', JSON.stringify({ type: 'icon', id: icon.id }))}>
-                      {icon.isShape ? <ShapeGlyph shape={icon.shape} /> : <img src={icon.url} alt={icon.label} />}
-                    </button>
-                  )
-                })}
+              {/* Las solapas mezclaban material (logos, trazos) con piezas
+                  que OPERAN distinto (una forma lleva texto adentro, un
+                  dispositivo lleva una captura). Separarlas en dos filas
+                  rotuladas le pone nombre a esa diferencia sin inventar
+                  taxonomía nueva: los rótulos salen de ICON_CATEGORIES. */}
+              <label>Logos y trazos</label>
+              <div className="chips" style={{ marginBottom: 6 }}>
+                {['agro', 'ai', 'social', 'trazos', 'magoya', 'custom'].map((k) => (
+                  <button key={k} className={'chip' + (cat === k ? ' on' : '')} onClick={() => setCat(k)}>{CATS[k]}</button>
+                ))}
               </div>
-              <div className="hint">Tocá para agregar o <b>arrastrá directo a la pieza</b>. ¿Falta un logo? Subilo en <b>Mis elementos</b>.</div>
+              <label>Con contenido adentro (texto, captura, foto)</label>
+              <div className="chips" style={{ marginBottom: 8 }}>
+                {['shapes', 'devices'].map((k) => (
+                  <button key={k} className={'chip' + (cat === k ? ' on' : '')} onClick={() => setCat(k)}>{CATS[k]}</button>
+                ))}
+              </div>
+              {cat === 'custom' ? (
+                <>
+                  <div className="icon-grid">
+                    <button className="icon-pick upload" title="Subir un elemento" onClick={() => fileRef.current?.click()}><span><Icon n="plus" size={18} /></span></button>
+                    {elements.filter((e) => e.kind !== 'photo').map(renderElemento)}
+                  </div>
+                  {elements.filter((e) => e.kind !== 'photo').length === 0 && <div className="hint">Subí logos o elementos (PNG/SVG). Las fotos van en el panel <b>Fotos</b>.</div>}
+                </>
+              ) : (
+                <>
+                  <div className="icon-grid">
+                    {iconsInCat.map(renderIcon)}
+                  </div>
+                  <div className="hint">Tocá para agregar o <b>arrastrá directo a la pieza</b>. ¿Falta un logo? Subilo en <b>Mis elementos</b>.</div>
+                </>
+              )}
             </>
           )}
         </div>
-      )}
+        )
+      })()}
     </>
   )
 }
@@ -1890,21 +2195,22 @@ function ValoresInput({ valores, onChange }) {
 // propiedades de UNO solo (¿de cuál?) — esto reemplaza a ObjectProps
 // mientras dure la multiselección: las acciones son de grupo.
 function MultiSelProps({ count, kind = 'elementos', onCopy, onDuplicate, onRemove }) {
-  // Los objetos se arrastran juntos; los textos todavía no (cada uno
-  // sigue atado a su lugar en el stack o a su propia posición libre) —
-  // el texto de acá no puede prometer lo mismo para los dos casos.
-  const puedeMover = kind === 'elementos'
+  // Desde la sesión del 3/8 el grupo se MUEVE entero sea de lo que sea
+  // (objetos, textos o mezcla). Copiar/duplicar siguen por tipo: en el
+  // grupo mixto no se ofrecen (dos portapapeles, dos semánticas) y por
+  // eso los botones sólo salen si el que arma el panel los pasó.
+  const mixto = !onCopy && !onDuplicate
   return (
     <>
       <div className="insp-kicker">{count} {kind} seleccionados</div>
       <p className="panel-help">
-        {puedeMover ? 'Se mueven, se copian y se borran juntos.' : 'Se copian y se borran juntos.'}
+        {mixto ? 'Se mueven y se borran juntos. Para copiar o duplicar, armá un grupo de un solo tipo.' : 'Se mueven, se copian y se borran juntos.'}
         {' '}Shift+click suma o saca uno del grupo; Escape lo suelta.
       </p>
       <div className="insp-head">
         <span className="insp-acts">
-          <button className="btn" onClick={onCopy} title="Copiar (⌘C)"><Icon n="copy" size={13} /> Copiar</button>
-          <button className="btn" onClick={onDuplicate} title="Duplicar (⌘D)"><Icon n="copy" size={13} /> Duplicar</button>
+          {onCopy && <button className="btn" onClick={onCopy} title="Copiar (⌘C)"><Icon n="copy" size={13} /> Copiar</button>}
+          {onDuplicate && <button className="btn" onClick={onDuplicate} title="Duplicar (⌘D)"><Icon n="copy" size={13} /> Duplicar</button>}
           <button className="btn" onClick={onRemove}>Quitar</button>
         </span>
       </div>
@@ -1912,7 +2218,7 @@ function MultiSelProps({ count, kind = 'elementos', onCopy, onDuplicate, onRemov
   )
 }
 
-function ObjectProps({ o, i, updateObject, objRemove, objDuplicate, objBringFront, objSendBack, onToast, goToBg, onAddElement }) {
+function ObjectProps({ o, i, updateObject, objRemove, objDuplicate, objBringFront, objSendBack, onToast, goToBg, onAddElement, template, content }) {
   const objIcon = (o.kind === 'icon' || o.kind === 'device') ? ICONS_BY_ID[o.iconId || o.deviceId] : null
   const isMark = !!objIcon?.isMark
   const showTint = o.kind === 'icon' && (isMark || o.style === 'plain')
@@ -2024,8 +2330,11 @@ function ObjectProps({ o, i, updateObject, objRemove, objDuplicate, objBringFron
       )}
       {o.kind === 'icon' && !isMark && (
         <div className="chips" style={{ marginBottom: 8 }}>
-          <button className={'chip' + (o.style !== 'plain' ? ' on' : '')} onClick={() => updateObject(i, { style: 'tile' })}>En cuadradito</button>
-          <button className={'chip' + (o.style === 'plain' ? ' on' : '')} onClick={() => updateObject(i, { style: 'plain' })}>Suelto</button>
+          {/* V15 · se llamaban "En cuadradito" / "Suelto": nombres del dibujo,
+              no de lo que la gente busca ("el logo como ícono de app" vs
+              "el logo pelado"). */}
+          <button className={'chip' + (o.style !== 'plain' ? ' on' : '')} onClick={() => updateObject(i, { style: 'tile' })}>Con fondo (app)</button>
+          <button className={'chip' + (o.style === 'plain' ? ' on' : '')} onClick={() => updateObject(i, { style: 'plain' })}>Sólo el logo</button>
         </div>
       )}
       {o.kind === 'image' && o.src && (
@@ -2098,6 +2407,29 @@ function ObjectProps({ o, i, updateObject, objRemove, objDuplicate, objBringFron
               <button key={t.k} className={'sw' + ((o.tint || 'accent') === t.value ? ' on' : '')} title={t.label} style={{ background: t.sw }} onClick={() => updateObject(i, { tint: t.value })} />
             ))}
           </div>
+          {/* El mismo aviso honesto que ya tienen los textos y el CTA: si el
+              motor separó el color elegido del fondo para que se vea, acá se
+              dice y se muestra el que quedó. "Los colores de acá no son los
+              reales" (Facu, sesión con Aye) era exactamente esto, sin avisar.
+              Con 'accent' no aplica (ese swatch ya es semántico, no un color
+              prometido) y sobre foto el fondo no es un color: no se evalúa. */}
+          {(() => {
+            const crudo = o.tint
+            if (!crudo || crudo === 'accent' || !template) return null
+            const p = resolvePiece(template, content || {})
+            const onPhoto = p.surface === 'photo' && !template.split
+            if (onPhoto) return null
+            const sil = p.silueta ? siluetaInfo(p.silueta, { scheme: p.scheme, accent: p.accent, onPhoto }) : null
+            const fondo = sil ? sil.campo : p.scheme.surface
+            const ef = tinteEfectivo(crudo, fondo)
+            if (!ef || ef.toLowerCase() === String(crudo).toLowerCase()) return null
+            return (
+              <div className="hint color-real">
+                <span className="sw-dot" style={{ background: ef }} />
+                Se ajustó para que se vea sobre este fondo: se está viendo así.
+              </div>
+            )
+          })()}
         </>
       )}
       {/* logo con tile: el fondo del cuadradito ya se podía cambiar en el
@@ -2143,7 +2475,16 @@ function ObjectProps({ o, i, updateObject, objRemove, objDuplicate, objBringFron
               )}
             </>
           )}
-          {(o.shape === 'badge' || o.shape === 'callout' || o.shape === 'window') && (
+          {/* el bocadillo es multilínea en el motor (wrapText respeta \n) y
+              acá era un <input> de una línea: Enter no hacía nada y el
+              salto de línea era imposible justo en la forma que más texto
+              lleva. La etiqueta y la barra de la ventana siguen de una
+              línea porque ASÍ se dibujan. */}
+          {o.shape === 'callout' && (
+            <div className="field"><label>Texto</label>
+              <textarea rows={3} value={o.text || ''} onChange={(e) => updateObject(i, { text: e.target.value })} /></div>
+          )}
+          {(o.shape === 'badge' || o.shape === 'window') && (
             <div className="field"><label>{o.shape === 'window' ? 'Barra de la ventana' : 'Texto'}</label>
               <input type="text" value={o.text || ''} onChange={(e) => updateObject(i, { text: e.target.value })} /></div>
           )}
@@ -2351,6 +2692,10 @@ function BrandBody({ content, template, set, onlyColors = false, soloLogo = fals
 function LogoPosition({ content, template, set }) {
   const pos = content.logoPos || template.defaults?.logoPos || 'left'
   const scale = content.logoScale || template.defaults?.logoScale || 1
+  // 13 · la vertical, con el mismo contrato que el motor: 'top' | 'bottom'
+  // pisan la regla; cualquier otra cosa es Automático (el default de siempre)
+  const vposCrudo = content.logoVPos || template.defaults?.logoVPos
+  const vpos = ['top', 'bottom'].includes(vposCrudo) ? vposCrudo : 'auto'
   return (
     <>
       <div className="field"><label>Posición del logo</label>
@@ -2358,6 +2703,15 @@ function LogoPosition({ content, template, set }) {
           <button className={'chip' + (pos === 'left' ? ' on' : '')} onClick={() => set({ logoPos: 'left' })}>Izquierda</button>
           <button className={'chip' + (pos === 'right' ? ' on' : '')} onClick={() => set({ logoPos: 'right' })}>Derecha</button>
         </div>
+        <div className="chips" style={{ marginTop: 6 }}>
+          {[['auto', 'Automático'], ['top', 'Arriba'], ['bottom', 'Abajo']].map(([k, l]) => (
+            <button key={k} className={'chip' + (vpos === k ? ' on' : '')}
+              onClick={() => set({ logoVPos: k === 'auto' ? undefined : k })}>{l}</button>
+          ))}
+        </div>
+        {vpos === 'auto' && (
+          <div className="hint">Automático lo pone en la punta opuesta al bloque de texto (y adentro de la banda, si la pieza tiene una).</div>
+        )}
       </div>
       <div className="field"><label>Tamaño del logo</label>
         <div className="chips">
@@ -2371,14 +2725,19 @@ function LogoPosition({ content, template, set }) {
 }
 
 /* ---------------- Freeform: Fondo / Textos / Posición / Logo ---------------- */
+// `hint` dice qué va a pasar ANTES de elegir: en la sesión del 3/8 el
+// select pelado obligaba a probar estilo por estilo para descubrir cuál
+// era grande y cuál chiquito — el único que anticipaba algo era "Dato
+// (número grande)", y justo por eso era el único que se entendía.
+// El label corto queda para las filas de la lista, que no tienen lugar.
 const TEXT_STYLE_OPTS = [
-  { k: 'title', label: 'Título' },
-  { k: 'subtitle', label: 'Bajada' },
-  { k: 'kicker', label: 'Etiqueta' },
-  { k: 'metric', label: 'Dato (número grande)' },
-  { k: 'metricLabel', label: 'Descripción del dato' },
-  { k: 'quote', label: 'Cita' },
-  { k: 'cta', label: 'Botón / CTA' },
+  { k: 'title', label: 'Título', hint: 'grande, el que manda' },
+  { k: 'subtitle', label: 'Bajada', hint: 'mediano, acompaña al título' },
+  { k: 'kicker', label: 'Etiqueta', hint: 'chiquito, en mayúsculas' },
+  { k: 'metric', label: 'Dato', hint: 'número enorme' },
+  { k: 'metricLabel', label: 'Descripción del dato', hint: 'chico, apagado' },
+  { k: 'quote', label: 'Cita', hint: 'grande, editorial' },
+  { k: 'cta', label: 'Botón / CTA', hint: 'una línea en pastilla de color' },
 ]
 
 
@@ -2498,11 +2857,42 @@ function TextProps({ eid, template, content, set, getText, setText, onVolverAlSt
   const isTb = eid.startsWith('tb:')
   const idx = isTb ? +eid.slice(3) : -1
   const block = isTb ? (content.textBlocks || [])[idx] : null
+  // El color con el que el texto SE ESTÁ VIENDO, leído del dibujo real.
+  // El motor empuja los colores hasta que se lean (visibleSobre y cía.) y
+  // los chips mostraban el crudo: elegías Crema sobre una tarjeta clara y
+  // "no pasaba nada" — pasaba, pero el panel no lo decía. En vez de
+  // recalcular acá lo que el motor ya decidió (y desincronizarse a la
+  // primera regla nueva), se lee el fill pintado: es la verdad por
+  // construcción. Se lee en un efecto porque durante el render el SVG
+  // todavía muestra el frame anterior.
+  const [fillReal, setFillReal] = useState(null)
+  useEffect(() => {
+    const t = document.querySelector(`.piece-frame svg text[data-eid="${CSS.escape(eid)}"]`)
+    setFillReal(t ? t.getAttribute('fill') : null)
+  }, [eid, content])
   // el rol para el contador y el tamaño. Un paso numerado es `step:0`, no
   // un rol: recortando por posición salía ':0' y se rompían los dos.
   const rolDeEid = eid.startsWith('step:') ? 'step' : eid.startsWith('role:') ? eid.slice(5) : null
   const val = getText(eid)
   const updateBlock = (patch) => set({ textBlocks: (content.textBlocks || []).map((b, i) => (i === idx ? { ...b, ...patch } : b)) })
+  // V2a · texto de un elemento o del chat: se escribe acá (o con doble
+  // click en la pieza), pero estilo/tamaño/color son de su dueño — mentir
+  // con chips que no hacen nada es peor que decirlo. (Va DESPUÉS de los
+  // hooks: un return antes de useState/useEffect rompe el orden de hooks.)
+  if (/^(obj:|msg:|chat:)/.test(eid)) {
+    return (
+      <>
+        <div className="insp-head"><span className="insp-name">Texto</span></div>
+        <label>Contenido</label>
+        <textarea value={val} onChange={(e) => setText(eid, e.target.value)} rows={2} />
+        <div className="hint">
+          {eid.startsWith('obj:')
+            ? 'Este texto es parte de un elemento: el color, el tamaño y la posición se ajustan tocando el elemento.'
+            : 'Este texto es parte del chat: el color y el tamaño salen del esquema de la pieza (panel Marca).'}
+        </div>
+      </>
+    )
+  }
   return (
     <>
       <div className="insp-head"><span className="insp-name">Texto</span></div>
@@ -2556,19 +2946,54 @@ function TextProps({ eid, template, content, set, getText, setText, onVolverAlSt
         <>
           <label>Estilo</label>
           <select value={block.style || 'title'} onChange={(e) => updateBlock({ style: e.target.value })}>
-            {TEXT_STYLE_OPTS.map((o) => <option key={o.k} value={o.k}>{o.label}</option>)}
+            {TEXT_STYLE_OPTS.map((o) => <option key={o.k} value={o.k}>{o.label} — {o.hint}</option>)}
           </select>
-          {block.style !== 'cta' && (
+          {/* Alineación por bloque (contrato con el motor: `align` opcional,
+              'left' | 'center'; sin el campo manda la plantilla, por eso el
+              primer chip no escribe nada en vez de escribir un default).
+              En un bloque SUELTO (con pos propia) el motor ignora `align`
+              —la alineación la da el punto donde lo soltaste—, así que los
+              chips no se ofrecen: un control que no hace nada enseña a
+              desconfiar de todos los demás. */}
+          {!content.pos?.[eid] && (
             <>
-              {/* El color va ANTES del marcador a propósito: cuando lo único
-                  que había era el marcador, la salida para destacar algo
-                  terminaba siendo resaltar la pieza entera. */}
-              <label>Color del texto</label>
-              <div className="chips">
-                {Object.entries(TEXT_COLORS).map(([k, tc]) => (
-                  <button key={k} className={'chip' + ((block.color || 'auto') === k ? ' on' : '')} onClick={() => updateBlock({ color: k })}>{tc.label}</button>
+              <label>Alineación</label>
+              <div className="chips" style={{ marginBottom: 10 }}>
+                {[[undefined, 'Como la plantilla'], ['left', 'Izquierda'], ['center', 'Centro']].map(([v, l]) => (
+                  <button key={l} className={'chip' + ((block.align || undefined) === v ? ' on' : '')}
+                    onClick={() => updateBlock({ align: v })}>{l}</button>
                 ))}
               </div>
+            </>
+          )}
+          {/* El color va ANTES del marcador a propósito: cuando lo único
+              que había era el marcador, la salida para destacar algo
+              terminaba siendo resaltar la pieza entera.
+              8 · en el CTA el color pinta la PASTILLA (el motor ya lo hacía;
+              el inspector lo escondía justo para style === 'cta'). */}
+          <label>{block.style === 'cta' ? 'Color del botón' : 'Color del texto'}</label>
+          <div className="chips">
+            {Object.entries(TEXT_COLORS).map(([k, tc]) => (
+              <button key={k} className={'chip' + ((block.color || 'auto') === k ? ' on' : '')} onClick={() => updateBlock({ color: k })}>{tc.label}</button>
+            ))}
+          </div>
+          {/* si el motor tuvo que empujar el color elegido para que se
+              lea, acá se DICE y se muestra el que quedó. No se desactiva
+              el ajuste: la app cuida la legibilidad, pero sin mentir. */}
+          {block.style === 'cta' ? (
+            <CtaColorReal template={template} content={content} colorKey={block.color} size={block.size} suelto={!!content.pos?.[eid]} />
+          ) : (() => {
+            const crudo = (TEXT_COLORS[block.color] || {}).value
+            if (!crudo || !fillReal || crudo.toLowerCase() === String(fillReal).toLowerCase()) return null
+            return (
+              <div className="hint color-real">
+                <span className="sw-dot" style={{ background: fillReal }} />
+                Se ajustó para que se lea sobre este fondo: se está viendo así.
+              </div>
+            )
+          })()}
+          {block.style !== 'cta' && (
+            <>
               <label>Resaltado (marcador)</label>
               <div className="chips">
                 {Object.entries(HIGHLIGHTS).map(([k, hl]) => (
@@ -2578,10 +3003,50 @@ function TextProps({ eid, template, content, set, getText, setText, onVolverAlSt
             </>
           )}
         </>
+      ) : rolDeEid === 'cta' ? (
+        <>
+          {/* 8 · el rol clásico `cta`: el motor ya leía content.colors.cta
+              (el gemelo de sizes) y no había ningún control que lo escriba.
+              Sólo el CTA: en los demás roles el color lo sigue decidiendo
+              la plantilla, que es la gracia de una plantilla. */}
+          <label>Color del botón</label>
+          <div className="chips">
+            {Object.entries(TEXT_COLORS).map(([k, tc]) => (
+              <button key={k} className={'chip' + ((content.colors?.cta || 'auto') === k ? ' on' : '')}
+                onClick={() => set({ colors: { ...(content.colors || {}), cta: k === 'auto' ? undefined : k } })}>{tc.label}</button>
+            ))}
+          </div>
+          <CtaColorReal template={template} content={content} colorKey={content.colors?.cta} size={content.sizes?.cta} suelto={!!content.pos?.[eid]} />
+          <div className="hint">El estilo de este texto lo define la plantilla; el color de la pastilla es tuyo.</div>
+        </>
       ) : (
         <div className="hint">El estilo y el tamaño de este texto los define la plantilla (marca bloqueada).</div>
       )}
     </>
+  )
+}
+
+// 8 · el aviso "se ajustó" del CTA. No puede leerse del fill del <text>
+// como el de los demás colores: en un CTA la elección pinta la PASTILLA y
+// la letra sigue siendo la tinta automática. Se le pregunta al motor
+// (colorEfectivo, el MISMO cálculo que pinta) contra el fondo real del
+// bloque: la placa si está en el stack, el campo de la pieza si lo moviste.
+function CtaColorReal({ template, content, colorKey, size, suelto }) {
+  if (!colorKey || colorKey === 'auto') return null
+  const p = resolvePiece(template, content)
+  const onPhoto = p.surface === 'photo' && !template.split
+  const sil = p.silueta ? siluetaInfo(p.silueta, { scheme: p.scheme, accent: p.accent, onPhoto }) : null
+  const campo = sil ? sil.campo : (onPhoto ? null : p.scheme.surface)
+  const opaca = p.plate === 'band' || p.plate === 'card'
+  const fondo = suelto ? campo : (opaca ? colorDePlaca(p.scheme, onPhoto) : (sil ? sil.fondo : campo))
+  const ef = colorEfectivo({ style: 'cta', color: colorKey, size }, fondo,
+    { scheme: p.scheme, accent: content.accent || template.defaults?.accent })
+  if (!ef.ajustado) return null
+  return (
+    <div className="hint color-real">
+      <span className="sw-dot" style={{ background: ef.color }} />
+      Se ajustó para que el botón se vea sobre este fondo: la pastilla se está viendo así.
+    </div>
   )
 }
 
@@ -2592,8 +3057,35 @@ function ChatBody({ content, template, set }) {
   const add = (from) => set({ messages: [...msgs, { from, text: 'Nuevo mensaje' }] })
   const remove = (i) => set({ messages: msgs.filter((_, idx) => idx !== i) })
   const move = (i, dir) => { const a = [...msgs]; const j = i + dir; if (j < 0 || j >= a.length) return; [a[i], a[j]] = [a[j], a[i]]; set({ messages: a }) }
+  // 9b · el color del globo propio. El motor ya aceptaba `bubbleTint`
+  // ('accent' o hex) y era la única burbuja de la app sin control: sólo se
+  // podía tocar editando el JSON a mano. La paleta real sale de paletaChat
+  // (el MISMO cálculo que dibuja), así el swatch de Automático muestra el
+  // verde que de verdad sale, y si el elegido se empujó por legibilidad, se
+  // dice — mismo patrón que el color de texto.
+  const elegido = content.bubbleTint ?? template.defaults?.bubbleTint ?? null
+  const pal = paletaChat(content, template)
+  const palAuto = elegido ? paletaChat({ ...content, bubbleTint: undefined }, template) : pal
+  const pedido = elegido === 'accent' ? pal.accent : elegido
+  const empujado = pedido && String(pal.mio).toLowerCase() !== String(pedido).toLowerCase()
   return (
     <>
+      <div className="field"><label>Color del globo (enviados)</label>
+        <div className="swatches" style={{ marginBottom: 8 }}>
+          <button className={'sw' + (!elegido ? ' on' : '')} title="Automático (según el esquema)"
+            style={{ background: palAuto.mio }} onClick={() => set({ bubbleTint: undefined })} />
+          {TINTS.map((t) => (
+            <button key={t.k} className={'sw' + (elegido === t.value ? ' on' : '')} title={t.label}
+              style={{ background: t.sw }} onClick={() => set({ bubbleTint: t.value })} />
+          ))}
+        </div>
+        {empujado && (
+          <div className="hint color-real">
+            <span className="sw-dot" style={{ background: pal.mio }} />
+            Se ajustó para que se distinga del papel del chat: se está viendo así.
+          </div>
+        )}
+      </div>
       {msgs.map((m, i) => (
         <div key={i} className="obj-card">
           <div className="obj-head">
