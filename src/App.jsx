@@ -628,6 +628,25 @@ export default function App() {
     if (view !== 'editor') navigate('editor')
   }
 
+  // La foto del banco que pide el copiloto (poner_foto) entra por el MISMO
+  // camino que el panel Detrás: changeContent sin tag = paso discreto de
+  // historial, o sea ⌘Z la saca igual que si la hubiera puesto la persona.
+  // No pasa por Aceptar porque acá no hay texto del modelo que revisar: es
+  // una foto de la marca, elegida a pedido. Y rige la misma regla que
+  // cambiarFormato: el chat vive en la home, un cambio que no se ve es un
+  // cambio que no pidió — se la lleva a la pieza. Quién puede recibir foto
+  // lo decide la capacidad ANTES de llamar acá (mismo criterio que
+  // resolvePiece); esto sólo escribe.
+  function ponerFotoDeFondo(foto) {
+    const pieza = piecesRef.current[active]
+    if (!pieza || !foto?.src) return
+    // bg:'photo' explícito, como el ponerFondo del panel: si la persona había
+    // pisado el fondo a color, la foto pedida tiene que verse, no quedar
+    // guardada detrás de un fondo que la tapa.
+    changeContent({ ...(pieza.content || {}), bg: 'photo', photo: foto })
+    if (view !== 'editor') navigate('editor')
+  }
+
   // ============================================================
   // EL COPILOTO — lo que ve y lo que puede tocar.
   //
@@ -797,6 +816,7 @@ export default function App() {
       abrirCarrusel: startBlankCarousel,
       abrirEnBlanco: startBlank,
       cambiarFormato,
+      ponerFoto: ponerFotoDeFondo,
       proponer: (p) => { setPropuesta(p); setPropFalla(null); return { encolada: true } },
     },
     // Sólo las funciones de LECTURA, enumeradas a mano. Acá iba el

@@ -54,6 +54,7 @@ const visibles = () => TEMPLATES.filter((t) => !t.hidden && t.id !== 'blank')
 const IDS_PLANTILLA = visibles().map((t) => t.id)
 const IDS_FORMATO = FORMATS.map((f) => f.id)
 const IDS_CARRUSEL = CAROUSELS.map((c) => c.id)
+const SLUGS_FOTO = PHOTOS.map((p) => p.slug)
 const REDES = [...new Set(FORMATS.map((f) => f.network))]
 const OBJETIVOS = [...new Set(visibles().map((t) => t.objetivo).filter(Boolean))]
 const ROLES = Object.keys(MAXCHARS)
@@ -586,7 +587,7 @@ export const CAPACIDADES = [
   {
     nombre: 'listar_fotos',
     etiqueta: 'Revisando el banco de fotos…',
-    descripcion: 'El banco de fotos de Magoya, por nombre. Son las únicas fotos de marca que hay adentro de la herramienta (la persona también puede subir la suya). Usala cuando pregunten qué fotos hay. No podés nombrar una foto que no esté en esta lista. OJO, es SÓLO PARA NOMBRAR: no existe ninguna capacidad para poner ni cambiar la foto de una pieza, y las plantillas con foto se abren con el marco VACÍO. La foto la elige la persona desde el panel Detrás del editor. No digas "te la abro con la imagen puesta" ni "le pongo la aérea": nombrá la que te parece y decile que la elija ella ahí.',
+    descripcion: 'El banco de fotos de Magoya, por nombre. Son las únicas fotos de marca que hay adentro de la herramienta (la persona también puede subir la suya). Usala cuando pregunten qué fotos hay, y para elegir el slug antes de llamar a poner_foto. No podés nombrar una foto que no esté en esta lista. Para PONERLA de fondo en la pieza abierta está poner_foto (sólo si la pieza lleva foto); lo que no existe es subir o poner fotos de la persona — ésas las maneja ella desde el panel Detrás del editor, y ahí también puede meterle foto a una pieza de color plano si insiste.',
     esquema: {
       type: 'object',
       properties: { buscar: { type: 'string', description: 'filtra por nombre: "campo", "persona", "trigo"…' } },
@@ -882,6 +883,91 @@ export const CAPACIDADES = [
       if (!cambiar) throw new Error('Ahora mismo no puedo cambiar el formato desde acá. La persona lo cambia con el selector de arriba.')
       cambiar(f)
       return { formato: formatLabel(f.id), medidas: `${f.w}×${f.h}` }
+    },
+  },
+
+  {
+    nombre: 'poner_foto',
+    etiqueta: 'Poniendo la foto…',
+    // El fallo más repetido del estrés con pedidos reales era PROMETER esto
+    // sin poder hacerlo: listar_fotos nombraba y nada ponía. Ahora existe el
+    // camino entero, con la misma regla que cambiar_formato: es inmediato y
+    // sin Aceptar, porque acá no hay texto del modelo que revisar — la foto
+    // es del banco de la marca y la pidió la persona. Lo que NO se negocia
+    // es contarlo: una mutación silenciosa es peor que una promesa vacía.
+    descripcion: 'Pone una foto del banco de Magoya como foto de FONDO de la pieza abierta. El slug sale de listar_fotos: no inventes uno. Es un cambio inmediato, como cambiar_formato: NO pasa por Aceptar (la foto es de la marca, no es texto tuyo), así que después contale a la persona QUÉ foto pusiste y decile que ⌘Z la saca si prefiere otra. Sólo entra en piezas que llevan foto (las plantillas con foto, o una a la que ya le pusieron foto de fondo): sobre una de color plano no la uses, te va a volver el error con las plantillas que sí llevan. NO sube fotos de la persona (eso lo hace ella desde el panel Detrás del editor) y NO pone fotos encima de la pieza: fondo solamente. Si no hay pieza abierta, primero se abre una plantilla.',
+    esquema: {
+      type: 'object',
+      properties: {
+        slug: { type: 'string', enum: SLUGS_FOTO, description: 'la foto del banco, por su slug (sale de listar_fotos)' },
+      },
+      required: ['slug'],
+      additionalProperties: false,
+    },
+    muta: true,
+    // El nombre de la foto y nada más: "Poniendo la foto… · de fondo quedó
+    // Maíz". Que se deshace con ⌘Z lo cuenta el modelo en su respuesta, que
+    // para eso la descripcion se lo exige.
+    resumir: (d) => `de fondo quedó ${d.foto}`,
+    ejecutar: async ({ slug }, ctx) => {
+      // El enum del esquema no lo garantiza (lección de revisar_copy: la API
+      // no valida los argumentos): se cruza acá, con la lista de válidos.
+      const foto = PHOTOS.find((p) => p.slug === slug)
+      if (!foto) throw new Error(noExiste('la foto', slug, SLUGS_FOTO))
+
+      const proyecto = ctx?.proyecto
+      if (!proyecto?.pieces?.length) {
+        throw new Error('No hay ninguna pieza abierta donde poner la foto. Primero se abre una plantilla (las que llevan foto salen de listar_plantillas con conFoto:true) y después se le pone la foto.')
+      }
+      const i = Number.isInteger(proyecto.slideActual) ? proyecto.slideActual : 0
+      const slide = proyecto.pieces[i] || proyecto.pieces[0]
+      const c = slide?.content || {}
+      // La plantilla se busca primero en ctx.plantillas, que trae también las
+      // guardadas por la persona: el catálogo (TEMPLATES_BY_ID) no las tiene
+      // y decirle "esa pieza no existe" a una pieza real sería mentir.
+      const t = (ctx?.plantillas || []).find((x) => x.id === slide?.templateId)
+        || TEMPLATES_BY_ID[slide?.templateId]
+        || null
+
+      // ¿Esta pieza LLEVA foto? El mismo razonamiento que resolvePiece en el
+      // motor (engine/layouts.js): el fondo explícito (content.bg) le gana a
+      // todo, y sin fondo explícito manda la superficie de la plantilla
+      // (surface 'photo' o el hasPhoto de sus defaults). Una plantilla de
+      // foto con el fondo pisado a color sigue siendo elegible: poner la
+      // foto vuelve a encender bg:'photo', igual que el botón "Una foto" del
+      // panel. Lo que NO se promueve desde acá es una pieza de color plano:
+      // el motor lo permite con bg, pero cambiarle la superficie a un diseño
+      // pensado sin foto es una decisión de composición de la persona, no
+      // del copiloto.
+      const d = t?.defaults || {}
+      const bg = c.bg || d.bg || null
+      const llevaFoto = bg === 'photo' || (t ? (t.surface === 'photo' || !!d.hasPhoto) : false)
+      if (!llevaFoto) {
+        const conFoto = visibles().filter((x) => x.surface === 'photo').map((x) => x.id)
+        throw new Error(
+          `«${t?.name || slide?.templateId || 'Esta pieza'}» es de color plano: no lleva foto de fondo, así que acá no hay dónde ponerla. `
+          + `Las plantillas que sí llevan foto: ${conFoto.join(', ')}. `
+          + 'Ofrecele abrir una de ésas (ojo: abrir reemplaza lo armado) — o, si quiere la foto en ESTA pieza, lo puede hacer ella desde el panel Detrás del editor: esa decisión de composición es suya.',
+        )
+      }
+
+      const poner = accion(ctx, 'ponerFoto')
+      if (!poner) throw new Error('Ahora mismo no puedo poner la foto desde acá. Decile a la persona cuál va y que la elija en el panel Detrás del editor.')
+
+      // El MISMO shape que escribe el panel Detrás y que trae fotoDeMuestra
+      // (templates/index.js): {src, natural, focal}, más el nombre para que
+      // el inspector no la llame "Imagen". natural:null es el mismo valor
+      // con el que abren las plantillas con foto: el motor lo resuelve solo.
+      // Si ya había una foto, su encuadre (focal) se conserva — la persona
+      // pudo haberlo ajustado y cambiar la imagen no es pedir que se pierda.
+      poner({ src: foto.url, natural: null, name: foto.label, focal: c.photo?.focal || { x: 0.5, y: 0.5 } })
+
+      return {
+        foto: foto.label,
+        slug: foto.slug,
+        reemplazo: !!c.photo?.src,
+        estado: 'La foto YA quedó puesta de fondo, sin pasar por Aceptar. Contale a la persona cuál pusiste y que ⌘Z la deshace si prefiere otra.',
+      }
     },
   },
 

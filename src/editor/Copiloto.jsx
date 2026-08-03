@@ -573,8 +573,18 @@ export default function Copiloto({ cop, sugerenciasIniciales = [], onAbrirPieza,
           y un input muerto es una promesa falsa. */}
       {sinCopiloto ? (
         <p className="cop-aviso cop-apagado">
-          {caida || SIN_COPILOTO}
-          {' '}Te dejo la conversación para releerla. Para seguir,{' '}
+          {/* Sin eco. El evento de error que apaga el chat escribe la MISMA
+              frase dos veces: como aviso en el hilo (manejarEvento) y en
+              `caida`. Facu la vio repetida en producción, una arriba de la
+              otra. La regla: el hilo conserva el aviso — es donde pasó — y
+              este cartel dice sólo lo que AGREGA: adónde seguir. La frase
+              va acá únicamente cuando el hilo no la tiene (una recarga con
+              la sesión restaurada, donde `caida` vuelve vacía y el cartel
+              es el único lugar donde quedaría explicado el apagado). */}
+          {!turnos.some((t) => t.tipo === 'aviso' && t.texto === (caida || SIN_COPILOTO)) && (
+            <>{caida || SIN_COPILOTO}{' '}</>
+          )}
+          Te dejo la conversación para releerla. Para seguir,{' '}
           {/* El buscador de reemplazo vive en la home. Desde el editor,
               mandar a "acá abajo" sería mandar a un lugar que no existe:
               se dice dónde está de verdad. */}

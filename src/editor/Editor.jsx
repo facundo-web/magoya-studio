@@ -21,6 +21,7 @@ const TINTS = [
   { k: 'yellow', label: 'Amarillo', value: '#F2C14E', sw: '#F2C14E' },
 ]
 import { imageSize, getAsset, compressImage, removeBackground, coloredIcon, gradientIcon } from '../engine/assets.js'
+import { remapEidKeys, idxTrasBorrar, idxTrasSwap, posConCopias } from './remapEids.js'
 import { measure, wrapText } from '../engine/textLayout.js'
 import { exportPiece, exportCarousel } from '../engine/export.js'
 
@@ -154,7 +155,12 @@ function shapeBox(o, ref) {
   }
 }
 
-const clampScale = (v) => Math.min(1.2, Math.max(0.05, v))
+// El techo era 1.2 (120% del lado corto) y una imagen no podía crecer más.
+// Facu: "¿está contemplado lo de la imagen que se pueda agrandar más?" — no
+// lo estaba. A 3× y con el centro llegando al borde, alcanza para el efecto
+// sangrado (la foto que se sale del lienzo); el motor dibuja cualquier
+// escala y el SVG recorta solo en el borde de la pieza.
+const clampScale = (v) => Math.min(3, Math.max(0.05, v))
 
 // Cerrar tiene que funcionar igual en todos lados. Los menús sólo cerraban
 // con `mouseleave`: en touch ese evento no existe, así que quedaban abiertos
@@ -455,6 +461,9 @@ export default function Editor({
     set({
       objects: objects.filter((_, i) => !idxSet.has(i)),
       textBlocks: (content.textBlocks || []).filter((_, i) => !tbIdx.has(i)),
+      // los tb:N que quedan cambian de número: sus posiciones movidas a
+      // mano los tienen que seguir, en el MISMO parche (ver remapEids.js)
+      pos: remapEidKeys(content.pos, 'tb:', idxTrasBorrar(tbIdx)),
     })
     deselectAll(); setSelText(null); setMultiSelText(new Set())
     const saltados = eids.length - tbIdx.size
@@ -549,6 +558,23 @@ export default function Editor({
     const cx = format.w * (o.x ?? 0.72), cy = format.h * (o.y ?? 0.5)
     return { left: ((cx - w / 2) / format.w) * 100, top: ((cy - h / 2) / format.h) * 100, w: (w / format.w) * 100, h: (h / format.h) * 100, rot: o.rotation || 0 }
   }
+  // Con el tope de escala en 3× un objeto puede quedar MÁS GRANDE que la
+  // pieza entera: las cuatro esquinas caen fuera del lienzo y no se ve
+  // ningún tirador. Los tiradores NO se mueven de las esquinas reales — el
+  // resize ancla en la esquina opuesta y correrlos haría saltar el objeto
+  // al primer arrastre — así que la salida es otra: alejar el zoom (los
+  // tiradores vuelven a entrar en pantalla) o el slider Tamaño. Eso existe
+  // pero no se ve solo; este aviso lo dice, una vez por objeto.
+  const avisadoEnormeRef = useRef(null)
+  useEffect(() => {
+    if (selObj == null || !objects[selObj]) { avisadoEnormeRef.current = null; return }
+    const bx = objBox(objects[selObj])
+    const sinTiradores = bx.left < 0 && bx.top < 0 && bx.left + bx.w > 100 && bx.top + bx.h > 100
+    if (sinTiradores && avisadoEnormeRef.current !== selObj) {
+      avisadoEnormeRef.current = selObj
+      onToast('El elemento quedó más grande que la pieza: alejá el zoom (botón −) para agarrar las esquinas, o ajustalo con el slider Tamaño.')
+    }
+  }, [selObj, content])
   // drop desde el picker (drag & drop) → agregar el objeto donde cayó
   const addObjectAt = async (data, pos) => {
     if (data.type === 'biblioteca') {
@@ -795,7 +821,13 @@ export default function Editor({
     const idxs = eids.map(textBlockIdx).filter((i) => i != null)
     if (!idxs.length) { onToast('Esos textos son parte de la plantilla: no se pueden quitar'); return }
     const idxSet = new Set(idxs)
-    set({ textBlocks: (content.textBlocks || []).filter((_, i) => !idxSet.has(i)) })
+    // Borrar corre los índices tb:N y `content.pos` se indexa por ellos:
+    // sin remapear, el bloque que quedaba saltaba a su posición default
+    // porque su pos quedó guardada con el número viejo (ver remapEids.js).
+    set({
+      textBlocks: (content.textBlocks || []).filter((_, i) => !idxSet.has(i)),
+      pos: remapEidKeys(content.pos, 'tb:', idxTrasBorrar(idxSet)),
+    })
     setSelText(null); setMultiSelText(new Set())
     const saltados = eids.length - idxs.length
     onToast((idxs.length > 1 ? `Se quitaron ${idxs.length} textos` : 'Se quitó el texto') + (saltados ? ` · ${saltados} de la plantilla no se tocaron` : ''))
@@ -806,7 +838,10 @@ export default function Editor({
     const blocks = content.textBlocks || []
     const nuevos = idxs.map((i) => ({ ...blocks[i] }))
     const base = blocks.length
-    set({ textBlocks: [...blocks, ...nuevos] })
+    // La copia de un bloque movido a mano hereda su posición, corrida un
+    // poquito — la decisión y el porqué están en posConCopias().
+    const pos = posConCopias(content.pos, base, idxs.map((i) => content.pos?.['tb:' + i] || null))
+    set({ textBlocks: [...blocks, ...nuevos], ...(pos !== content.pos ? { pos } : {}) })
     setSelText('tb:' + base)
     setMultiSelText(new Set(nuevos.slice(1).map((_, k) => 'tb:' + (base + 1 + k))))
   }
@@ -814,7 +849,11 @@ export default function Editor({
     const idxs = eids.map(textBlockIdx).filter((i) => i != null)
     if (!idxs.length) { onToast('Esos textos son parte de la plantilla: no se pueden copiar'); return }
     const blocks = content.textBlocks || []
-    textClipboardRef.current = idxs.map((i) => ({ ...blocks[i] }))
+    // El portapapeles lleva el bloque Y su posición movida a mano: pegar un
+    // texto que vivía suelto en una esquina tiene que dejar la copia ahí al
+    // lado, no devolverla al stack. Se guarda la pos de AHORA (snapshot):
+    // si después movés o borrás el original, lo copiado no cambia.
+    textClipboardRef.current = idxs.map((i) => ({ block: { ...blocks[i] }, pos: content.pos?.['tb:' + i] || null }))
     onToast(idxs.length > 1 ? `Copiados ${idxs.length} textos` : 'Copiado')
   }
   const textPasteClipboard = () => {
@@ -822,10 +861,23 @@ export default function Editor({
     if (!src?.length) return
     const blocks = content.textBlocks || []
     const base = blocks.length
-    set({ textBlocks: [...blocks, ...src.map((b) => ({ ...b }))] })
+    const pos = posConCopias(content.pos, base, src.map((it) => it.pos))
+    set({ textBlocks: [...blocks, ...src.map((it) => ({ ...it.block }))], ...(pos !== content.pos ? { pos } : {}) })
     setSelText('tb:' + base)
     setMultiSelText(new Set(src.slice(1).map((_, k) => 'tb:' + (base + 1 + k))))
     onToast(src.length > 1 ? `Pegados ${src.length} textos` : 'Pegado')
+  }
+  // La selección también apunta por índice: después de borrar o reordenar
+  // desde el panel tiene que seguir señalando al MISMO bloque, no al que
+  // heredó su número — si no, el inspector queda editando a otro.
+  const remapSeleccionTb = (nuevoIdx) => {
+    const rem = (eid) => {
+      if (!eid || !eid.startsWith('tb:')) return eid
+      const n = nuevoIdx(+eid.slice(3))
+      return n == null ? null : 'tb:' + n
+    }
+    setSelText((s) => rem(s))
+    setMultiSelText((ms) => new Set([...ms].map(rem).filter(Boolean)))
   }
   const [guides, setGuides] = useState({ v: false, h: false })
   // Un texto seleccionado no se veía seleccionado EN LA PIEZA: cambiaba el
@@ -1195,7 +1247,7 @@ export default function Editor({
             <>
               <div className="panel-title">Textos</div>
               <p className="panel-help">Sumá textos y tocalos para ajustarlos a la derecha.</p>
-              <TextBlocksBody content={content} set={set} onSelectText={onSelectText} selText={selText} multiSelText={multiSelText} toggleMultiSelText={toggleMultiSelText} />
+              <TextBlocksBody content={content} set={set} onSelectText={onSelectText} selText={selText} multiSelText={multiSelText} toggleMultiSelText={toggleMultiSelText} onTbRemap={remapSeleccionTb} />
               <div className="panel-title" style={{ marginTop: 16 }}>Posición del texto</div>
               <AnchorBody content={content} template={template} set={set} />
             </>
@@ -1216,7 +1268,7 @@ export default function Editor({
                   "quiero agregar un texto y moverlo" (Aye). */}
               <div className="panel-title" style={{ marginTop: 16 }}>Textos sueltos</div>
               <p className="panel-help">Los que sumás vos. Arrastralos en la pieza para ubicarlos donde quieras.</p>
-              <TextBlocksBody content={content} set={set} onSelectText={onSelectText} selText={selText} multiSelText={multiSelText} toggleMultiSelText={toggleMultiSelText} />
+              <TextBlocksBody content={content} set={set} onSelectText={onSelectText} selText={selText} multiSelText={multiSelText} toggleMultiSelText={toggleMultiSelText} onTbRemap={remapSeleccionTb} />
               {/* Mover el bloque de texto se podía sólo en las piezas libres,
                   y en el resto vivía escondido como tres "estilos" (Arriba,
                   Abajo, Centrado) que a 128 px no se distinguían del
@@ -2144,7 +2196,9 @@ function StepsBody({ content, template, set }) {
         <div key={i} className="step-row">
           <span className="step-num">{String(i + 1).padStart(2, '0')}</span>
           <input type="text" value={s} onChange={(e) => upd(i, e.target.value)} maxLength={60} />
-          <button className="obj-row-del" onClick={() => set({ steps: steps.filter((_, idx) => idx !== i) })} title="Quitar">✕</button>
+          {/* los pasos también se nombran por índice (step:N) y también se
+              pueden mover a mano: mismo remapeo de pos que los tb:N */}
+          <button className="obj-row-del" onClick={() => set({ steps: steps.filter((_, idx) => idx !== i), pos: remapEidKeys(content.pos, 'step:', idxTrasBorrar(new Set([i]))) })} title="Quitar">✕</button>
         </div>
       ))}
       {steps.length < 6 && <button className="btn" onClick={() => set({ steps: [...steps, 'Nuevo paso'] })}>+ Agregar paso</button>}
@@ -2552,7 +2606,7 @@ function ObjectProps({ o, i, updateObject, objRemove, objDuplicate, objBringFron
             title={`Ubicar ${nombrePos(px, py)}`} aria-label={`Ubicar ${nombrePos(px, py)}`} />
         ))}
       </div>
-      <Ctl label="Tamaño" value={Math.round((o.scale ?? 0.3) * 100)} min={5} max={120} suffix="%" onChange={(v) => updateObject(i, { scale: v / 100 }, 'scale')} />
+      <Ctl label="Tamaño" value={Math.round((o.scale ?? 0.3) * 100)} min={5} max={300} suffix="%" onChange={(v) => updateObject(i, { scale: v / 100 }, 'scale')} />
       <Ctl label="Rotación" value={Math.round(o.rotation || 0)} min={-180} max={180} step={1} suffix="°"
         onChange={(v) => updateObject(i, { rotation: v }, 'rot')} />
       <div className="chips" style={{ marginTop: -4, marginBottom: 10 }}>
@@ -2741,11 +2795,25 @@ const TEXT_STYLE_OPTS = [
 ]
 
 
-function TextBlocksBody({ content, set, onSelectText, selText, multiSelText, toggleMultiSelText }) {
+function TextBlocksBody({ content, set, onSelectText, selText, multiSelText, toggleMultiSelText, onTbRemap }) {
   const blocks = content.textBlocks || []
   const add = () => { const n = blocks.length; set({ textBlocks: [...blocks, { style: 'title', text: 'Nuevo texto' }] }); onSelectText && onSelectText('tb:' + n) }
-  const remove = (i) => set({ textBlocks: blocks.filter((_, idx) => idx !== i) })
-  const move = (i, dir) => { const a = [...blocks]; const j = i + dir; if (j < 0 || j >= a.length) return; [a[i], a[j]] = [a[j], a[i]]; set({ textBlocks: a }) }
+  // Quitar y Subir/Bajar corren los índices tb:N: las posiciones movidas a
+  // mano (content.pos) van remapeadas en el MISMO parche, y la selección
+  // se avisa hacia arriba para que siga apuntando al mismo bloque.
+  const remove = (i) => {
+    const mapa = idxTrasBorrar(new Set([i]))
+    set({ textBlocks: blocks.filter((_, idx) => idx !== i), pos: remapEidKeys(content.pos, 'tb:', mapa) })
+    onTbRemap && onTbRemap(mapa)
+  }
+  const move = (i, dir) => {
+    const a = [...blocks]; const j = i + dir
+    if (j < 0 || j >= a.length) return
+    ;[a[i], a[j]] = [a[j], a[i]]
+    const mapa = idxTrasSwap(i, j)
+    set({ textBlocks: a, pos: remapEidKeys(content.pos, 'tb:', mapa) })
+    onTbRemap && onTbRemap(mapa)
+  }
   return (
     <>
       <div className="obj-list">

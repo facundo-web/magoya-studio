@@ -754,10 +754,13 @@ El copiloto ya es el nivel: continuo, sin declarar nada antes de empezar. Un
 selector de modos sería una decisión más para gente que nos dijo que le
 sobran decisiones.
 
-Pendiente heredado, chico y concreto: capacidad `poner_foto({slug})` para
-que el copiloto pueda elegir foto del banco (hoy la nombra pero no la puede
-poner), y revisar que ningún chip de arranque ofrezca carrusel en formato
-que no lo admite.
+Del pendiente heredado, `poner_foto({slug})` ✅ (ago 2026): el copiloto pone
+una foto del banco como fondo de la pieza abierta, por el mismo camino que
+el panel Detrás (paso de historial, ⌘Z la saca) y sin pasar por Aceptar —
+la foto es de la marca y la pidió la persona, no hay texto del modelo que
+revisar. Sólo sobre piezas que llevan foto: promover una de color plano
+sigue siendo decisión de la persona en el panel. Queda pendiente: revisar
+que ningún chip de arranque ofrezca carrusel en formato que no lo admite.
 
 ---
 
