@@ -84,6 +84,114 @@ export const CAROUSELS = [
       ] },
     ],
   },
+  {
+    // ============================================================
+    // "AI EN CAMPO · EDUCATIVO" — la pieza que Facu armó con GPT,
+    // revisada con Aye (5/8) y corregida a marca:
+    //   · verde-crema-negro-negro-crema-verde (el verde vivo de la pieza
+    //     es el emerald de Magoya → esquema 'emerald'; el crema es el
+    //     esquema 'cream' de siempre; el negro es el esquema 'ink' a
+    //     sangre). Ronda 3 de Facu (5/8): "las que tienen negro no me
+    //     gusta que sea un contenedor sobre otro" — las placas 3/4 eran
+    //     una tarjeta negra sobre campo crema (silueta 'tarjeta' +
+    //     siluetaCampo) y ahora son fondo negro pleno, la cita directo
+    //     sobre la pieza. Es además más fiel a la pieza original. Con eso
+    //     `siluetaCampo` quedó sin usuarios acá (el knob del motor queda:
+    //     es genérico de la silueta tarjeta).
+    //   · sin los "1/6" ("eso lo sacaría")
+    //   · el lockup "AI en Campo" queda como logo de la serie
+    //     (marks:aiencampo-ink/-cream) y CONVIVE con el wordmark real del
+    //     kit, que es el que estaba mal en la pieza original. Ronda 2 de
+    //     Facu (5/8): sin el "por Magoya" debajo (el wordmark ya está
+    //     arriba) y siempre en la MISMA posición — alineado al margen
+    //     izquierdo del texto, borde inferior a ~1334 de 1350. Ronda 3:
+    //     sin el doble subrayado bajo el "en" (las rayitas del "AI"
+    //     quedan); el viewBox recortado achica apenas el alto y la y de
+    //     los lockups pasa de 0.912 a 0.913 para sostener ese borde.
+    //   · la trama de circulitos se FUE (ronda 2: "los puntitos eliminalos";
+    //     hay una lógica pendiente para puntitos+flecha — las flechas quedan)
+    //   · comillas UNIFICADAS: el mismo glifo (") abre y cierra la cita —
+    //     en la pieza original eran dos distintas
+    //
+    // ESCALA DE LA SERIE (ronda 2: "todos tienen distintos tamaños
+    // tipográficos y contenedores, ajustalo"). TODOS los bloques llevan
+    // `size` explícito: un tamaño elegido a mano no participa de
+    // tamanoComun ni del auto-ajuste, así que la escala queda CLAVADA por
+    // diseño y no depende de cuánto copy tenga cada placa.
+    //   título portada/cierre  0.9   (85,5 px — abren y cierran más fuerte)
+    //   título interno (2/5)   0.8   (76 px)
+    //   cuerpo                 1     (32,4 px — también los steps de la 5,
+    //                                 vía sizes.step = 32,4/38,9)
+    //   cita corta (3)         0.9   (64,2 px — el mismo px de la ronda 2,
+    //                                 que salía de 1 × el peso 0,9 de la
+    //                                 tarjeta; sin tarjeta el 0,9 va
+    //                                 explícito)
+    //   cita larga (4)         0.495 (35 px: ídem, era 0,55 × 0,9; más
+    //                                 chica pero mismo estilo, arriba del
+    //                                 cuerpo, que para eso es la
+    //                                 protagonista)
+    //   kicker (3/4)           0.86  (26 px, entra en una línea en ambas)
+    //   CTA/pill (2/6)         1     (43 px, pastillas idénticas)
+    //
+    // Este preset NO lleva `design` compartido a propósito: en los otros
+    // carruseles el diseño único es lo que hace que las slides combinen,
+    // pero esta serie alterna esquemas POR PLACA (decisión de la reunión)
+    // y ese diseño ya viene puesto en los defaults de cada plantilla aiec-*.
+    //
+    // Los `steps` de la placa 5 tampoco viajan en el copy: viven en los
+    // defaults de aiec-lista (que ya son el copy real). Pasarlos por acá
+    // compartiría el MISMO array entre el preset y la pieza abierta
+    // (buildCarousel clona textBlocks pero no steps) y editar la pieza
+    // mutaría el preset.
+    //
+    // LÍMITES DEL MOTOR, verificados y decididos acá:
+    //   · resaltado inline ("una palabra de este renglón") NO existe: el
+    //     marcador y el color son POR BLOQUE. Por eso "prompt." y "en tu
+    //     prompt" van como bloque propio resaltado, y los datos de la
+    //     placa 4 (Pergamino, 15/11, RECSO…) van SIN resaltar dentro de
+    //     la cita — resaltar la cita entera sería mentirle a la pieza.
+    //     El cierre "Está en preguntar mejor." sí se resalta (bloque
+    //     entero), en verde y no en negro: sobre el fondo negro un
+    //     marcador negro no existe.
+    // ============================================================
+    id: 'aiencampo',
+    name: 'AI en Campo · educativo',
+    purpose: 'La serie educativa del ciclo: por qué la IA te contesta cualquier cosa y cómo preguntar mejor.',
+    slides: ['aiec-portada', 'aiec-texto', 'aiec-cita', 'aiec-cita', 'aiec-lista', 'aiec-cierre'],
+    copy: [
+      { textBlocks: [
+        { style: 'title', size: 0.9, text: 'Le preguntaste algo de tu lote a la IA y te contestó cualquier cosa.' },
+        { style: 'title', size: 0.9, text: '¿Sabés por qué?' },
+      ] },
+      { textBlocks: [
+        { style: 'title', size: 0.8, text: 'El problema fue el' },
+        { style: 'title', size: 0.8, text: 'prompt.', highlight: 'ink' },
+        { style: 'body', size: 1, text: 'Pensalo así: la IA es como alguien que leyó muchísimo, pero nunca pisó un lote.' },
+        { style: 'body', size: 1, text: 'Sabe teoría, pero no conoce tu campo.' },
+        { style: 'cta', size: 1, text: 'Eso se lo tenés que contar vos.', color: 'ink' },
+      ] },
+      { textBlocks: [
+        { style: 'kicker', size: 0.86, text: 'Esto es lo que la mayoría pregunta' },
+        { style: 'quote', size: 0.9, text: '"Para mi lote de soja del bajo, ¿qué fertilizante uso y con qué dosis?"' },
+        { style: 'body', size: 1, text: 'El problema: faltan datos clave.' },
+      ] },
+      { textBlocks: [
+        { style: 'kicker', size: 0.86, text: 'Esto es lo mismo, pero con contexto' },
+        { style: 'quote', size: 0.495, text: '"Tengo un lote de soja de primera en Pergamino, sembrado el 15/11, teniendo en cuenta los resultados de la RECSO que te adjunto y con un análisis de suelo que marca 7 ppm de fósforo. Mi rinde objetivo es de 35 qq/ha. Decime qué fertilizante y dosis aplicar, en una tabla con producto, dosis y momento de aplicación."' },
+        { style: 'body', size: 1, text: 'La diferencia no está en preguntar más.' },
+        { style: 'body', size: 1, text: 'Está en preguntar mejor.', highlight: 'emerald' },
+      ] },
+      { textBlocks: [
+        { style: 'title', size: 0.8, text: 'Los 4 elementos que no pueden faltar' },
+        { style: 'title', size: 0.8, text: 'en tu prompt', highlight: 'ink' },
+      ] },
+      { textBlocks: [
+        { style: 'title', size: 0.9, text: '¿Querés aprender a armar prompts que realmente te sirvan?' },
+        { style: 'body', size: 1, text: 'En "AI en Campo", nuestro ciclo de webinars gratuitos, te mostramos cómo usar la IA con información real, mejores preguntas y criterio agronómico.' },
+        { style: 'cta', size: 1, text: 'Sumate al próximo encuentro.', color: 'ink' },
+      ] },
+    ],
+  },
 ]
 
 // Arma las piezas de un carrusel: plantilla + copy calibrado + el mismo

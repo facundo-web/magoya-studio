@@ -32,7 +32,12 @@ Un template es un `.json` en esta carpeta + un import en `index.js`. Es **data**
   "treatment": "bw",       // foto: bw (B&N) | color
   "kicker": "…", "title": "…", "subtitle": "…",  // textos por rol
   "colors": { "cta": "ink" },   // opcional: color por rol (claves de TEXT_COLORS); en un CTA pinta la pastilla
-  "bubbleTint": "accent"        // sólo chat: color del globo propio ('accent' o hex); default: la regla de WhatsApp
+  "bubbleTint": "accent",       // sólo chat: color del globo propio ('accent' o hex); default: la regla de WhatsApp
+  "steps": ["…", "…"],          // pasos de lista: por defecto salen numerados ("01  …")
+  "stepIcons": ["agro:persona"] // opcional: un icon id por paso — el tile chico (panel tinta
+                                // redondeado + glifo en acento) reemplaza al numerito como
+                                // bullet, con sangría francesa: todas las líneas del paso
+                                // quedan alineadas después del tile
 }
 ```
 Los bloques de texto libres (`textBlocks`) aceptan además `align: "left" | "center"`

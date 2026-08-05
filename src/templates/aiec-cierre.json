@@ -1,0 +1,65 @@
+{
+  "id": "aiec-cierre",
+  "name": "AI en Campo · cierre webinar",
+  "purpose": "Cierre de la serie: vuelve al verde de la portada, pregunta de invitación, qué es el ciclo y la pill negra que llama al próximo encuentro.",
+  "category": "impacto",
+  "surface": "solid",
+  "anchor": "center-left",
+  "motif": false,
+  "freeform": true,
+  "roles": [],
+  "defaults": {
+    "scheme": "emerald",
+    "accent": "ink",
+    "logo": "black",
+    "hasPhoto": false,
+    "bg": "color",
+    "showLogo": true,
+    "logoVPos": "top",
+    "rule": "none",
+    "textBlocks": [
+      {
+        "style": "title",
+        "text": "¿Querés aprender a armar prompts que realmente te sirvan?",
+        "size": 0.9
+      },
+      {
+        "style": "body",
+        "text": "En \"AI en Campo\", nuestro ciclo de webinars gratuitos, te mostramos cómo usar la IA con información real, mejores preguntas y criterio agronómico.",
+        "size": 1
+      },
+      {
+        "style": "cta",
+        "text": "Sumate al próximo encuentro.",
+        "color": "ink",
+        "size": 1
+      }
+    ],
+    "objects": [
+      {
+        "kind": "icon",
+        "iconId": "marks:splash",
+        "style": "plain",
+        "tint": "ink",
+        "x": 0.84,
+        "y": 0.13,
+        "scale": 0.2,
+        "rotation": 0,
+        "shadow": false,
+        "opacity": 1
+      },
+      {
+        "kind": "icon",
+        "iconId": "marks:aiencampo-ink",
+        "style": "plain",
+        "x": 0.21,
+        "y": 0.913,
+        "scale": 0.3,
+        "rotation": 0,
+        "shadow": false,
+        "opacity": 1
+      }
+    ]
+  },
+  "objetivo": "webinar"
+}

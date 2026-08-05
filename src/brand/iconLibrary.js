@@ -79,6 +79,10 @@ const AGRO_NAMES = {
   'nube-lluvia': 'Clima · lluvia', tractor: 'Maquinaria', escaneo: 'Escaneo',
   'alerta-lote': 'Alerta', grafico: 'Resultados', 'mapa-pin': 'Ubicación',
   semilla: 'Semilla', 'reloj-campana': 'Tiempo de campaña',
+  // los tiles de la placa "los 4 elementos del prompt" (AI en Campo):
+  // contexto → persona, tarea → objetivo, formato → tabla. El cuarto
+  // (datos) ya existía: es `grafico`. Mismo trazo 1.75 que el resto.
+  persona: 'Persona · contexto', objetivo: 'Objetivo · tarea', tabla: 'Tabla · formato',
 }
 
 export const ICONS = Object.entries(modules).map(([path, url]) => {
@@ -113,14 +117,36 @@ const MARK_NAMES = {
   'flourish-arrow': 'Flecha', 'flourish-circle': 'Círculo', 'flourish-underline': 'Subrayado',
   'flourish-navarrow': 'Botón flecha', 'doodle-loop': 'Conector', 'doodle-blob': 'Mancha',
 }
-export const MARKS = Object.entries(markModules)
-  .map(([path, url]) => {
-    const m = path.match(/\/((?:flourish|doodle)-[^/]+)\.svg$/)
-    return m ? { slug: m[1], url } : null
-  })
-  .filter(Boolean)
-  .filter((x) => MARK_NAMES[x.slug])
-  .map((x) => ({ id: `marks:${x.slug}`, slug: x.slug, category: 'trazos', label: MARK_NAMES[x.slug], url: x.url, color: '#0D0C0C', isMark: true }))
+export const MARKS = [
+  ...Object.entries(markModules)
+    .map(([path, url]) => {
+      const m = path.match(/\/((?:flourish|doodle)-[^/]+)\.svg$/)
+      return m ? { slug: m[1], url } : null
+    })
+    .filter(Boolean)
+    .filter((x) => MARK_NAMES[x.slug])
+    .map((x) => ({ id: `marks:${x.slug}`, slug: x.slug, category: 'trazos', label: MARK_NAMES[x.slug], url: x.url, color: '#0D0C0C', isMark: true })),
+  // W · los dos gestos cómic de la pieza "AI en Campo" que gustaron en la
+  // revisión con Aye (5/8): el splash de rayitas (el 'sparkle' ya existía
+  // como forma, pero el splash de énfasis tipo "¡!" no) y el globo de
+  // pensamiento de la placa del prompt. Van a mano y no por el glob porque
+  // el regex de arriba exige prefijo flourish-/doodle- y el contrato de ids
+  // con los templates de la serie fija `marks:splash` y `marks:pensamiento`.
+  { id: 'marks:splash', slug: 'splash', category: 'trazos', label: 'Splash cómic', url: markModules['./assets/splash.svg'], color: '#0D0C0C', isMark: true },
+  { id: 'marks:pensamiento', slug: 'pensamiento', category: 'trazos', label: 'Globo de pensamiento', url: markModules['./assets/pensamiento.svg'], color: '#0D0C0C', isMark: true },
+]
+
+// ---- lockup de serie "AI en Campo" (ciclo de webinars) ----
+// Es un LOGO, no un trazo: color fijo en dos variantes (tinta / crema),
+// como los wordmarks — un logo de serie no se tiñe con el acento de la
+// pieza. Igual llevan isMark: es lo que hace que el picker los coloque
+// planos (sin tile de app-icon); como los paths llevan su fill propio,
+// el teñido del pipeline no los toca. Manrope 800 convertida a curvas y
+// el "Magoya" son los paths del wordmark oficial (ver el SVG).
+export const SERIES = [
+  { id: 'marks:aiencampo-ink', slug: 'aiencampo-ink', category: 'brand', label: 'AI en Campo · tinta', url: markModules['./assets/aiencampo-ink.svg'], color: '#0D0C0C', isMark: true },
+  { id: 'marks:aiencampo-cream', slug: 'aiencampo-cream', category: 'brand', label: 'AI en Campo · crema', url: markModules['./assets/aiencampo-cream.svg'], color: '#F6F1EB', isMark: true },
+]
 
 // ---- marca de Magoya como elemento colocable (wordmark + isotipo) ----
 import { WORDMARKS, ISOTIPOS } from './brandKit.js'
@@ -185,7 +211,7 @@ export const SHAPES = [
   { id: 'shape:panel', slug: 'panel', category: 'shapes', label: 'Panel de color', shape: 'panel', isShape: true, color: '#00DE68' },
 ]
 
-export const ALL_OBJECTS = [...ICONS, ...MARKS, ...SHAPES, ...MAGOYA_OBJECTS, ...DEVICES, MOCKUP_FOTO]
+export const ALL_OBJECTS = [...ICONS, ...MARKS, ...SERIES, ...SHAPES, ...MAGOYA_OBJECTS, ...DEVICES, MOCKUP_FOTO]
 export const ICONS_BY_ID = Object.fromEntries(ALL_OBJECTS.map((i) => [i.id, i]))
-export const ICON_CATEGORIES = { agro: 'Agro e IA', ai: 'Logos de IA', social: 'Redes sociales', trazos: 'Trazos y marcas', shapes: 'Formas', devices: 'Dispositivos', magoya: 'Logo Magoya' }
+export const ICON_CATEGORIES = { agro: 'Agro e IA', ai: 'Logos de IA', social: 'Redes sociales', trazos: 'Trazos y marcas', brand: 'Logos de serie', shapes: 'Formas', devices: 'Dispositivos', magoya: 'Logo Magoya' }
 export const ICON_URLS = ALL_OBJECTS.map((i) => i.url).filter(Boolean)

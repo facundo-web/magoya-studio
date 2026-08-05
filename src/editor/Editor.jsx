@@ -2097,7 +2097,7 @@ function ObjectsBody({ objects, setObjects, selObj, setSelObj, multiSel, toggleM
                   taxonomía nueva: los rótulos salen de ICON_CATEGORIES. */}
               <label>Logos y trazos</label>
               <div className="chips" style={{ marginBottom: 6 }}>
-                {['agro', 'ai', 'social', 'trazos', 'magoya', 'custom'].map((k) => (
+                {['agro', 'ai', 'social', 'trazos', 'brand', 'magoya', 'custom'].map((k) => (
                   <button key={k} className={'chip' + (cat === k ? ' on' : '')} onClick={() => setCat(k)}>{CATS[k]}</button>
                 ))}
               </div>
@@ -2346,7 +2346,7 @@ function AvisoTinte({ crudo, template, content }) {
   const p = resolvePiece(template, content || {})
   const onPhoto = p.surface === 'photo' && !template.split
   if (onPhoto) return null
-  const sil = p.silueta ? siluetaInfo(p.silueta, { scheme: p.scheme, accent: p.accent, onPhoto }) : null
+  const sil = p.silueta ? siluetaInfo(p.silueta, { scheme: p.scheme, accent: p.accent, onPhoto, siluetaCampo: p.siluetaCampo }) : null
   const fondo = sil ? sil.campo : p.scheme.surface
   const ef = tinteEfectivo(crudo, fondo)
   if (!ef || ef.toLowerCase() === String(crudo).toLowerCase()) return null
@@ -3209,7 +3209,7 @@ function CtaColorReal({ template, content, colorKey, size, suelto }) {
   if (!colorKey || colorKey === 'auto') return null
   const p = resolvePiece(template, content)
   const onPhoto = p.surface === 'photo' && !template.split
-  const sil = p.silueta ? siluetaInfo(p.silueta, { scheme: p.scheme, accent: p.accent, onPhoto }) : null
+  const sil = p.silueta ? siluetaInfo(p.silueta, { scheme: p.scheme, accent: p.accent, onPhoto, siluetaCampo: p.siluetaCampo }) : null
   const campo = sil ? sil.campo : (onPhoto ? null : p.scheme.surface)
   const opaca = p.plate === 'band' || p.plate === 'card'
   const fondo = suelto ? campo : (opaca ? colorDePlaca(p.scheme, onPhoto) : (sil ? sil.fondo : campo))

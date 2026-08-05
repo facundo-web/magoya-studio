@@ -1,0 +1,87 @@
+{
+  "id": "aiec-texto",
+  "name": "AI en Campo · texto con resaltado",
+  "purpose": "Placa interna de la serie: titular con la palabra clave resaltada en negro, dos párrafos que explican y una pill de cierre. El globo de pensamiento acompaña.",
+  "category": "impacto",
+  "surface": "solid",
+  "anchor": "center-left",
+  "motif": false,
+  "freeform": true,
+  "roles": [],
+  "defaults": {
+    "scheme": "cream",
+    "accent": "deep",
+    "logo": "deep",
+    "hasPhoto": false,
+    "bg": "color",
+    "showLogo": true,
+    "logoVPos": "top",
+    "rule": "none",
+    "textBlocks": [
+      {
+        "style": "title",
+        "text": "El problema fue el",
+        "size": 0.8
+      },
+      {
+        "style": "title",
+        "text": "prompt.",
+        "highlight": "ink",
+        "size": 0.8
+      },
+      {
+        "style": "body",
+        "text": "Pensalo así: la IA es como alguien que leyó muchísimo, pero nunca pisó un lote.",
+        "size": 1
+      },
+      {
+        "style": "body",
+        "text": "Sabe teoría, pero no conoce tu campo.",
+        "size": 1
+      },
+      {
+        "style": "cta",
+        "text": "Eso se lo tenés que contar vos.",
+        "color": "ink",
+        "size": 1
+      }
+    ],
+    "objects": [
+      {
+        "kind": "icon",
+        "iconId": "marks:pensamiento",
+        "style": "plain",
+        "tint": "ink",
+        "x": 0.79,
+        "y": 0.16,
+        "scale": 0.26,
+        "rotation": 0,
+        "shadow": false,
+        "opacity": 1
+      },
+      {
+        "kind": "shape",
+        "shape": "handArrow",
+        "tint": "ink",
+        "x": 0.82,
+        "y": 0.85,
+        "scale": 0.16,
+        "rotation": 18,
+        "shadow": false,
+        "opacity": 1
+      },
+      {
+        "kind": "icon",
+        "iconId": "marks:aiencampo-ink",
+        "style": "plain",
+        "x": 0.21,
+        "y": 0.913,
+        "scale": 0.3,
+        "rotation": 0,
+        "shadow": false,
+        "opacity": 1
+      }
+    ]
+  },
+  "objetivo": "ensenar"
+}

@@ -179,7 +179,7 @@ export function checkContrast({ role, template, content = {}, block = null }) {
   // es la superficie del esquema: es el bloque de acento, la tinta inundada
   // o el papel de la tarjeta. Se lo pregunta al motor, no se lo adivina.
   const acentoPieza = acentoLegible(content.accent || d.accent, scheme)
-  const sil = siluetaInfo(content.silueta ?? d.silueta, { scheme, accent: acentoPieza, onPhoto })
+  const sil = siluetaInfo(content.silueta ?? d.silueta, { scheme, accent: acentoPieza, onPhoto, siluetaCampo: content.siluetaCampo ?? d.siluetaCampo })
   const campo = sil ? sil.fondo : (onPhoto ? null : scheme.surface)
   const fondoPlaca = opaquePlate ? colorDePlaca(scheme, onPhoto) : campo
   const accent = acentoLegible(content.accent || d.accent, scheme, fondoPlaca || scheme.surface)

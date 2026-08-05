@@ -35,11 +35,21 @@ import celularNotif from './celular-notificaciones.json'
 import cuentaRegresiva from './cuenta-regresiva.json'
 import collageStickers from './collage-stickers.json'
 import fechaMarcada from './fecha-marcada.json'
+// serie "AI en Campo" (revisión Facu + Aye, 5/8): la pieza pop/comic que
+// Facu armó con GPT, corregida a marca y metida como plantillas + preset.
+// Cada placa es una plantilla porque la serie se arma placa por placa
+// (verde-crema-crema-crema-crema-verde), no con un diseño único compartido.
+import aiecPortada from './aiec-portada.json'
+import aiecTexto from './aiec-texto.json'
+import aiecCita from './aiec-cita.json'
+import aiecLista from './aiec-lista.json'
+import aiecCierre from './aiec-cierre.json'
 
 // Orden por OBJETIVO de marketing (auditoría): primero lo que prueba y
 // educa; "en blanco" al final — arrancar en blanco es donde se rompe la marca.
 export const TEMPLATES = [
   impCifra, impApps, impPantalla, impPregunta, ytMiniatura, celularNotif, // AI en campo · alto impacto
+  aiecPortada, aiecTexto, aiecCita, aiecLista, aiecCierre, // AI en Campo · serie educativa (5/8)
   casoCliente, dato, insight, cita, retrato,          // prueba social y resultados
   metodo, contraste, techTitular, evento, eventoTarjeta, speakers,
   cuentaRegresiva, fechaMarcada, collageStickers, bloqueColor, // autoridad y anuncios

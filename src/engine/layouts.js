@@ -434,8 +434,18 @@ export const SILUETAS = {
   tarjeta: ({ W, H, ref, onPhoto, p }) => {
     const m = ref * 0.085
     const pad = ref * 0.06
-    const campo = onPhoto ? null : p.scheme.onSurface
     const papel = p.scheme.surface
+    // El campo alrededor de la tarjeta sale del esquema (onSurface), pero una
+    // plantilla puede pedir OTRO con nombre (`siluetaCampo`, clave de TINTES).
+    // Existe por la serie "AI en Campo": alterna esquemas por placa (decisión
+    // de la reunión) y el campo del esquema ink es el cream50 (#F6F1EB),
+    // que al lado de las placas crema (#ECE3DB, el Crema Magoya oficial)
+    // se leía como DOS cremas distintos en el mismo carrusel. Sólo claves de
+    // TINTES (colores del sistema, nunca hex sueltos) y sólo si el campo se
+    // distingue del papel — el mismo 1,22 que usa colorDePlaca: un campo
+    // igual al papel haría desaparecer la tarjeta sin avisar.
+    const pedido = TINTES[p.siluetaCampo]
+    const campo = onPhoto ? null : (pedido && ratio(pedido, papel) >= 1.22 ? pedido : p.scheme.onSurface)
     const card = { x: m, y: m, w: W - m * 2, h: H - m * 2 }
     return {
       pintar(b) {
@@ -499,10 +509,10 @@ function normalizePlate(v, template, onPhoto) {
 // cometido con las placas (389 pares medidos en U2); no hay motivo para
 // repetirlo con las siluetas. La geometría es de mentira a propósito: el
 // color y los pesos no dependen del formato.
-export function siluetaInfo(id, { scheme, accent, onPhoto }) {
+export function siluetaInfo(id, { scheme, accent, onPhoto, siluetaCampo = null }) {
   const sil = SILUETAS[id]
   if (!sil) return null
-  const esc = sil({ W: 1000, H: 1250, ref: 1000, onPhoto, p: { scheme, accent, surface: onPhoto ? 'photo' : 'solid' } })
+  const esc = sil({ W: 1000, H: 1250, ref: 1000, onPhoto, p: { scheme, accent, siluetaCampo, surface: onPhoto ? 'photo' : 'solid' } })
   // `campo` = el color del CENTRO de la pieza, que es contra el que se ven
   // los objetos sueltos (drawObjects recibe exactamente esto). Lo necesita
   // el inspector para llamar a `tinteEfectivo` con el mismo fondo que el
@@ -533,6 +543,9 @@ export function resolvePiece(template, content) {
     // la silueta (Bloque S) no es un eje más: los otros cinco componen
     // ADENTRO del marco, ésta cambia el marco
     silueta: SILUETAS[c.silueta ?? d.silueta] ? (c.silueta ?? d.silueta) : null,
+    // el campo alternativo de la silueta tarjeta (ver SILUETAS.tarjeta):
+    // clave de TINTES elegida por la plantilla, no un hex de la persona
+    siluetaCampo: c.siluetaCampo ?? d.siluetaCampo ?? null,
     density: DENSITY[c.density ?? d.density] ? (c.density ?? d.density) : 'normal',
     scale: Number(c.scale ?? d.scale) || 1,
     rule: c.rule ?? d.rule ?? 'top',
@@ -563,6 +576,13 @@ export function resolvePiece(template, content) {
     pos: c.pos || d.pos || null,
     objects: c.objects || d.objects || [],
     steps: c.steps || d.steps || [],
+    // bullets con glifo para los pasos (contrato `stepIcons`): un array de
+    // icon ids, uno por paso. Si el paso tiene ícono, el tile chico
+    // REEMPLAZA al numerito "01" — nació en la ronda 3 de "AI en Campo"
+    // (Facu: "los íconos si son para un copy van al lado de cada uno como
+    // bullet"): los glifos vivían como objetos sueltos en una columna y
+    // alinearlos a ojo contra el texto renderizado era frágil por diseño.
+    stepIcons: c.stepIcons || d.stepIcons || null,
     sizes: c.sizes || d.sizes || null,
     // 8 · color por ROL (rol → clave de TEXT_COLORS), el gemelo de `sizes`.
     // Los textBlocks siempre tuvieron `color`; los roles clásicos no tenían
@@ -715,9 +735,17 @@ export function drawPiece(b, { template, content, format, sizeLock = null }) {
     // abajo: deja de ser un número. Son unidades: o entran enteros o el
     // tamaño baja hasta que entren.
     const sinPartir = role === 'metric' || role === 'cta'
+    // Sangría francesa del bullet (stepIcons): el tile mide el alto de la
+    // primera línea (px · interlineado) y el aire hasta el texto es fijo
+    // (0,55 em). Se descuenta del ancho ANTES de partir líneas, así TODAS
+    // quedan alineadas a la izquierda DESPUÉS del tile — no sólo la primera.
+    // Se estima con startPx: si el auto-ajuste achicara el paso, la sangría
+    // real (proporcional al px final, ver pintarBloque) sería menor y sólo
+    // sobraría ancho; nunca falta.
+    const sangria = opts.bullet ? startPx * ((st.lineHeight || 1.15) + 0.55) : 0
     const fitOpts = {
       weight: hand ? 700 : st.weight, tracking: hand ? 0 : (st.tracking || 0),
-      maxWidth: maxTextW, family, sinPartir,
+      maxWidth: maxTextW - sangria, family, sinPartir,
     }
     // `fitOpts` sale de acá y no al lado: el auto-ajuste de abajo y el
     // crecimiento de "Titular gigante" tienen que medir con EXACTAMENTE las
@@ -729,8 +757,12 @@ export function drawPiece(b, { template, content, format, sizeLock = null }) {
       maxHeight: fijo ? H * 0.86 : H * (esc?.techo ?? 0.5), startPx: fijo || startPx,
       lineHeight: st.lineHeight || 1.15, maxLines: fijo ? 99 : maxLines,
     })
-    blocks.push({ role, st, value, px: fit.px, lines: fit.lines, lineHeight: st.lineHeight || 1.15, hand, hl: opts.hl || null, color: opts.color || null, align: opts.align || null, eid: opts.eid || null, fijo: !!elegido, fitOpts })
+    blocks.push({ role, st, value, px: fit.px, lines: fit.lines, lineHeight: st.lineHeight || 1.15, hand, hl: opts.hl || null, color: opts.color || null, align: opts.align || null, eid: opts.eid || null, fijo: !!elegido, fitOpts, bullet: opts.bullet || null })
   }
+  // cuánto corre el bullet al texto de su paso — la MISMA cuenta que la
+  // sangría de arriba, pero con el px final del bloque (fuente única: si
+  // el tile y la sangría se calculan en dos lugares, se desalinean solos)
+  const sangriaDe = (bl) => bl.px * (bl.lineHeight + 0.55)
   // roles de la plantilla (piezas clásicas)
   for (const role of STACK_ORDER) {
     if (p.roles.includes(role)) pushBlock(role, p.text[role], { eid: `role:${role}`, color: p.colors?.[role] })
@@ -739,9 +771,13 @@ export function drawPiece(b, { template, content, format, sizeLock = null }) {
   p.textBlocks.forEach((tb, idx) => {
     pushBlock(tb.style || 'title', tb.text, { hl: (HIGHLIGHTS[tb.highlight] || {}).value, color: tb.color, align: tb.align, eid: `tb:${idx}`, size: tb.size })
   })
-  // pasos numerados (plantilla "método")
+  // pasos numerados (plantilla "método") — o con bullet de glifo si la
+  // plantilla trae `stepIcons`: el tile chico y el numerito "01" juntos
+  // serían dos viñetas para el mismo renglón, así que uno reemplaza al otro
   ;(p.steps || []).forEach((st, idx) => {
-    if (String(st || '').trim()) pushBlock('step', `${String(idx + 1).padStart(2, '0')}  ${st}`, { eid: `step:${idx}` })
+    if (!String(st || '').trim()) return
+    const icono = p.stepIcons?.[idx] && ICONS_BY_ID[p.stepIcons[idx]] ? p.stepIcons[idx] : null
+    pushBlock('step', icono ? String(st) : `${String(idx + 1).padStart(2, '0')}  ${st}`, { eid: `step:${idx}`, bullet: icono })
   })
 
   // ---- bloques sueltos: los que la persona movió a mano ----
@@ -838,7 +874,10 @@ export function drawPiece(b, { template, content, format, sizeLock = null }) {
     const wgt = bl.hand ? 700 : bl.st.weight
     const trk = bl.hand ? 0 : (bl.st.tracking || 0)
     const fam = bl.hand ? FONT_HAND_STACK : undefined
-    bl.lines.forEach((ln) => { stackW = Math.max(stackW, measure(ln, { px: bl.px, weight: wgt, tracking: trk, family: fam })) })
+    // el paso con bullet ocupa su sangría ADEMÁS del texto: sin sumarla,
+    // una placa o banda ajustada al stack dejaría el tile afuera
+    const extra = bl.bullet ? sangriaDe(bl) : 0
+    bl.lines.forEach((ln) => { stackW = Math.max(stackW, extra + measure(ln, { px: bl.px, weight: wgt, tracking: trk, family: fam })) })
   })
 
   // posición del stack según ancla
@@ -941,6 +980,33 @@ export function drawPiece(b, { template, content, format, sizeLock = null }) {
       { role: bl.role, colorKey: bl.color, hl: bl.hl, px: bl.px, weight },
       fondoBase, p.scheme, accentTexto, ref,
     )
+
+    // ---- bullet del paso (stepIcons): el tile chico a la izquierda ----
+    // Calca los tiles de la biblioteca (panel tinta redondeado, glifo en
+    // acento) al alto de la primera línea del paso, y corre el texto la
+    // sangría que pushBlock ya descontó del ancho de línea. Sólo con el
+    // stack alineado a la izquierda: centrar una lista con viñetas no es
+    // una composición del sistema, y ahí el paso sale sin tile (el ancho
+    // ya reservado sólo deja aire de más, nunca rompe).
+    if (bl.bullet && textAnchor !== 'middle') {
+      const icon = ICONS_BY_ID[bl.bullet]
+      const lado = bl.px * bl.lineHeight
+      // garantías del sistema: la tinta del tile se separa del fondo real
+      // si hace falta (tinteEfectivo), y el glifo se elige MEDIDO contra el
+      // tile — el acento de la pieza si se ve; si no, el del esquema; si
+      // tampoco (en crema los dos son verdes oscuros, invisibles sobre
+      // tinta), el verde que enciende de la paleta, que es exactamente lo
+      // que hacían los tiles de la biblioteca (panel negro + glifo
+      // emerald); y como último recurso la mejor tinta, que se ve siempre.
+      const tile = tinteEfectivo(TINTES.ink, fondoBase)
+      const glifo = [p.accent, p.scheme.accent, TINTES.emerald].find((c) => ratio(c, tile) >= 3) || mejorTinta(tile)
+      // centrado óptico contra la PRIMERA línea: b.text pone la baseline
+      // en y + 0.8·px y la mayúscula mide ~0.72 em → centro en y + 0.44·px
+      const cyTile = cursorY + bl.px * 0.44
+      b.path({ d: roundRect(textX, cyTile - lado / 2, lado, lado, lado * 0.24), fill: tile })
+      b.object({ cx: textX + lado / 2, cy: cyTile, size: lado * 0.58, href: coloredIcon(icon.url, glifo), tile: false })
+      textX += sangriaDe(bl) // sangría francesa: TODAS las líneas después del tile
+    }
 
     // fondo del texto: CTA (pill acento) o resaltado (marcador).
     // Geometría basada en la línea de base real que usa b.text (y + px*0.8).

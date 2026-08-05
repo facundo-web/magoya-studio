@@ -1,0 +1,58 @@
+{
+  "id": "aiec-cita",
+  "name": "AI en Campo · cita sobre negro",
+  "purpose": "El prompt de ejemplo sobre fondo negro a sangre: intro en verde, la cita en crema y la lectura abajo. Placas 3 y 4 de la serie.",
+  "category": "impacto",
+  "surface": "solid",
+  "anchor": "center-left",
+  "motif": false,
+  "freeform": true,
+  "roles": [],
+  "variants": [
+    {
+      "id": "base",
+      "label": "Original",
+      "set": {}
+    }
+  ],
+  "defaults": {
+    "scheme": "ink",
+    "accent": "emerald",
+    "logo": "cream",
+    "hasPhoto": false,
+    "bg": "color",
+    "showLogo": true,
+    "rule": "none",
+    "textBlocks": [
+      {
+        "style": "kicker",
+        "text": "Esto es lo que la mayoría pregunta",
+        "size": 0.86
+      },
+      {
+        "style": "quote",
+        "text": "\"Para mi lote de soja del bajo, ¿qué fertilizante uso y con qué dosis?\"",
+        "size": 0.9
+      },
+      {
+        "style": "body",
+        "text": "El problema: faltan datos clave.",
+        "size": 1
+      }
+    ],
+    "objects": [
+      {
+        "kind": "icon",
+        "iconId": "marks:aiencampo-cream",
+        "style": "plain",
+        "x": 0.21,
+        "y": 0.913,
+        "scale": 0.3,
+        "rotation": 0,
+        "shadow": false,
+        "opacity": 1
+      }
+    ]
+  },
+  "objetivo": "ensenar"
+}

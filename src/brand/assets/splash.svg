@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" fill="none">
+  <!-- splash cómic: tres rayitas gruesas divergentes (el gesto "¡!" de la
+       pieza de AI en Campo que gustó en la revisión del 5/8). Mismo
+       lenguaje que los doodle-*: trazo redondeado, currentColor, se tiñe. -->
+  <g stroke="currentColor" stroke-width="10" stroke-linecap="round">
+    <path d="M28 64 C 33 48, 39 33, 49 16"/>
+    <path d="M50 80 C 62 66, 77 53, 98 40"/>
+    <path d="M60 100 C 76 95, 92 92, 110 90"/>
+  </g>
+</svg>
